@@ -1,0 +1,23 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
+
+body {
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Force buttons + inputs to inherit font */
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+select option {
+  color: black;
+  background: white;
+} 
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
