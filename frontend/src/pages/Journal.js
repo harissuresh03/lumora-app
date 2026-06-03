@@ -2,11 +2,26 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
+import {
+  BookOpen,
+  PenLine,
+  Trash2,
+  Sparkles,
+  ArrowLeft,
+  Menu,
+  LogOut,
+  User,
+  Clock,
+  Brain,
+  Activity,
+  TrendingUp,
+  Heart
+} from "lucide-react";
 
 function Journal() {
   const navigate = useNavigate();
   const user_id = localStorage.getItem("user_id");
-  const [userName, setUserName] = useState("");
+  const [userNickname, setUserNickname] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [entries, setEntries] = useState([]);
@@ -14,13 +29,19 @@ function Journal() {
   const [loading, setLoading] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const [selectedAiAnalysis, setSelectedAiAnalysis] = useState(null);
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
 
-  // Fetch user profile
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
         const res = await api.get(`/profile/${user_id}`);
-        setUserName(res.data.name.split(" ")[0]);
+        if (res.data.nickname) {
+          setUserNickname(res.data.nickname);
+        } else {
+          setUserNickname(res.data.name.split(" ")[0]);
+        }
       } catch (err) {
         console.log("Profile fetch error:", err);
       }
@@ -74,26 +95,38 @@ function Journal() {
     setIsModalOpen(true);
   };
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 17) return "Good afternoon";
-    return "Good evening";
+  const fetchAiAnalysis = async (journalId) => {
+    try {
+      const res = await api.get(`/ai/analysis/${journalId}`);
+      if (res.data) {
+        setSelectedAiAnalysis(res.data);
+        setShowAnalysisModal(true);
+      } else {
+        alert("No AI analysis available for this entry");
+      }
+    } catch (err) {
+      console.error("Fetch AI analysis error:", err);
+      alert("Could not load AI analysis");
+    }
   };
 
-  // Get mood emoji based on entry content (simple keyword detection)
-  const getMoodEmoji = (content) => {
-    const lowerContent = content.toLowerCase();
-    if (lowerContent.includes("happy") || lowerContent.includes("grateful") || lowerContent.includes("blessed"))
-      return "😊";
-    if (lowerContent.includes("sad") || lowerContent.includes("upset") || lowerContent.includes("cry"))
-      return "😔";
-    if (lowerContent.includes("angry") || lowerContent.includes("frustrated")) return "😠";
-    if (lowerContent.includes("excited") || lowerContent.includes("amazing")) return "🤩";
-    if (lowerContent.includes("tired") || lowerContent.includes("exhausted")) return "😴";
-    if (lowerContent.includes("anxious") || lowerContent.includes("worried")) return "😰";
-    if (lowerContent.includes("peaceful") || lowerContent.includes("calm")) return "😌";
-    return "📝";
+  const getMoodColor = (mood) => {
+    const colors = { 1: "#ef4444", 2: "#f97316", 3: "#eab308", 4: "#22c55e", 5: "#16a34a" };
+    return colors[mood] || "#6b7280";
+  };
+
+  const getEmotionColor = (emotion) => {
+    const colors = {
+      anxiety: "#f59e0b", sadness: "#3b82f6", frustration: "#ef4444",
+      hope: "#10b981", joy: "#fbbf24", neutral: "#6b7280",
+      anger: "#dc2626", fear: "#8b5cf6", loneliness: "#8b5cf6"
+    };
+    return colors[emotion?.toLowerCase()] || "#6b7280";
+  };
+
+  const getMoodLabel = (mood) => {
+    const labels = { 1: "Terrible", 2: "Sad", 3: "Okay", 4: "Good", 5: "Great" };
+    return labels[mood] || "Unknown";
   };
 
   const logout = () => {
@@ -102,196 +135,194 @@ function Journal() {
   };
 
   return (
-    <div style={styles.container}>
-      {/* BACKGROUND DECORATION */}
-      <div style={styles.bgDecoration}>
-        <div style={styles.blob1}></div>
-        <div style={styles.blob2}></div>
-        <div style={styles.blob3}></div>
+    <div className="app-container">
+      <div className="bg-decoration">
+        <div className="blob1"></div>
+        <div className="blob2"></div>
+        <div className="blob3"></div>
       </div>
 
-      {/* HAMBURGER MENU BUTTON */}
-      <div style={styles.hamburgerBtn} onClick={() => setSidebarOpen(!sidebarOpen)}>
-        <span style={styles.hamburgerIcon}>☰</span>
+      <div className="hamburger-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
+        <Menu size={20} />
       </div>
 
-      {/* SIDEBAR */}
-      <div style={{...styles.sidebar, transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)'}}>
-        <div style={styles.sidebarHeader}>
-          <span style={styles.sidebarLogo}>✨ Lumora</span>
-          <button style={styles.closeSidebar} onClick={() => setSidebarOpen(false)}>✕</button>
+      <div className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
+        <div className="sidebar-header">
+          <span className="sidebar-logo">Lumora</span>
+          <button className="close-sidebar" onClick={() => setSidebarOpen(false)}>✕</button>
         </div>
-        <nav style={styles.sidebarNav}>
-          <button style={styles.sidebarItem} onClick={() => navigate("/dashboard")}>
-            <span>📊</span> Dashboard
+        <nav className="sidebar-nav">
+          <button className={`sidebar-item ${window.location.pathname === "/dashboard" ? "active" : ""}`} onClick={() => navigate("/dashboard")}>
+            <Activity size={18} /><span>Dashboard</span>
           </button>
-          <button style={styles.sidebarItem} onClick={() => navigate("/journal")}>
-            <span>📓</span> Journal
+          <button className={`sidebar-item ${window.location.pathname === "/journal" ? "active" : ""}`} onClick={() => navigate("/journal")}>
+            <BookOpen size={18} /><span>Journal</span>
           </button>
-          <button style={styles.sidebarItem} onClick={() => navigate("/mental-health")}>
-            <span>🧠</span> Mental Health
+          <button className={`sidebar-item ${window.location.pathname === "/mental-health" ? "active" : ""}`} onClick={() => navigate("/mental-health")}>
+            <Heart size={18} /><span>Mental Health</span>
           </button>
-          <button style={styles.sidebarItem} onClick={() => navigate("/student-support")}>
-            <span>🎓</span> Student Support
+          <button className={`sidebar-item ${window.location.pathname === "/student-support" ? "active" : ""}`} onClick={() => navigate("/student-support")}>
+            <TrendingUp size={18} /><span>Student Support</span>
           </button>
-          <button style={styles.sidebarItem} onClick={() => navigate("/profile")}>
-            <span>👤</span> Profile
+          <button className={`sidebar-item ${window.location.pathname === "/profile" ? "active" : ""}`} onClick={() => navigate("/profile")}>
+            <User size={18} /><span>Profile</span>
           </button>
-          <button style={styles.sidebarItem} onClick={() => alert("Settings coming soon!")}>
-            <span>⚙️</span> Settings
-          </button>
-          <button style={styles.sidebarItemLogout} onClick={logout}>
-            <span>🚪</span> Logout
+          <button className="sidebar-item-logout" onClick={logout}>
+            <LogOut size={18} /><span>Logout</span>
           </button>
         </nav>
       </div>
 
-      {/* OVERLAY FOR SIDEBAR */}
-      {sidebarOpen && (
-        <div style={styles.overlay} onClick={() => setSidebarOpen(false)}></div>
-      )}
+      {sidebarOpen && <div className="overlay" onClick={() => setSidebarOpen(false)}></div>}
 
-      <div style={styles.contentWrapper}>
-        {/* TOP BAR */}
-        <div style={styles.topBar}>
-          <div style={styles.logoArea}>
-            <span style={styles.logoIcon}>✨</span>
-            <span style={styles.logoText}>Lumora</span>
-          </div>
-          <div style={styles.topBarRight}>
-            <button style={styles.logoutBtn} onClick={logout}>
-              <span>🚪</span> Exit
-            </button>
+      <div className="content-wrapper">
+        {/* Top Bar */}
+        <div className="top-bar">
+          <div className="user-profile">
+            <div className="user-avatar"><User size={18} /></div>
+            <span className="user-name-top">{userNickname || "User"}</span>
+            <div className="logout-icon" onClick={logout}><LogOut size={16} /></div>
           </div>
         </div>
 
-        {/* BACK TO DASHBOARD LINK */}
-        <button onClick={() => navigate("/dashboard")} style={styles.backToDashboard}>
-          ← Back to Dashboard
-        </button>
-
-        {/* HEADER */}
-        <div style={styles.headerContent}>
-          <div style={styles.titleSection}>
-            <span style={styles.titleIcon}>📓✨</span>
-            <div>
-              <h1 style={styles.title}>Your Journal</h1>
-              <p style={styles.subtitle}>A sacred space for your thoughts and reflections</p>
-            </div>
-          </div>
-          <div style={styles.statsBadge}>
-            <span>{entries.length}</span>
-            <span>{entries.length === 1 ? "entry" : "entries"}</span>
+        {/* Page Header - Only ONE title */}
+        <div className="page-header">
+          <button onClick={() => navigate("/dashboard")} className="back-arrow-btn">
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h1 className="page-title">Journal</h1>
+            <p className="page-subtitle">A space for your thoughts and reflections</p>
           </div>
         </div>
 
-        {/* Writing Section */}
-        <div style={styles.writingSection}>
-          <div style={styles.writingCard}>
-            <div style={styles.writingHeader}>
-              <span style={styles.writingIcon}>✍️</span>
-              <h3 style={styles.writingTitle}>Write your thoughts</h3>
-            </div>
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="What's on your mind today? Write freely, without judgment..."
-              style={styles.textarea}
-            />
-            <button
-              onClick={addEntry}
-              disabled={loading || !text.trim()}
-              style={styles.saveBtn}
-            >
-              {loading ? "Saving..." : "Save to journal →"}
-            </button>
-          </div>
-        </div>
-
-        {/* Entries Section */}
-        <div style={styles.entriesSection}>
-          <div style={styles.entriesHeader}>
-            <h3 style={styles.entriesTitle}>Previous entries</h3>
-            <span style={styles.entriesCount}>{entries.length} total</span>
-          </div>
-
+        {/* Previous Entries Section */}
+        <div className="journal-entries-section">
+          <h3 className="card-title" style={{ marginBottom: "16px" }}>Previous entries</h3>
+          
           {entries.length === 0 ? (
-            <div style={styles.emptyState}>
-              <div style={styles.emptyIcon}>📖</div>
-              <h4 style={styles.emptyTitle}>Your journal is empty</h4>
-              <p style={styles.emptyText}>
-                Start writing your first entry above. This is your personal space to reflect, grow, and heal.
-              </p>
+            <div className="journal-empty-state">
+              <BookOpen size={48} color="var(--text-muted)" />
+              <h4>No journal entries yet</h4>
+              <p>Write your first entry below.</p>
             </div>
           ) : (
-            <div style={styles.entriesGrid}>
+            <div className="journal-entries-grid">
               {entries.map((entry) => (
-                <div
-                  key={entry.id}
-                  style={styles.entryCard}
-                  onClick={() => openEntry(entry)}
-                >
-                  <div style={styles.entryHeader}>
-                    <div style={styles.entryMood}>{getMoodEmoji(entry.content)}</div>
-                    <div style={styles.entryDate}>
+                <div key={entry.id} className="journal-entry-card" onClick={() => openEntry(entry)}>
+                  <div className="journal-entry-header">
+                    <div className="journal-entry-date">
                       {new Date(entry.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
+                        month: 'short', day: 'numeric', year: 'numeric'
                       })}
                     </div>
                   </div>
-                  <p style={styles.entryPreview}>
-                    {entry.content.length > 120 
-                      ? entry.content.substring(0, 120) + "..." 
-                      : entry.content}
+                  <p className="journal-entry-preview">
+                    {entry.content.length > 120 ? entry.content.substring(0, 120) + "..." : entry.content}
                   </p>
-                  <div style={styles.entryFooter}>
-                    <span style={styles.readMore}>Read more →</span>
-                    <span style={styles.entryTime}>
-                      {new Date(entry.created_at).toLocaleTimeString('en-US', {
-                        hour: 'numeric',
-                        minute: '2-digit'
-                      })}
-                    </span>
+                  <div className="journal-entry-footer">
+                    <span className="journal-read-more">Read more →</span>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); fetchAiAnalysis(entry.id); }} 
+                      className="journal-ai-insights-btn"
+                    >
+                      <Sparkles size={12} /> AI Insights
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
           )}
         </div>
+
+        {/* Writing Section */}
+        <div className="journal-writing-card">
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+            <PenLine size={24} color="var(--accent-primary)" />
+            <h3 className="card-title" style={{ margin: 0 }}>Write your thoughts</h3>
+          </div>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="What's on your mind today? Write freely, without judgment..."
+            className="journal-textarea"
+          />
+          <button onClick={addEntry} disabled={loading || !text.trim()} className="journal-save-btn">
+            {loading ? "Saving..." : "Save to journal"}
+          </button>
+        </div>
       </div>
 
       {/* Modal for viewing full entry */}
       {isModalOpen && selectedEntry && (
-        <div style={styles.modalOverlay} onClick={() => setIsModalOpen(false)}>
-          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <div style={styles.modalDate}>
-                <span>{new Date(selectedEntry.created_at).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}</span>
-                <span style={styles.modalTime}>
-                  at {new Date(selectedEntry.created_at).toLocaleTimeString('en-US', {
-                    hour: 'numeric',
-                    minute: '2-digit'
-                  })}
-                </span>
+        <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3>{new Date(selectedEntry.created_at).toLocaleDateString('en-US', {
+                  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                })}</h3>
+                <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>
+                  <Clock size={12} style={{ display: "inline", marginRight: "4px" }} />
+                  {new Date(selectedEntry.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                </p>
               </div>
-              <button style={styles.modalClose} onClick={() => setIsModalOpen(false)}>
-                ✕
+              <button className="modal-close" onClick={() => setIsModalOpen(false)}>✕</button>
+            </div>
+            <div className="modal-content">
+              <p style={{ whiteSpace: "pre-wrap", lineHeight: "1.6" }}>{selectedEntry.content}</p>
+            </div>
+            <div style={{ padding: "20px", borderTop: "1px solid var(--border-light)", display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+              <button onClick={() => fetchAiAnalysis(selectedEntry.id)} className="primary-btn" style={{ width: "auto", padding: "8px 16px" }}>
+                <Sparkles size={14} style={{ marginRight: "6px" }} /> AI Analysis
+              </button>
+              <button onClick={() => deleteEntry(selectedEntry.id)} style={{ padding: "8px 16px", background: "#fee2e2", color: "#ef4444", border: "none", borderRadius: "8px", cursor: "pointer" }}>
+                <Trash2 size={14} style={{ marginRight: "6px" }} /> Delete
               </button>
             </div>
-            <div style={styles.modalContent}>
-              <p>{selectedEntry.content}</p>
+          </div>
+        </div>
+      )}
+
+      {/* AI Analysis Modal */}
+      {showAnalysisModal && selectedAiAnalysis && (
+        <div className="modal-overlay" onClick={() => setShowAnalysisModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3><Brain size={18} style={{ marginRight: "8px" }} /> AI Analysis</h3>
+              <button className="modal-close" onClick={() => setShowAnalysisModal(false)}>✕</button>
             </div>
-            <div style={styles.modalFooter}>
-              <button style={styles.deleteBtn} onClick={() => deleteEntry(selectedEntry.id)}>
-                Delete entry
-              </button>
+            <div className="modal-content">
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}>
+                <span>Detected Mood:</span>
+                <strong style={{ background: getMoodColor(selectedAiAnalysis.detected_mood), padding: "4px 12px", borderRadius: "20px", color: selectedAiAnalysis.detected_mood <= 2 ? "white" : "#1f2937" }}>
+                  {getMoodLabel(selectedAiAnalysis.detected_mood)}
+                </strong>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}>
+                <span>Primary Emotion:</span>
+                <strong style={{ textTransform: "capitalize", color: getEmotionColor(selectedAiAnalysis.primary_emotion) }}>
+                  {selectedAiAnalysis.primary_emotion}
+                </strong>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px", alignItems: "center" }}>
+                <span>Intensity:</span>
+                <div style={{ width: "120px", height: "6px", background: "#e5e7eb", borderRadius: "3px", overflow: "hidden" }}>
+                  <div style={{ width: `${selectedAiAnalysis.intensity * 20}%`, height: "100%", background: "linear-gradient(90deg, #f59e0b, #ef4444)" }}></div>
+                </div>
+              </div>
+              <div style={{ marginBottom: "16px" }}>
+                <span>Themes: </span>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
+                  {selectedAiAnalysis.themes?.map((theme, i) => (
+                    <span key={i} style={{ background: "#ede8fc", color: "#6d5acf", padding: "4px 10px", borderRadius: "20px", fontSize: "11px" }}>#{theme}</span>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>Confidence:</span>
+                <span style={{ fontWeight: "600", color: "#10b981" }}>{Math.round(selectedAiAnalysis.confidence * 100)}%</span>
+              </div>
             </div>
           </div>
         </div>
@@ -299,564 +330,5 @@ function Journal() {
     </div>
   );
 }
-
-const styles = {
-  container: {
-    width: "100%",
-    minHeight: "100vh",
-    background: "#f0f9ff",
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-    position: "relative",
-    overflowX: "hidden",
-  },
-
-  contentWrapper: {
-    maxWidth: "1280px",
-    margin: "0 auto",
-    padding: "24px 32px",
-    position: "relative",
-    zIndex: 2,
-  },
-
-  bgDecoration: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 0,
-    pointerEvents: "none",
-    overflow: "hidden",
-  },
-
-  blob1: {
-    position: "absolute",
-    top: "-20%",
-    right: "-10%",
-    width: "500px",
-    height: "500px",
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(59,130,246,0.1), rgba(139,92,246,0.05))",
-    filter: "blur(60px)",
-  },
-
-  blob2: {
-    position: "absolute",
-    bottom: "-10%",
-    left: "-5%",
-    width: "400px",
-    height: "400px",
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(16,185,129,0.08), rgba(5,150,105,0.03))",
-    filter: "blur(50px)",
-  },
-
-  blob3: {
-    position: "absolute",
-    top: "40%",
-    left: "30%",
-    width: "300px",
-    height: "300px",
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(245,158,11,0.08), rgba(245,158,11,0.03))",
-    filter: "blur(50px)",
-  },
-
-  hamburgerBtn: {
-    position: "fixed",
-    top: "20px",
-    left: "20px",
-    zIndex: 100,
-    background: "white",
-    width: "45px",
-    height: "45px",
-    borderRadius: "12px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-    transition: "all 0.2s",
-  },
-
-  hamburgerIcon: {
-    fontSize: "24px",
-    color: "#667eea",
-  },
-
-  sidebar: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    width: "280px",
-    height: "100vh",
-    background: "white",
-    boxShadow: "2px 0 20px rgba(0,0,0,0.1)",
-    zIndex: 1000,
-    transition: "transform 0.3s ease",
-    display: "flex",
-    flexDirection: "column",
-  },
-
-  sidebarHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "24px 20px",
-    borderBottom: "1px solid #e5e7eb",
-  },
-
-  sidebarLogo: {
-    fontSize: "20px",
-    fontWeight: "700",
-    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-  },
-
-  closeSidebar: {
-    background: "none",
-    border: "none",
-    fontSize: "20px",
-    cursor: "pointer",
-    color: "#9ca3af",
-  },
-
-  sidebarNav: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-    padding: "20px",
-  },
-
-  sidebarItem: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "12px 16px",
-    background: "none",
-    border: "none",
-    borderRadius: "12px",
-    fontSize: "15px",
-    fontWeight: "500",
-    color: "#4b5563",
-    cursor: "pointer",
-    transition: "all 0.2s",
-    width: "100%",
-    textAlign: "left",
-  },
-
-  sidebarItemLogout: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "12px 16px",
-    background: "none",
-    border: "1px solid #fee2e2",
-    borderRadius: "12px",
-    fontSize: "15px",
-    fontWeight: "500",
-    color: "#ef4444",
-    cursor: "pointer",
-    transition: "all 0.2s",
-    width: "100%",
-    textAlign: "left",
-    marginTop: "auto",
-  },
-
-  overlay: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: "rgba(0,0,0,0.5)",
-    zIndex: 999,
-    animation: "fadeIn 0.3s ease",
-  },
-
-  topBar: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "24px",
-    position: "relative",
-    zIndex: 2,
-  },
-
-  logoArea: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    marginLeft: "40px",
-  },
-
-  logoIcon: {
-    fontSize: "28px",
-  },
-
-  logoText: {
-    fontSize: "20px",
-    fontWeight: "700",
-    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-  },
-
-  topBarRight: {
-    display: "flex",
-    alignItems: "center",
-    gap: "16px",
-  },
-
-  logoutBtn: {
-    background: "white",
-    color: "#ef4444",
-    border: "1px solid #fee2e2",
-    padding: "8px 16px",
-    borderRadius: "10px",
-    fontSize: "14px",
-    fontWeight: "500",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-  },
-
-  backToDashboard: {
-    background: "white",
-    border: "1px solid #e5e7eb",
-    padding: "8px 16px",
-    borderRadius: "10px",
-    fontSize: "14px",
-    color: "#4b5563",
-    cursor: "pointer",
-    transition: "all 0.2s",
-    marginBottom: "24px",
-    fontFamily: "inherit",
-  },
-
-  headerContent: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: "20px",
-    marginBottom: "32px",
-  },
-
-  titleSection: {
-    display: "flex",
-    alignItems: "center",
-    gap: "16px",
-  },
-
-  titleIcon: {
-    fontSize: "48px",
-  },
-
-  title: {
-    fontSize: "36px",
-    fontWeight: "700",
-    color: "#1f2937",
-    margin: 0,
-    letterSpacing: "-0.5px",
-  },
-
-  subtitle: {
-    fontSize: "14px",
-    color: "#6b7280",
-    margin: "8px 0 0 0",
-  },
-
-  statsBadge: {
-    background: "linear-gradient(135deg, #667eea, #764ba2)",
-    padding: "12px 24px",
-    borderRadius: "40px",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    boxShadow: "0 4px 12px rgba(102,126,234,0.3)",
-  },
-
-  writingSection: {
-    marginBottom: "48px",
-  },
-
-  writingCard: {
-    background: "white",
-    borderRadius: "24px",
-    padding: "28px",
-    boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-    border: "1px solid rgba(203,213,225,0.3)",
-  },
-
-  writingHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    marginBottom: "20px",
-  },
-
-  writingIcon: {
-    fontSize: "28px",
-  },
-
-  writingTitle: {
-    fontSize: "18px",
-    fontWeight: "600",
-    color: "#1f2937",
-    margin: 0,
-  },
-
-  textarea: {
-    width: "100%",
-    minHeight: "180px",
-    padding: "16px",
-    borderRadius: "16px",
-    border: "1px solid #e5e7eb",
-    outline: "none",
-    fontSize: "15px",
-    lineHeight: "1.6",
-    resize: "vertical",
-    fontFamily: "inherit",
-    transition: "all 0.2s",
-    backgroundColor: "#fafbfc",
-  },
-
-  saveBtn: {
-    marginTop: "20px",
-    padding: "12px 24px",
-    borderRadius: "12px",
-    border: "none",
-    background: "linear-gradient(135deg, #667eea, #764ba2)",
-    color: "white",
-    fontSize: "14px",
-    fontWeight: "600",
-    cursor: "pointer",
-    transition: "all 0.2s",
-    width: "auto",
-    minWidth: "160px",
-  },
-
-  entriesSection: {
-    marginTop: "20px",
-  },
-
-  entriesHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-    marginBottom: "24px",
-  },
-
-  entriesTitle: {
-    fontSize: "20px",
-    fontWeight: "600",
-    color: "#1f2937",
-    margin: 0,
-  },
-
-  entriesCount: {
-    fontSize: "13px",
-    color: "#9ca3af",
-  },
-
-  entriesGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
-    gap: "24px",
-  },
-
-  entryCard: {
-    background: "white",
-    borderRadius: "20px",
-    padding: "20px",
-    cursor: "pointer",
-    transition: "all 0.3s",
-    border: "1px solid #f0f0f0",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-  },
-
-  entryHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "12px",
-  },
-
-  entryMood: {
-    fontSize: "24px",
-  },
-
-  entryDate: {
-    fontSize: "12px",
-    color: "#9ca3af",
-    fontWeight: "500",
-  },
-
-  entryPreview: {
-    fontSize: "14px",
-    lineHeight: "1.6",
-    color: "#4b5563",
-    margin: "12px 0",
-    overflow: "hidden",
-    display: "-webkit-box",
-    WebkitLineClamp: 3,
-    WebkitBoxOrient: "vertical",
-  },
-
-  entryFooter: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: "12px",
-    paddingTop: "12px",
-    borderTop: "1px solid #f0f0f0",
-  },
-
-  readMore: {
-    fontSize: "12px",
-    color: "#667eea",
-    fontWeight: "500",
-  },
-
-  entryTime: {
-    fontSize: "11px",
-    color: "#d1d5db",
-  },
-
-  emptyState: {
-    textAlign: "center",
-    padding: "60px 40px",
-    background: "white",
-    borderRadius: "24px",
-    border: "2px dashed #e5e7eb",
-  },
-
-  emptyIcon: {
-    fontSize: "64px",
-    marginBottom: "16px",
-  },
-
-  emptyTitle: {
-    fontSize: "20px",
-    fontWeight: "600",
-    color: "#4b5563",
-    margin: "0 0 8px 0",
-  },
-
-  emptyText: {
-    fontSize: "14px",
-    color: "#9ca3af",
-    margin: 0,
-    maxWidth: "400px",
-    marginInline: "auto",
-  },
-
-  modalOverlay: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: "rgba(0,0,0,0.7)",
-    backdropFilter: "blur(8px)",
-    zIndex: 1000,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "20px",
-  },
-
-  modal: {
-    background: "white",
-    borderRadius: "24px",
-    maxWidth: "600px",
-    width: "100%",
-    maxHeight: "80vh",
-    overflow: "auto",
-    boxShadow: "0 25px 50px rgba(0,0,0,0.3)",
-    animation: "slideUp 0.3s ease",
-  },
-
-  modalHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    padding: "24px 28px",
-    borderBottom: "1px solid #f0f0f0",
-  },
-
-  modalDate: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-    fontSize: "14px",
-    fontWeight: "500",
-    color: "#1f2937",
-  },
-
-  modalTime: {
-    fontSize: "12px",
-    color: "#9ca3af",
-    fontWeight: "normal",
-  },
-
-  modalClose: {
-    background: "none",
-    border: "none",
-    fontSize: "24px",
-    cursor: "pointer",
-    color: "#9ca3af",
-  },
-
-  modalContent: {
-    padding: "28px",
-    fontSize: "16px",
-    lineHeight: "1.7",
-    color: "#374151",
-    whiteSpace: "pre-wrap",
-  },
-
-  modalFooter: {
-    padding: "20px 28px",
-    borderTop: "1px solid #f0f0f0",
-    display: "flex",
-    justifyContent: "flex-end",
-  },
-
-  deleteBtn: {
-    background: "#fee2e2",
-    color: "#ef4444",
-    border: "none",
-    padding: "10px 20px",
-    borderRadius: "10px",
-    fontSize: "13px",
-    fontWeight: "500",
-    cursor: "pointer",
-  },
-};
-
-// Add keyframes for animations
-const styleSheet = document.createElement("style");
-styleSheet.textContent = `
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  @keyframes slideUp {
-    from {
-      opacity: 0;
-      transform: translateY(30px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-`;
-document.head.appendChild(styleSheet);
 
 export default Journal;

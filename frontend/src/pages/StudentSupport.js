@@ -2,23 +2,62 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
+import {
+  Phone,
+  Mail,
+  Globe,
+  AlertTriangle,
+  Heart,
+  BookOpen,
+  LogOut,
+  Menu,
+  ArrowLeft,
+  Activity,
+  TrendingUp,
+  User,
+  MessageCircle,
+  Shield,
+  Building,
+  ExternalLink,
+  Clock
+} from "lucide-react";
 
 function StudentSupport() {
   const navigate = useNavigate();
   const user_id = localStorage.getItem("user_id");
-  const [userName, setUserName] = useState("");
+  const [userNickname, setUserNickname] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [supportData, setSupportData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("university");
 
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
         const res = await api.get(`/profile/${user_id}`);
-        setUserName(res.data.name.split(" ")[0]);
+        if (res.data.nickname) {
+          setUserNickname(res.data.nickname);
+        } else {
+          setUserNickname(res.data.name.split(" ")[0]);
+        }
       } catch (err) {
         console.log("Profile fetch error:", err);
       }
     };
+    
+    const fetchSupportResources = async () => {
+      try {
+        const res = await api.get(`/support/${user_id}`);
+        setSupportData(res.data);
+      } catch (err) {
+        console.error("Support resources error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
     fetchUserProfile();
+    fetchSupportResources();
   }, [user_id]);
 
   const logout = () => {
@@ -26,574 +65,322 @@ function StudentSupport() {
     navigate("/");
   };
 
-  const openExternalLink = () => {
-    window.open("https://ucreds.utem.edu.my/support/student/", "_blank");
+  const openExternalLink = (url) => {
+    if (url) {
+      window.open(url, "_blank", "noopener noreferrer");
+    }
   };
 
-  return (
-    <div style={styles.container}>
-      {/* BACKGROUND DECORATION */}
-      <div style={styles.bgDecoration}>
-        <div style={styles.blob1}></div>
-        <div style={styles.blob2}></div>
-        <div style={styles.blob3}></div>
-      </div>
-
-      {/* HAMBURGER MENU BUTTON */}
-      <div style={styles.hamburgerBtn} onClick={() => setSidebarOpen(!sidebarOpen)}>
-        <span style={styles.hamburgerIcon}>☰</span>
-      </div>
-
-      {/* SIDEBAR */}
-      <div style={{...styles.sidebar, transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)'}}>
-        <div style={styles.sidebarHeader}>
-          <span style={styles.sidebarLogo}>✨ Lumora</span>
-          <button style={styles.closeSidebar} onClick={() => setSidebarOpen(false)}>✕</button>
+  if (loading) {
+    return (
+      <div className="app-container">
+        <div className="bg-decoration">
+          <div className="blob1"></div>
+          <div className="blob2"></div>
+          <div className="blob3"></div>
         </div>
-        <nav style={styles.sidebarNav}>
-          <button style={styles.sidebarItem} onClick={() => navigate("/dashboard")}>
-            <span>📊</span> Dashboard
+        <div className="content-wrapper">
+          <div className="loading-container">
+            <div className="spinner"></div>
+            <p>Loading support resources...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app-container">
+      <div className="bg-decoration">
+        <div className="blob1"></div>
+        <div className="blob2"></div>
+        <div className="blob3"></div>
+      </div>
+
+      <div className="hamburger-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
+        <Menu size={20} />
+      </div>
+
+      <div className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
+        <div className="sidebar-header">
+          <span className="sidebar-logo">Lumora</span>
+          <button className="close-sidebar" onClick={() => setSidebarOpen(false)}>✕</button>
+        </div>
+        <nav className="sidebar-nav">
+          <button className={`sidebar-item ${window.location.pathname === "/dashboard" ? "active" : ""}`} onClick={() => navigate("/dashboard")}>
+            <Activity size={18} /><span>Dashboard</span>
           </button>
-          <button style={styles.sidebarItem} onClick={() => navigate("/journal")}>
-            <span>📓</span> Journal
+          <button className={`sidebar-item ${window.location.pathname === "/journal" ? "active" : ""}`} onClick={() => navigate("/journal")}>
+            <BookOpen size={18} /><span>Journal</span>
           </button>
-          <button style={styles.sidebarItem} onClick={() => navigate("/mental-health")}>
-            <span>🧠</span> Mental Health
+          <button className={`sidebar-item ${window.location.pathname === "/mental-health" ? "active" : ""}`} onClick={() => navigate("/mental-health")}>
+            <Heart size={18} /><span>Mental Health</span>
           </button>
-          <button style={styles.sidebarItem} onClick={() => navigate("/student-support")}>
-            <span>🎓</span> Student Support
+          <button className={`sidebar-item ${window.location.pathname === "/student-support" ? "active" : ""}`} onClick={() => navigate("/student-support")}>
+            <TrendingUp size={18} /><span>Student Support</span>
           </button>
-          <button style={styles.sidebarItem} onClick={() => navigate("/profile")}>
-            <span>👤</span> Profile
+          <button className={`sidebar-item ${window.location.pathname === "/profile" ? "active" : ""}`} onClick={() => navigate("/profile")}>
+            <User size={18} /><span>Profile</span>
           </button>
-          <button style={styles.sidebarItem} onClick={() => alert("Settings coming soon!")}>
-            <span>⚙️</span> Settings
-          </button>
-          <button style={styles.sidebarItemLogout} onClick={logout}>
-            <span>🚪</span> Logout
+          <button className="sidebar-item-logout" onClick={logout}>
+            <LogOut size={18} /><span>Logout</span>
           </button>
         </nav>
       </div>
 
-      {/* OVERLAY FOR SIDEBAR */}
-      {sidebarOpen && (
-        <div style={styles.overlay} onClick={() => setSidebarOpen(false)}></div>
-      )}
+      {sidebarOpen && <div className="overlay" onClick={() => setSidebarOpen(false)}></div>}
 
-      <div style={styles.contentWrapper}>
-        {/* TOP BAR */}
-        <div style={styles.topBar}>
-          <div style={styles.logoArea}>
-            <span style={styles.logoIcon}>✨</span>
-            <span style={styles.logoText}>Lumora</span>
-          </div>
-          <div style={styles.topBarRight}>
-            <button style={styles.logoutBtn} onClick={logout}>
-              <span>🚪</span> Exit
-            </button>
+      <div className="content-wrapper">
+        {/* Top Bar */}
+        <div className="top-bar">
+          <div className="user-profile">
+            <div className="user-avatar"><User size={18} /></div>
+            <span className="user-name-top">{userNickname || "User"}</span>
+            <div className="logout-icon" onClick={logout}><LogOut size={16} /></div>
           </div>
         </div>
 
-        {/* BACK TO DASHBOARD LINK */}
-        <button onClick={() => navigate("/dashboard")} style={styles.backToDashboard}>
-          ← Back to Dashboard
-        </button>
-
-        {/* MAIN CONTENT */}
-        <div style={styles.heroSection}>
-          <h1 style={styles.heroTitle}>Student Support Resources 🎓</h1>
-          <p style={styles.heroSubtitle}>
-            Official resources from Universiti Teknikal Malaysia Melaka (UTeM)
-          </p>
+        {/* Page Header */}
+        <div className="page-header">
+          <button onClick={() => navigate("/dashboard")} className="back-arrow-btn">
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h1 className="page-title">Student Support</h1>
+            <p className="page-subtitle">
+              {supportData?.hasUniversity && supportData.universityName 
+                ? `Resources for ${supportData.universityName} students` 
+                : "Mental health and wellness resources for students"}
+            </p>
+          </div>
         </div>
 
-        {/* EXTERNAL LINK BUTTON */}
-        <div style={styles.externalLinkCard}>
-          <div style={styles.externalLinkContent}>
-            <span style={styles.externalIcon}>🔗</span>
+        {/* University Banner */}
+        {supportData?.hasUniversity && supportData.universityName && (
+          <div className="support-university-banner">
+            <Building size={32} />
             <div>
-              <h3 style={styles.externalTitle}>Visit UTeM Student Support Portal</h3>
-              <p style={styles.externalText}>
-                Access counseling services, orientation materials, online facilities, and more
+              <h3 className="support-university-name">{supportData.universityName}</h3>
+              <p className="support-university-note">
+                {supportData.hasCustomResources 
+                  ? "Your university has dedicated mental health support services below." 
+                  : "We're working to add more university-specific resources. Here are general support options available to you."}
               </p>
             </div>
           </div>
-          <button style={styles.externalButton} onClick={openExternalLink}>
-            Open in New Tab → 
+        )}
+
+        {/* Tab Navigation */}
+        <div className="support-tab-container">
+          <button 
+            className={`support-tab ${activeTab === "university" ? "support-tab-active" : ""}`}
+            onClick={() => setActiveTab("university")}
+          >
+            <Building size={14} style={{ marginRight: "6px" }} />
+            University Resources
+          </button>
+          <button 
+            className={`support-tab ${activeTab === "national" ? "support-tab-active" : ""}`}
+            onClick={() => setActiveTab("national")}
+          >
+            <AlertTriangle size={14} style={{ marginRight: "6px" }} />
+            National Hotlines
+          </button>
+          <button 
+            className={`support-tab ${activeTab === "online" ? "support-tab-active" : ""}`}
+            onClick={() => setActiveTab("online")}
+          >
+            <Globe size={14} style={{ marginRight: "6px" }} />
+            Online Resources
+          </button>
+          <button 
+            className={`support-tab ${activeTab === "tips" ? "support-tab-active" : ""}`}
+            onClick={() => setActiveTab("tips")}
+          >
+            <Heart size={14} style={{ marginRight: "6px" }} />
+            Wellness Tips
           </button>
         </div>
 
-        {/* DISCLAIMER */}
-        <div style={styles.disclaimer}>
-          <span style={styles.disclaimerIcon}>ℹ️</span>
-          <p style={styles.disclaimerText}>
-            External resources are provided for your convenience. Please check with UTeM for the most up‑to‑date information and availability of services.
-          </p>
-        </div>
+        {/* University Resources Tab */}
+        {activeTab === "university" && (
+          <div className="tab-content">
+            {supportData?.resources?.university && (
+              <div className="resources-section">
+                <h3 className="card-title" style={{ marginBottom: "20px" }}>Counselling Services</h3>
+                
+                {supportData.resources.university.counselling_contact && (
+                  <div className="support-resource-card">
+                    <Phone size={24} color="var(--accent-primary)" />
+                    <div className="support-resource-info">
+                      <h4>Contact Number</h4>
+                      <p>{supportData.resources.university.counselling_contact}</p>
+                      <button 
+                        onClick={() => window.location.href = `tel:${supportData.resources.university.counselling_contact.replace(/\D/g, '')}`}
+                        className="support-call-btn"
+                      >
+                        Call Now
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {supportData.resources.university.counselling_email && (
+                  <div className="support-resource-card">
+                    <Mail size={24} color="var(--accent-primary)" />
+                    <div className="support-resource-info">
+                      <h4>Email</h4>
+                      <p>{supportData.resources.university.counselling_email}</p>
+                      <button 
+                        onClick={() => window.location.href = `mailto:${supportData.resources.university.counselling_email.split(' ')[0]}`}
+                        className="support-email-btn"
+                      >
+                        Send Email
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {supportData.resources.university.counselling_website && (
+                  <div className="support-resource-card">
+                    <Globe size={24} color="var(--accent-primary)" />
+                    <div className="support-resource-info">
+                      <h4>Website</h4>
+                      <p>{supportData.resources.university.counselling_website}</p>
+                      <button 
+                        onClick={() => openExternalLink(supportData.resources.university.counselling_website)}
+                        className="support-link-btn"
+                      >
+                        Visit Website <ExternalLink size={12} style={{ marginLeft: "4px" }} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {supportData.resources.university.support_notes && (
+                  <div className="support-resource-card">
+                    <MessageCircle size={24} color="var(--accent-primary)" />
+                    <div className="support-resource-info">
+                      <h4>Additional Information</h4>
+                      <p>{supportData.resources.university.support_notes}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {(!supportData?.resources?.university || Object.keys(supportData.resources.university).filter(k => supportData.resources.university[k]).length === 0) && (
+              <div className="no-resources-message">
+                <Shield size={48} color="var(--text-muted)" />
+                <p>No specific university resources found in our database yet.</p>
+                <p>Please check your university's official website or student portal for counselling services.</p>
+                <button 
+                  onClick={() => window.open("https://www.google.com/search?q=university+counselling+services+malaysia", "_blank")}
+                  className="search-btn"
+                >
+                  Search for University Resources →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
-        {/* RESOURCES OVERVIEW */}
-        <div style={styles.resourcesSection}>
-          <h2 style={styles.resourcesTitle}>What You'll Find There</h2>
-          <div style={styles.resourcesGrid}>
-            <div style={styles.resourceCard}>
-              <div style={styles.resourceIcon}>💬</div>
-              <h4>eCounseling</h4>
-              <p>Counseling procedures, career exploration, crisis prevention, tech & social media impact</p>
-            </div>
-            <div style={styles.resourceCard}>
-              <div style={styles.resourceIcon}>📚</div>
-              <h4>eOrientation</h4>
-              <p>ODL handbook, academic regulations, health centre, eLibrary resources</p>
-            </div>
-            <div style={styles.resourceCard}>
-              <div style={styles.resourceIcon}>💻</div>
-              <h4>Online Facilities</h4>
-              <p>Welfare Virtual Library, VPN access, and other digital support tools</p>
+        {/* National Hotlines Tab */}
+        {activeTab === "national" && (
+          <div className="tab-content">
+            <div className="resources-section">
+              <h3 className="card-title" style={{ marginBottom: "20px" }}>24/7 Crisis Support Hotlines</h3>
+              <p className="card-subtitle" style={{ marginBottom: "24px" }}>Free and confidential support available anytime</p>
+              
+              {supportData?.resources?.general?.nationalHotlines?.map((hotline, idx) => (
+                <div key={idx} className="hotline-card">
+                  <AlertTriangle size={28} color="#dc2626" />
+                  <div className="hotline-info">
+                    <h4>{hotline.name}</h4>
+                    <p className="hotline-number">{hotline.number}</p>
+                    {hotline.hours && <p className="hotline-hours"><Clock size={12} style={{ display: "inline", marginRight: "4px" }} /> {hotline.hours}</p>}
+                    <p className="hotline-desc">{hotline.description}</p>
+                    <button 
+                      onClick={() => {
+                        const phoneNumber = hotline.number.replace(/[^0-9+]/g, '');
+                        window.location.href = `tel:${phoneNumber}`;
+                      }}
+                      className="support-emergency-call-btn"
+                    >
+                      <Phone size={14} style={{ marginRight: "6px" }} />
+                      Call Now
+                    </button>
+                  </div>
+                </div>
+              ))}
+              
+              <div className="emergency-card">
+                <h4>Emergency Services</h4>
+                <div className="emergency-grid">
+                  <div className="emergency-item"><span>🚓 Police</span><strong>999</strong></div>
+                  <div className="emergency-item"><span>🚑 Ambulance</span><strong>999</strong></div>
+                  <div className="emergency-item"><span>🔥 Fire</span><strong>999</strong></div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* CONTACT & EMERGENCY SECTION */}
-        <div style={styles.emergencySection}>
-          <h2 style={styles.emergencyTitle}>Need Immediate Help?</h2>
-          <p style={styles.emergencyText}>
-            If you're experiencing a mental health crisis, please reach out to:
-          </p>
-          <div style={styles.emergencyContacts}>
-            <div style={styles.contactCard}>
-              <span>📞</span>
-              <div>
-                <strong>Befrienders KL</strong>
-                <p>03-7627 2929 (24 hours)</p>
-              </div>
+        {/* Online Resources Tab */}
+        {activeTab === "online" && (
+          <div className="tab-content">
+            <div className="resources-section">
+              <h3 className="card-title" style={{ marginBottom: "20px" }}>Online Mental Health Resources</h3>
+              
+              {supportData?.resources?.general?.onlineResources?.map((resource, idx) => (
+                <div key={idx} className="support-resource-card">
+                  <Globe size={24} color="var(--accent-primary)" />
+                  <div className="support-resource-info">
+                    <h4>{resource.name}</h4>
+                    <p>{resource.description}</p>
+                    <button 
+                      onClick={() => openExternalLink(resource.url)}
+                      className="support-link-btn"
+                    >
+                      Visit Website <ExternalLink size={12} style={{ marginLeft: "4px" }} />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div style={styles.contactCard}>
-              <span>📞</span>
-              <div>
-                <strong>Talian Kasih</strong>
-                <p>15999 (24 hours)</p>
-              </div>
-            </div>
-            <div style={styles.contactCard}>
-              <span>📞</span>
-              <div>
-                <strong>UTeM Counseling Unit</strong>
-                <p>06-270 1248</p>
+          </div>
+        )}
+
+        {/* Wellness Tips Tab */}
+        {activeTab === "tips" && (
+          <div className="tab-content">
+            <div className="tips-section">
+              <h3 className="card-title" style={{ marginBottom: "20px" }}>Mental Wellness Tips</h3>
+              
+              {supportData?.resources?.general?.tips?.map((tip, idx) => (
+                <div key={idx} className="tip-card-simple">
+                  <Heart size={18} color="var(--accent-primary)" />
+                  <p>{tip}</p>
+                </div>
+              ))}
+              
+              <div className="self-care-card">
+                <h4>Daily Self-Care Reminders</h4>
+                <ul className="self-care-list">
+                  <li>Get 7-9 hours of quality sleep</li>
+                  <li>Stay hydrated and eat regular meals</li>
+                  <li>Take short breaks between study sessions</li>
+                  <li>Connect with friends and family</li>
+                  <li>Practice deep breathing when feeling overwhelmed</li>
+                  <li>Limit social media and screen time before bed</li>
+                </ul>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
 }
-
-const styles = {
-  container: {
-    width: "100%",
-    minHeight: "100vh",
-    background: "#f0f9ff",
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-    position: "relative",
-    overflowX: "hidden",
-  },
-
-  contentWrapper: {
-    maxWidth: "1280px",
-    margin: "0 auto",
-    padding: "24px 32px",
-    position: "relative",
-    zIndex: 2,
-  },
-
-  bgDecoration: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 0,
-    pointerEvents: "none",
-    overflow: "hidden",
-  },
-
-  blob1: {
-    position: "absolute",
-    top: "-20%",
-    right: "-10%",
-    width: "500px",
-    height: "500px",
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(59,130,246,0.1), rgba(139,92,246,0.05))",
-    filter: "blur(60px)",
-  },
-
-  blob2: {
-    position: "absolute",
-    bottom: "-10%",
-    left: "-5%",
-    width: "400px",
-    height: "400px",
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(16,185,129,0.08), rgba(5,150,105,0.03))",
-    filter: "blur(50px)",
-  },
-
-  blob3: {
-    position: "absolute",
-    top: "40%",
-    left: "30%",
-    width: "300px",
-    height: "300px",
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(245,158,11,0.08), rgba(245,158,11,0.03))",
-    filter: "blur(50px)",
-  },
-
-  hamburgerBtn: {
-    position: "fixed",
-    top: "20px",
-    left: "20px",
-    zIndex: 100,
-    background: "white",
-    width: "45px",
-    height: "45px",
-    borderRadius: "12px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-    transition: "all 0.2s",
-  },
-
-  hamburgerIcon: {
-    fontSize: "24px",
-    color: "#667eea",
-  },
-
-  sidebar: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    width: "280px",
-    height: "100vh",
-    background: "white",
-    boxShadow: "2px 0 20px rgba(0,0,0,0.1)",
-    zIndex: 1000,
-    transition: "transform 0.3s ease",
-    display: "flex",
-    flexDirection: "column",
-  },
-
-  sidebarHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "24px 20px",
-    borderBottom: "1px solid #e5e7eb",
-  },
-
-  sidebarLogo: {
-    fontSize: "20px",
-    fontWeight: "700",
-    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-  },
-
-  closeSidebar: {
-    background: "none",
-    border: "none",
-    fontSize: "20px",
-    cursor: "pointer",
-    color: "#9ca3af",
-  },
-
-  sidebarNav: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-    padding: "20px",
-  },
-
-  sidebarItem: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "12px 16px",
-    background: "none",
-    border: "none",
-    borderRadius: "12px",
-    fontSize: "15px",
-    fontWeight: "500",
-    color: "#4b5563",
-    cursor: "pointer",
-    transition: "all 0.2s",
-    width: "100%",
-    textAlign: "left",
-  },
-
-  sidebarItemLogout: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "12px 16px",
-    background: "none",
-    border: "1px solid #fee2e2",
-    borderRadius: "12px",
-    fontSize: "15px",
-    fontWeight: "500",
-    color: "#ef4444",
-    cursor: "pointer",
-    transition: "all 0.2s",
-    width: "100%",
-    textAlign: "left",
-    marginTop: "auto",
-  },
-
-  overlay: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: "rgba(0,0,0,0.5)",
-    zIndex: 999,
-    animation: "fadeIn 0.3s ease",
-  },
-
-  topBar: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "24px",
-    position: "relative",
-    zIndex: 2,
-  },
-
-  logoArea: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    marginLeft: "40px",
-  },
-
-  logoIcon: {
-    fontSize: "28px",
-  },
-
-  logoText: {
-    fontSize: "20px",
-    fontWeight: "700",
-    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-  },
-
-  topBarRight: {
-    display: "flex",
-    alignItems: "center",
-    gap: "16px",
-  },
-
-  logoutBtn: {
-    background: "white",
-    color: "#ef4444",
-    border: "1px solid #fee2e2",
-    padding: "8px 16px",
-    borderRadius: "10px",
-    fontSize: "14px",
-    fontWeight: "500",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-  },
-
-  backToDashboard: {
-    background: "white",
-    border: "1px solid #e5e7eb",
-    padding: "8px 16px",
-    borderRadius: "10px",
-    fontSize: "14px",
-    color: "#4b5563",
-    cursor: "pointer",
-    transition: "all 0.2s",
-    marginBottom: "24px",
-    fontFamily: "inherit",
-  },
-
-  heroSection: {
-    textAlign: "center",
-    marginBottom: "40px",
-  },
-
-  heroTitle: {
-    fontSize: "42px",
-    fontWeight: "700",
-    color: "#1f2937",
-    marginBottom: "16px",
-  },
-
-  heroSubtitle: {
-    fontSize: "18px",
-    color: "#6b7280",
-  },
-
-  externalLinkCard: {
-    background: "white",
-    padding: "32px",
-    borderRadius: "20px",
-    border: "1px solid rgba(203,213,225,0.3)",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: "20px",
-    marginBottom: "24px",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-  },
-
-  externalLinkContent: {
-    display: "flex",
-    alignItems: "center",
-    gap: "16px",
-    flex: 1,
-  },
-
-  externalIcon: {
-    fontSize: "40px",
-  },
-
-  externalTitle: {
-    fontSize: "18px",
-    fontWeight: "600",
-    color: "#1f2937",
-    marginBottom: "4px",
-  },
-
-  externalText: {
-    fontSize: "14px",
-    color: "#6b7280",
-    margin: 0,
-  },
-
-  externalButton: {
-    padding: "12px 24px",
-    background: "linear-gradient(135deg, #667eea, #764ba2)",
-    color: "white",
-    border: "none",
-    borderRadius: "12px",
-    fontSize: "14px",
-    fontWeight: "600",
-    cursor: "pointer",
-    transition: "all 0.2s",
-    whiteSpace: "nowrap",
-  },
-
-  disclaimer: {
-    background: "#fef3c7",
-    padding: "16px 20px",
-    borderRadius: "12px",
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    marginBottom: "40px",
-    borderLeft: "4px solid #f59e0b",
-  },
-
-  disclaimerIcon: {
-    fontSize: "20px",
-  },
-
-  disclaimerText: {
-    margin: 0,
-    fontSize: "13px",
-    color: "#92400e",
-    lineHeight: "1.5",
-  },
-
-  resourcesSection: {
-    marginBottom: "48px",
-  },
-
-  resourcesTitle: {
-    fontSize: "24px",
-    fontWeight: "600",
-    color: "#1f2937",
-    marginBottom: "24px",
-    textAlign: "center",
-  },
-
-  resourcesGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-    gap: "24px",
-  },
-
-  resourceCard: {
-    background: "white",
-    padding: "24px",
-    borderRadius: "16px",
-    border: "1px solid #e5e7eb",
-    textAlign: "center",
-    transition: "all 0.2s",
-  },
-
-  resourceIcon: {
-    fontSize: "48px",
-    marginBottom: "12px",
-  },
-
-  emergencySection: {
-    background: "linear-gradient(135deg, #667eea, #764ba2)",
-    padding: "40px",
-    borderRadius: "24px",
-    color: "white",
-    textAlign: "center",
-  },
-
-  emergencyTitle: {
-    fontSize: "24px",
-    fontWeight: "600",
-    marginBottom: "16px",
-  },
-
-  emergencyText: {
-    fontSize: "14px",
-    marginBottom: "24px",
-    opacity: 0.95,
-  },
-
-  emergencyContacts: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
-    gap: "16px",
-  },
-
-  contactCard: {
-    background: "rgba(255,255,255,0.15)",
-    backdropFilter: "blur(10px)",
-    padding: "16px",
-    borderRadius: "12px",
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    textAlign: "left",
-    fontSize: "14px",
-  },
-};
-
-// Add keyframes for animations
-const styleSheet = document.createElement("style");
-styleSheet.textContent = `
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-`;
-document.head.appendChild(styleSheet);
 
 export default StudentSupport;

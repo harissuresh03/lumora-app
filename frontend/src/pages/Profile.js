@@ -1,182 +1,235 @@
 // pages/Profile.js
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../utils/api"; // ✅ Import api
+import api from "../utils/api";
+import {
+  User,
+  Mail,
+  Calendar,
+  BookOpen,
+  Phone,
+  Heart,
+  LogOut,
+  Menu,
+  ArrowLeft,
+  Activity,
+  TrendingUp,
+  Building,
+  IdCard
+} from "lucide-react";
 
 function Profile() {
   const navigate = useNavigate();
   const user_id = localStorage.getItem("user_id");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userNickname, setUserNickname] = useState("");
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    api
-      .get(`/profile/${user_id}`) // ✅ Use api
-      .then((res) => setUser(res.data))
-      .catch((err) => {
+    const fetchUserProfile = async () => {
+      try {
+        const res = await api.get(`/profile/${user_id}`);
+        setUser(res.data);
+        if (res.data.nickname) {
+          setUserNickname(res.data.nickname);
+        } else {
+          setUserNickname(res.data.name.split(" ")[0]);
+        }
+      } catch (err) {
         console.log("Profile fetch error:", err);
         if (err.response?.status === 401) {
           navigate("/");
         }
-      });
+      }
+    };
+    fetchUserProfile();
   }, [user_id, navigate]);
+
+  const logout = () => {
+    localStorage.clear();
+    navigate("/");
+  };
 
   if (!user) {
     return (
-      <div style={styles.container}>
-        <div style={styles.card}>
-          <p style={styles.loadingText}>Loading profile 🌿</p>
-        </div>
+      <div className="loading-container">
+        <div className="spinner"></div>
+        <p className="loading-text">Loading profile...</p>
       </div>
     );
   }
 
   return (
-    <div style={styles.container}>
-      {/* Top Bar */}
-      <div style={styles.topBar}>
-        <button style={styles.backBtn} onClick={() => navigate("/dashboard")}>
-          ← Back
-        </button>
+    <div className="app-container">
+      <div className="bg-decoration">
+        <div className="blob1"></div>
+        <div className="blob2"></div>
+        <div className="blob3"></div>
       </div>
 
-      {/* Profile Card */}
-      <div style={styles.card}>
-        <div style={styles.header}>
-          <div style={styles.avatar}>👤</div>
+      {/* Hamburger Menu */}
+      <div className="hamburger-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
+        <Menu size={20} />
+      </div>
+
+      {/* Sidebar */}
+      <div className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
+        <div className="sidebar-header">
+          <span className="sidebar-logo">Lumora</span>
+          <button className="close-sidebar" onClick={() => setSidebarOpen(false)}>✕</button>
+        </div>
+        <nav className="sidebar-nav">
+          <button className={`sidebar-item ${window.location.pathname === "/dashboard" ? "active" : ""}`} onClick={() => navigate("/dashboard")}>
+            <Activity size={18} /><span>Dashboard</span>
+          </button>
+          <button className={`sidebar-item ${window.location.pathname === "/journal" ? "active" : ""}`} onClick={() => navigate("/journal")}>
+            <BookOpen size={18} /><span>Journal</span>
+          </button>
+          <button className={`sidebar-item ${window.location.pathname === "/mental-health" ? "active" : ""}`} onClick={() => navigate("/mental-health")}>
+            <Heart size={18} /><span>Mental Health</span>
+          </button>
+          <button className={`sidebar-item ${window.location.pathname === "/student-support" ? "active" : ""}`} onClick={() => navigate("/student-support")}>
+            <TrendingUp size={18} /><span>Student Support</span>
+          </button>
+          <button className={`sidebar-item ${window.location.pathname === "/profile" ? "active" : ""}`} onClick={() => navigate("/profile")}>
+            <User size={18} /><span>Profile</span>
+          </button>
+          <button className="sidebar-item-logout" onClick={logout}>
+            <LogOut size={18} /><span>Logout</span>
+          </button>
+        </nav>
+      </div>
+
+      {sidebarOpen && <div className="overlay" onClick={() => setSidebarOpen(false)}></div>}
+
+      <div className="content-wrapper">
+        {/* Top Bar */}
+        <div className="top-bar">
+          <div className="user-profile">
+            <div className="user-avatar"><User size={18} /></div>
+            <span className="user-name-top">{userNickname || "User"}</span>
+            <div className="logout-icon" onClick={logout}><LogOut size={16} /></div>
+          </div>
+        </div>
+
+        {/* Page Header */}
+        <div className="page-header">
+          <button onClick={() => navigate("/dashboard")} className="back-arrow-btn">
+            <ArrowLeft size={18} />
+          </button>
           <div>
-            <h2 style={{ margin: 0 }}>Your Profile</h2>
-            <p style={styles.subText}>Personal information & account details</p>
+            <h1 className="page-title">Profile</h1>
+            <p className="page-subtitle">Your personal information and account details</p>
           </div>
         </div>
 
-        <div style={styles.infoGrid}>
-          <div style={styles.infoItem}>
-            <span style={styles.label}>Name</span>
-            <span style={styles.value}>{user.name}</span>
+        {/* Profile Card */}
+        <div className="profile-card">
+          <div className="profile-header">
+            <div className="profile-avatar">
+              <User size={40} />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: "22px" }}>{user.name}</h2>
+              <p className="profile-subtext" style={{ color: "var(--text-secondary)", marginTop: "4px" }}>
+                {user.nickname ? `@${user.nickname}` : ""}
+              </p>
+            </div>
           </div>
 
-          <div style={styles.infoItem}>
-            <span style={styles.label}>Date of Birth</span>
-            <span style={styles.value}>
-              {user.dob ? new Date(user.dob).toLocaleDateString() : "-"}
-            </span>
+          <div className="profile-info-grid">
+            {/* Personal Information */}
+            <div className="profile-section">
+              <h4 className="profile-section-title">
+                <User size={16} style={{ display: "inline", marginRight: "8px" }} />
+                Personal Information
+              </h4>
+              
+              <div className="profile-info-item">
+                <span className="profile-label">Full Name</span>
+                <span className="profile-value">{user.name}</span>
+              </div>
+
+              <div className="profile-info-item">
+                <span className="profile-label">Nickname</span>
+                <span className="profile-value">{user.nickname || "-"}</span>
+              </div>
+
+              <div className="profile-info-item">
+                <span className="profile-label">Date of Birth</span>
+                <span className="profile-value">
+                  {user.dob ? new Date(user.dob).toLocaleDateString() : "-"}
+                </span>
+              </div>
+
+              <div className="profile-info-item">
+                <span className="profile-label">Gender</span>
+                <span className="profile-value">{user.gender || "-"}</span>
+              </div>
+            </div>
+
+            {/* Academic Information */}
+            <div className="profile-section">
+              <h4 className="profile-section-title">
+                <BookOpen size={16} style={{ display: "inline", marginRight: "8px" }} />
+                Academic Information
+              </h4>
+              
+              <div className="profile-info-item">
+                <span className="profile-label">University</span>
+                <span className="profile-value">{user.university_name || "-"}</span>
+              </div>
+
+              <div className="profile-info-item">
+                <span className="profile-label">Student ID</span>
+                <span className="profile-value">{user.student_id || "-"}</span>
+              </div>
+            </div>
+
+            {/* Emergency Contact */}
+            <div className="profile-section">
+              <h4 className="profile-section-title">
+                <Heart size={16} style={{ display: "inline", marginRight: "8px" }} />
+                Emergency Contact
+              </h4>
+              
+              <div className="profile-info-item">
+                <span className="profile-label">Contact Name</span>
+                <span className="profile-value">{user.emergency_contact_name || "-"}</span>
+              </div>
+
+              <div className="profile-info-item">
+                <span className="profile-label">Phone Number</span>
+                <span className="profile-value">{user.emergency_contact_phone || "-"}</span>
+              </div>
+
+              <div className="profile-info-item">
+                <span className="profile-label">Relationship</span>
+                <span className="profile-value">{user.emergency_contact_relationship || "-"}</span>
+              </div>
+            </div>
+
+            {/* Account Information */}
+            <div className="profile-section">
+              <h4 className="profile-section-title">
+                <Mail size={16} style={{ display: "inline", marginRight: "8px" }} />
+                Account Information
+              </h4>
+              
+              <div className="profile-info-item">
+                <span className="profile-label">Email</span>
+                <span className="profile-value">{user.email}</span>
+              </div>
+            </div>
           </div>
 
-          <div style={styles.infoItem}>
-            <span style={styles.label}>Gender</span>
-            <span style={styles.value}>{user.gender || "-"}</span>
-          </div>
-
-          <div style={styles.infoItem}>
-            <span style={styles.label}>Email</span>
-            <span style={styles.value}>{user.email}</span>
-          </div>
+          <button className="primary-btn" onClick={() => navigate("/profile/edit")}>
+            Edit Profile
+          </button>
         </div>
-
-        <button
-          style={styles.primaryBtn}
-          onClick={() => navigate("/profile/edit")}
-        >
-          Edit Profile
-        </button>
       </div>
     </div>
   );
 }
-
-/* 🌿 Styles */
-const styles = {
-  container: {
-    minHeight: "100vh",
-    padding: "40px",
-    background:
-      "linear-gradient(180deg, #dbeafe 0%, #f8fbff 40%, #ffffff 100%)",
-  },
-
-  topBar: {
-    marginBottom: "20px",
-  },
-
-  backBtn: {
-    padding: "10px 14px",
-    borderRadius: "10px",
-    border: "1px solid #e5e7eb",
-    background: "white",
-    cursor: "pointer",
-  },
-
-  card: {
-    maxWidth: "520px",
-    margin: "0 auto",
-    background: "white",
-    borderRadius: "18px",
-    padding: "25px",
-    boxShadow: "0 10px 25px rgba(0,0,0,0.05)",
-    border: "1px solid #e5e7eb",
-  },
-
-  header: {
-    display: "flex",
-    gap: "15px",
-    alignItems: "center",
-    marginBottom: "25px",
-  },
-
-  avatar: {
-    fontSize: "32px",
-    background: "#eff6ff",
-    padding: "10px",
-    borderRadius: "12px",
-  },
-
-  subText: {
-    margin: 0,
-    fontSize: "13px",
-    color: "#6b7280",
-  },
-
-  infoGrid: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "14px",
-    marginBottom: "20px",
-  },
-
-  infoItem: {
-    display: "flex",
-    justifyContent: "space-between",
-    padding: "12px 14px",
-    background: "#f9fafb",
-    borderRadius: "12px",
-    border: "1px solid #eef2f7",
-  },
-
-  label: {
-    fontSize: "13px",
-    color: "#6b7280",
-  },
-
-  value: {
-    fontSize: "14px",
-    fontWeight: "500",
-    color: "#111827",
-  },
-
-  primaryBtn: {
-    width: "100%",
-    padding: "12px",
-    borderRadius: "12px",
-    border: "none",
-    background: "#3b82f6",
-    color: "white",
-    cursor: "pointer",
-    fontWeight: "500",
-  },
-
-  loadingText: {
-    textAlign: "center",
-    color: "#6b7280",
-  },
-};
 
 export default Profile;

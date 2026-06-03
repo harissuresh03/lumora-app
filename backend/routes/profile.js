@@ -1,4 +1,4 @@
-// routes/profile.js
+// backend/routes/profile.js
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
@@ -6,41 +6,55 @@ const bcrypt = require("bcryptjs");
 const verifyToken = require("../middleware/authmiddleware");
 
 /* =========================
-   GET PROFILE - with auth & ownership check
+   GET PROFILE - Join with universities to get name
 ========================= */
 router.get("/:id", verifyToken, (req, res) => {
   const userId = parseInt(req.params.id);
   
-  // Check if user is accessing their own profile
   if (req.user.id !== userId) {
     return res.status(403).json({ msg: "Unauthorized: Cannot view another user's profile" });
   }
 
   db.query(
-    "SELECT id, name, email, dob, gender FROM users WHERE id = ?",
+    `SELECT u.id, u.name, u.nickname, u.email, u.dob, u.gender, 
+            u.university_id, u.student_id,
+            u.emergency_contact_name, u.emergency_contact_phone, u.emergency_contact_relationship,
+            un.name as university_name, un.short_name as university_short_name
+     FROM users u
+     LEFT JOIN universities un ON u.university_id = un.id
+     WHERE u.id = ?`,
     [userId],
     (err, result) => {
-      if (err) return res.status(500).json(err);
+      if (err) {
+        console.error("Profile fetch error:", err);
+        return res.status(500).json(err);
+      }
       if (!result.length) {
         return res.status(404).json({ msg: "User not found" });
       }
+      console.log("Profile data fetched:", result[0]);
       res.json(result[0]);
     }
   );
 });
 
 /* =========================
-   UPDATE PROFILE - with auth & ownership check
+   UPDATE PROFILE - Only update university_id
 ========================= */
 router.put("/update/:id", verifyToken, async (req, res) => {
   const userId = parseInt(req.params.id);
   
-  // Check if user is updating their own profile
   if (req.user.id !== userId) {
     return res.status(403).json({ msg: "Unauthorized: Cannot update another user's profile" });
   }
 
-  const { name, email, dob, gender, password } = req.body;
+  const { 
+    name, nickname, email, dob, gender, university_id, student_id,
+    emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
+    password 
+  } = req.body;
+
+  console.log("Update data received:", { name, nickname, email, university_id });
 
   if (!name || !email) {
     return res.status(400).json({ msg: "Name and Email required" });
@@ -54,7 +68,6 @@ router.put("/update/:id", verifyToken, async (req, res) => {
 
   try {
     if (password && password.trim() !== "") {
-      // Password strength check
       if (password.length < 6) {
         return res.status(400).json({ msg: "Password must be at least 6 characters" });
       }
@@ -62,30 +75,60 @@ router.put("/update/:id", verifyToken, async (req, res) => {
       const hashed = await bcrypt.hash(password, 10);
 
       db.query(
-        `UPDATE users SET name=?, email=?, dob=?, gender=?, password=? WHERE id=?`,
-        [name, email, dob || null, gender || null, hashed, userId],
+        `UPDATE users SET 
+          name = ?, nickname = ?, email = ?, dob = ?, gender = ?, 
+          university_id = ?,
+          student_id = ?,
+          emergency_contact_name = ?, emergency_contact_phone = ?, emergency_contact_relationship = ?,
+          password = ? 
+         WHERE id = ?`,
+        [
+          name, nickname || null, email, dob || null, gender || null,
+          university_id || null,
+          student_id || null,
+          emergency_contact_name || null, emergency_contact_phone || null, emergency_contact_relationship || null,
+          hashed, userId
+        ],
         (err, result) => {
-          if (err) return res.status(500).json(err);
+          if (err) {
+            console.error("Update error:", err);
+            return res.status(500).json(err);
+          }
           if (result.affectedRows === 0) {
             return res.status(404).json({ msg: "User not found" });
           }
-          res.json({ msg: "Updated with password" });
+          res.json({ msg: "Profile updated successfully" });
         }
       );
     } else {
       db.query(
-        `UPDATE users SET name=?, email=?, dob=?, gender=? WHERE id=?`,
-        [name, email, dob || null, gender || null, userId],
+        `UPDATE users SET 
+          name = ?, nickname = ?, email = ?, dob = ?, gender = ?, 
+          university_id = ?,
+          student_id = ?,
+          emergency_contact_name = ?, emergency_contact_phone = ?, emergency_contact_relationship = ?
+         WHERE id = ?`,
+        [
+          name, nickname || null, email, dob || null, gender || null,
+          university_id || null,
+          student_id || null,
+          emergency_contact_name || null, emergency_contact_phone || null, emergency_contact_relationship || null,
+          userId
+        ],
         (err, result) => {
-          if (err) return res.status(500).json(err);
+          if (err) {
+            console.error("Update error:", err);
+            return res.status(500).json(err);
+          }
           if (result.affectedRows === 0) {
             return res.status(404).json({ msg: "User not found" });
           }
-          res.json({ msg: "Updated successfully" });
+          res.json({ msg: "Profile updated successfully" });
         }
       );
     }
   } catch (err) {
+    console.error("Server error:", err);
     res.status(500).json({ msg: "Server error" });
   }
 });

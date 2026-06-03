@@ -1,77 +1,120 @@
 // pages/Register.js
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 
 function Register() {
   const navigate = useNavigate();
+  const [universities, setUniversities] = useState([]);
+  const [loadingUniversities, setLoadingUniversities] = useState(true);
 
   const [form, setForm] = useState({
     name: "",
+    nickname: "",
     dob: "",
     gender: "",
     email: "",
     password: "",
     confirmPassword: "",
+    university_id: "",
+    university_other: "",
+    student_id: "",
+    emergency_contact_name: "",
+    emergency_contact_phone: "",
+    emergency_contact_relationship: "",
   });
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showOtherUniversity, setShowOtherUniversity] = useState(false);
+
+  // Fetch universities on component mount
+  useEffect(() => {
+    const fetchUniversities = async () => {
+      try {
+        const res = await api.get("/universities");
+        setUniversities(res.data);
+      } catch (err) {
+        console.error("Failed to fetch universities:", err);
+      } finally {
+        setLoadingUniversities(false);
+      }
+    };
+    fetchUniversities();
+  }, []);
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
+    
+    if (name === "university_id") {
+      const selectedUniversity = universities.find(u => u.id === parseInt(value));
+      if (selectedUniversity?.short_name === "Other") {
+        setShowOtherUniversity(true);
+      } else {
+        setShowOtherUniversity(false);
+        setForm(prev => ({ ...prev, university_other: "" }));
+      }
+    }
   };
 
   const handleRegister = async (e) => {
-    e.preventDefault();
-    setError("");
+  e.preventDefault();
+  setError("");
 
-    const { name, dob, gender, email, password, confirmPassword } = form;
+  const { name, nickname, dob, gender, email, password, confirmPassword, 
+          university_id, university_other, student_id,
+          emergency_contact_name, emergency_contact_phone, emergency_contact_relationship } = form;
 
-    if (!name || !dob || !gender || !email || !password) {
-      setError("Please fill in all fields 🌙");
-      return;
+  if (!name || !dob || !gender || !email || !password) {
+    setError("Please fill in all required fields 🌙");
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    setError("Passwords do not match ⚠️");
+    return;
+  }
+
+  if (password.length < 6) {
+    setError("Password must be at least 6 characters");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const response = await api.post("/auth/register", {
+      name: form.name,
+      nickname: form.nickname,
+      email: form.email,
+      password: form.password,
+      dob: form.dob,
+      gender: form.gender,
+      university_id: form.university_id || null,  // Only send the ID
+      student_id: form.student_id,
+      emergency_contact_name: form.emergency_contact_name,
+      emergency_contact_phone: form.emergency_contact_phone,
+      emergency_contact_relationship: form.emergency_contact_relationship,
+    });
+
+    console.log("Registration success:", response.data);
+
+    if (response.data.user_id) {
+      localStorage.setItem("user_id", response.data.user_id);
     }
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match ⚠️");
-      return;
-    }
-
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const response = await api.post("/auth/register", {
-        name: form.name,
-        email: form.email,
-        password: form.password,
-        dob: form.dob,
-        gender: form.gender,
-      });
-
-      console.log("Registration success:", response.data);
-
-      if (response.data.user_id) {
-        localStorage.setItem("user_id", response.data.user_id);
-      }
-
-      navigate("/");
-    } catch (err) {
-      console.error("Registration error:", err);
-      setError(err.response?.data?.msg || "Something went wrong 🌙");
-    } finally {
-      setLoading(false);
-    }
-  };
+    navigate("/");
+  } catch (err) {
+    console.error("Registration error:", err);
+    setError(err.response?.data?.msg || "Something went wrong 🌙");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div style={styles.container}>
-      {/* Background Decoration */}
       <div style={styles.bgDecoration}>
         <div style={styles.blob1}></div>
         <div style={styles.blob2}></div>
@@ -91,52 +134,176 @@ function Register() {
           <p style={styles.subtitle}>Begin your calm journey 🌿</p>
 
           <form onSubmit={handleRegister} style={styles.form}>
+            {/* Personal Information Section */}
+            <div style={styles.sectionTitle}>
+              <span>👤 Personal Information</span>
+            </div>
+
+            <div style={styles.row}>
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Full Name *</label>
+                <input
+                  name="name"
+                  placeholder="e.g., Haris Khan"
+                  value={form.name}
+                  onChange={handleChange}
+                  style={styles.input}
+                  disabled={loading}
+                  required
+                />
+              </div>
+
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Nickname (optional)</label>
+                <input
+                  name="nickname"
+                  placeholder="e.g., Haris, Harry"
+                  value={form.nickname}
+                  onChange={handleChange}
+                  style={styles.input}
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            <div style={styles.row}>
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Date of Birth *</label>
+                <input
+                  type="date"
+                  name="dob"
+                  value={form.dob}
+                  onChange={handleChange}
+                  style={styles.input}
+                  disabled={loading}
+                  required
+                />
+              </div>
+
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Gender *</label>
+                <select
+                  name="gender"
+                  value={form.gender}
+                  onChange={handleChange}
+                  style={styles.select}
+                  disabled={loading}
+                  required
+                >
+                  <option value="" disabled hidden>Select gender</option>
+                  <option value="Female">Female</option>
+                  <option value="Male">Male</option>
+                  <option value="Non-binary">Non-binary</option>
+                  <option value="Prefer to self-describe">Self-describe</option>
+                  <option value="Prefer not to say">Prefer not to say</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Academic Information Section */}
+            <div style={styles.sectionTitle}>
+              <span>🎓 Academic Information</span>
+            </div>
+
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Full Name</label>
+              <label style={styles.label}>University</label>
+              {loadingUniversities ? (
+                <div style={styles.loadingText}>Loading universities...</div>
+              ) : (
+                <select
+                  name="university_id"
+                  value={form.university_id}
+                  onChange={handleChange}
+                  style={styles.select}
+                  disabled={loading}
+                >
+                  <option value="">Select your university</option>
+                  {universities.map((uni) => (
+                    <option key={uni.id} value={uni.id}>
+                      {uni.name} ({uni.short_name})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {showOtherUniversity && (
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Please specify your university</label>
+                <input
+                  name="university_other"
+                  placeholder="Enter your university name"
+                  value={form.university_other}
+                  onChange={handleChange}
+                  style={styles.input}
+                  disabled={loading}
+                />
+              </div>
+            )}
+
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Student ID (optional)</label>
               <input
-                name="name"
-                placeholder="e.g., Haris Smith"
-                value={form.name}
+                name="student_id"
+                placeholder="e.g., B012310101"
+                value={form.student_id}
                 onChange={handleChange}
                 style={styles.input}
                 disabled={loading}
               />
             </div>
 
+            {/* Emergency Contact Section */}
+            <div style={styles.sectionTitle}>
+              <span>🆘 Emergency / Support Contact</span>
+              <p style={styles.sectionHint}>Someone you trust who can support you</p>
+            </div>
+
+            <div style={styles.row}>
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Contact Name (optional)</label>
+                <input
+                  name="emergency_contact_name"
+                  placeholder="e.g., Ahmad Bin Abdullah"
+                  value={form.emergency_contact_name}
+                  onChange={handleChange}
+                  style={styles.input}
+                  disabled={loading}
+                />
+              </div>
+
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Phone Number (optional)</label>
+                <input
+                  name="emergency_contact_phone"
+                  placeholder="e.g., 012-3456789"
+                  value={form.emergency_contact_phone}
+                  onChange={handleChange}
+                  style={styles.input}
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Date of Birth</label>
+              <label style={styles.label}>Relationship (optional)</label>
               <input
-                type="date"
-                name="dob"
-                value={form.dob}
+                name="emergency_contact_relationship"
+                placeholder="e.g., Parent, Sibling, Close Friend"
+                value={form.emergency_contact_relationship}
                 onChange={handleChange}
                 style={styles.input}
                 disabled={loading}
               />
             </div>
 
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>Gender</label>
-              <select
-                name="gender"
-                value={form.gender}
-                onChange={handleChange}
-                style={styles.select}
-                disabled={loading}
-              >
-                <option value="" disabled hidden>
-                  Select your gender
-                </option>
-                <option value="Female">Female</option>
-                <option value="Male">Male</option>
-                <option value="Non-binary">Non-binary</option>
-                <option value="Prefer to self-describe">Self-describe</option>
-                <option value="Prefer not to say">Prefer not to say</option>
-              </select>
+            {/* Account Information Section */}
+            <div style={styles.sectionTitle}>
+              <span>🔐 Account Information</span>
             </div>
 
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Email Address</label>
+              <label style={styles.label}>Email Address *</label>
               <input
                 type="email"
                 name="email"
@@ -145,33 +312,38 @@ function Register() {
                 onChange={handleChange}
                 style={styles.input}
                 disabled={loading}
+                required
               />
             </div>
 
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>Password</label>
-              <input
-                type="password"
-                name="password"
-                placeholder="Create a password (min. 6 characters)"
-                value={form.password}
-                onChange={handleChange}
-                style={styles.input}
-                disabled={loading}
-              />
-            </div>
+            <div style={styles.row}>
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Password *</label>
+                <input
+                  type="password"
+                  name="password"
+                  placeholder="Create a password (min. 6 characters)"
+                  value={form.password}
+                  onChange={handleChange}
+                  style={styles.input}
+                  disabled={loading}
+                  required
+                />
+              </div>
 
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>Confirm Password</label>
-              <input
-                type="password"
-                name="confirmPassword"
-                placeholder="Confirm your password"
-                value={form.confirmPassword}
-                onChange={handleChange}
-                style={styles.input}
-                disabled={loading}
-              />
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Confirm Password *</label>
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  placeholder="Confirm your password"
+                  value={form.confirmPassword}
+                  onChange={handleChange}
+                  style={styles.input}
+                  disabled={loading}
+                  required
+                />
+              </div>
             </div>
 
             {error && <div style={styles.error}>{error}</div>}
@@ -230,10 +402,11 @@ const styles = {
     minHeight: "100vh",
     background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
     position: "relative",
-    overflow: "hidden",
+    overflow: "auto",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    padding: "40px 20px",
   },
 
   bgDecoration: {
@@ -284,13 +457,12 @@ const styles = {
     position: "relative",
     zIndex: 2,
     width: "100%",
-    padding: "20px",
+    maxWidth: "850px",
   },
 
   card: {
-    maxWidth: "500px",
     margin: "0 auto",
-    padding: "40px 40px",
+    padding: "40px",
     borderRadius: "28px",
     background: "rgba(255,255,255,0.98)",
     backdropFilter: "blur(20px)",
@@ -308,10 +480,6 @@ const styles = {
     fontSize: "13px",
     cursor: "pointer",
     fontWeight: "500",
-    transition: "color 0.2s",
-    ":hover": {
-      color: "#764ba2",
-    },
   },
 
   logoSection: {
@@ -323,17 +491,13 @@ const styles = {
     marginTop: "8px",
   },
 
-  logoIcon: {
-    fontSize: "36px",
-  },
-
+  logoIcon: { fontSize: "36px" },
   logo: {
     fontSize: "32px",
     fontWeight: "700",
     background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
-    backgroundClip: "text",
     margin: 0,
   },
 
@@ -347,6 +511,29 @@ const styles = {
   form: {
     display: "flex",
     flexDirection: "column",
+    gap: "18px",
+  },
+
+  sectionTitle: {
+    fontSize: "16px",
+    fontWeight: "600",
+    color: "#1f2937",
+    marginTop: "16px",
+    marginBottom: "4px",
+    paddingBottom: "8px",
+    borderBottom: "2px solid #e5e7eb",
+  },
+
+  sectionHint: {
+    fontSize: "11px",
+    fontWeight: "normal",
+    color: "#9ca3af",
+    marginTop: "4px",
+  },
+
+  row: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
     gap: "16px",
   },
 
@@ -376,10 +563,6 @@ const styles = {
       borderColor: "#667eea",
       boxShadow: "0 0 0 3px rgba(102,126,234,0.1)",
     },
-    ":disabled": {
-      backgroundColor: "#f9fafb",
-      cursor: "not-allowed",
-    },
   },
 
   select: {
@@ -393,14 +576,6 @@ const styles = {
     fontFamily: "inherit",
     backgroundColor: "white",
     cursor: "pointer",
-    ":focus": {
-      borderColor: "#667eea",
-      boxShadow: "0 0 0 3px rgba(102,126,234,0.1)",
-    },
-    ":disabled": {
-      backgroundColor: "#f9fafb",
-      cursor: "not-allowed",
-    },
   },
 
   button: {
@@ -414,18 +589,6 @@ const styles = {
     fontWeight: "600",
     cursor: "pointer",
     transition: "all 0.2s",
-    ":hover": {
-      transform: "translateY(-2px)",
-      boxShadow: "0 8px 20px rgba(102,126,234,0.4)",
-    },
-    ":active": {
-      transform: "translateY(0)",
-    },
-    ":disabled": {
-      opacity: 0.6,
-      cursor: "not-allowed",
-      transform: "none",
-    },
   },
 
   error: {
@@ -434,7 +597,6 @@ const styles = {
     padding: "8px 12px",
     backgroundColor: "#fef2f2",
     borderRadius: "10px",
-    marginTop: "-4px",
   },
 
   footer: {
@@ -448,11 +610,6 @@ const styles = {
     color: "#667eea",
     cursor: "pointer",
     fontWeight: "600",
-    transition: "color 0.2s",
-    ":hover": {
-      color: "#764ba2",
-      textDecoration: "underline",
-    },
   },
 
   emojiLayer: {
@@ -471,9 +628,16 @@ const styles = {
     bottom: "-50px",
     animation: "floatUp linear infinite",
   },
+
+  loadingText: {
+    fontSize: "13px",
+    color: "#6b7280",
+    padding: "12px",
+    textAlign: "center",
+  },
 };
 
-// Add keyframes for floating animation
+// Add keyframes
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
   @keyframes floatUp {

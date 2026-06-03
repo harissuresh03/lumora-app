@@ -1,4 +1,4 @@
-// src/utils/api.js
+// frontend/src/utils/api.js
 import axios from "axios";
 
 const api = axios.create({
@@ -29,7 +29,6 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid - clear storage and redirect to login
       localStorage.clear();
       window.location.href = "/";
     }
