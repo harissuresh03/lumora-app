@@ -1,12 +1,14 @@
-// pages/Register.js
+// frontend/src/pages/Register.js
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
+import { showSuccessToast, showErrorToast } from "./components/ToastNotification";
 
 function Register() {
   const navigate = useNavigate();
   const [universities, setUniversities] = useState([]);
   const [loadingUniversities, setLoadingUniversities] = useState(true);
+  const [registerAs, setRegisterAs] = useState("student");
 
   const [form, setForm] = useState({
     name: "",
@@ -19,16 +21,21 @@ function Register() {
     university_id: "",
     university_other: "",
     student_id: "",
+    faculty: "",  // ✅ New field
+    department: "",  // ✅ New field
+    counsellor_consent: false,  // ✅ New field - consent
     emergency_contact_name: "",
     emergency_contact_phone: "",
     emergency_contact_relationship: "",
+    qualification: "",
+    experience: ""
   });
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showOtherUniversity, setShowOtherUniversity] = useState(false);
+  const [requestSubmitted, setRequestSubmitted] = useState(false);
 
-  // Fetch universities on component mount
   useEffect(() => {
     const fetchUniversities = async () => {
       try {
@@ -44,8 +51,11 @@ function Register() {
   }, []);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
+    const { name, value, type, checked } = e.target;
+    setForm({ 
+      ...form, 
+      [name]: type === 'checkbox' ? checked : value 
+    });
     
     if (name === "university_id") {
       const selectedUniversity = universities.find(u => u.id === parseInt(value));
@@ -59,59 +69,134 @@ function Register() {
   };
 
   const handleRegister = async (e) => {
-  e.preventDefault();
-  setError("");
+    e.preventDefault();
+    setError("");
 
-  const { name, nickname, dob, gender, email, password, confirmPassword, 
-          university_id, university_other, student_id,
-          emergency_contact_name, emergency_contact_phone, emergency_contact_relationship } = form;
+    const { name, nickname, dob, gender, email, password, confirmPassword, 
+            university_id, university_other, student_id, faculty, department,
+            emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
+            counsellor_consent, qualification, experience } = form;
 
-  if (!name || !dob || !gender || !email || !password) {
-    setError("Please fill in all required fields 🌙");
-    return;
-  }
-
-  if (password !== confirmPassword) {
-    setError("Passwords do not match ⚠️");
-    return;
-  }
-
-  if (password.length < 6) {
-    setError("Password must be at least 6 characters");
-    return;
-  }
-
-  setLoading(true);
-
-  try {
-    const response = await api.post("/auth/register", {
-      name: form.name,
-      nickname: form.nickname,
-      email: form.email,
-      password: form.password,
-      dob: form.dob,
-      gender: form.gender,
-      university_id: form.university_id || null,  // Only send the ID
-      student_id: form.student_id,
-      emergency_contact_name: form.emergency_contact_name,
-      emergency_contact_phone: form.emergency_contact_phone,
-      emergency_contact_relationship: form.emergency_contact_relationship,
-    });
-
-    console.log("Registration success:", response.data);
-
-    if (response.data.user_id) {
-      localStorage.setItem("user_id", response.data.user_id);
+    if (!name || !dob || !gender || !email || !password) {
+      setError("Please fill in all required fields 🌙");
+      return;
     }
 
-    navigate("/");
-  } catch (err) {
-    console.error("Registration error:", err);
-    setError(err.response?.data?.msg || "Something went wrong 🌙");
-  } finally {
-    setLoading(false);
+    if (password !== confirmPassword) {
+      setError("Passwords do not match ⚠️");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      if (registerAs === "student") {
+        // STUDENT: Register directly to users table
+        const response = await api.post("/auth/register", {
+          name: form.name,
+          nickname: form.nickname,
+          email: form.email,
+          password: form.password,
+          dob: form.dob,
+          gender: form.gender,
+          university_id: form.university_id || null,
+          student_id: form.student_id,
+          faculty: form.faculty || null,  // ✅ New field
+          department: form.department || null,  // ✅ New field
+          counsellor_consent: form.counsellor_consent,  // ✅ Consent
+          emergency_contact_name: form.emergency_contact_name,
+          emergency_contact_phone: form.emergency_contact_phone,
+          emergency_contact_relationship: form.emergency_contact_relationship,
+        });
+
+        if (response.data.user_id) {
+          showSuccessToast("Registration successful! Welcome to Lumora 🌿");
+          navigate("/");
+        }
+        setLoading(false);
+        return;
+      }
+
+      if (registerAs === "counsellor") {
+        // COUNSELLOR: Submit application to counsellor_requests table
+        const counsellorRes = await api.post("/counsellor-requests/apply", {
+          name: form.name,
+          nickname: form.nickname || "",
+          email: form.email,
+          password: form.password,
+          dob: form.dob,
+          gender: form.gender,
+          university_id: form.university_id || null,
+          student_id: form.student_id || "",
+          faculty: form.faculty || null,  // ✅ New field
+          department: form.department || null,  // ✅ New field
+          emergency_contact_name: form.emergency_contact_name || "",
+          emergency_contact_phone: form.emergency_contact_phone || "",
+          emergency_contact_relationship: form.emergency_contact_relationship || "",
+          qualification: form.qualification || "",
+          experience: form.experience || ""
+        });
+
+        if (counsellorRes.data.msg) {
+          setRequestSubmitted(true);
+          showSuccessToast("Application submitted! You will be notified once approved.");
+        }
+        setLoading(false);
+        return;
+      }
+    } catch (err) {
+      console.error("Registration error:", err);
+      console.error("Error details:", err.response?.data);
+      setError(err.response?.data?.msg || "Something went wrong 🌙");
+      setLoading(false);
+    }
+  };
+
+  if (requestSubmitted) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.contentWrapper}>
+          <div style={styles.card}>
+            <div style={styles.logoSection}>
+              <div style={styles.logoIcon}>✨</div>
+              <h1 style={styles.logo}>Lumora</h1>
+            </div>
+            <div style={{ textAlign: "center", padding: "20px 0" }}>
+              <div style={{ fontSize: "48px", marginBottom: "16px" }}>📋</div>
+              <h2 style={{ marginBottom: "12px" }}>Application Submitted!</h2>
+              <p style={{ color: "#6b7280", marginBottom: "8px" }}>
+                Your counsellor registration request has been submitted.
+              </p>
+              <p style={{ color: "#6b7280", fontSize: "14px" }}>
+                You will be notified once an admin reviews your application.
+              </p>
+              <button
+                onClick={() => navigate("/")}
+                style={{
+                  marginTop: "24px",
+                  padding: "12px 32px",
+                  borderRadius: "12px",
+                  border: "none",
+                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  color: "white",
+                  fontSize: "15px",
+                  fontWeight: "600",
+                  cursor: "pointer"
+                }}
+              >
+                Go to Login
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
-};
 
   return (
     <div style={styles.container}>
@@ -132,6 +217,46 @@ function Register() {
             <h1 style={styles.logo}>Lumora</h1>
           </div>
           <p style={styles.subtitle}>Begin your calm journey 🌿</p>
+
+          {/* Role Selection */}
+          <div style={styles.roleSelector}>
+            <button
+              type="button"
+              onClick={() => setRegisterAs("student")}
+              style={{
+                flex: 1,
+                padding: "12px",
+                borderRadius: "10px",
+                border: registerAs === "student" ? "2px solid #667eea" : "1px solid #e5e7eb",
+                background: registerAs === "student" ? "rgba(102, 126, 234, 0.1)" : "transparent",
+                cursor: "pointer",
+                fontWeight: registerAs === "student" ? "600" : "400"
+              }}
+            >
+              👤 Student
+            </button>
+            <button
+              type="button"
+              onClick={() => setRegisterAs("counsellor")}
+              style={{
+                flex: 1,
+                padding: "12px",
+                borderRadius: "10px",
+                border: registerAs === "counsellor" ? "2px solid #667eea" : "1px solid #e5e7eb",
+                background: registerAs === "counsellor" ? "rgba(102, 126, 234, 0.1)" : "transparent",
+                cursor: "pointer",
+                fontWeight: registerAs === "counsellor" ? "600" : "400"
+              }}
+            >
+              🧑‍🏫 Counsellor
+            </button>
+          </div>
+
+          {registerAs === "counsellor" && (
+            <div style={{ padding: "12px", background: "rgba(102, 126, 234, 0.08)", borderRadius: "10px", marginBottom: "16px", fontSize: "13px", color: "#6b7280" }}>
+              <strong>Note:</strong> Counsellor registration requires admin approval. You will be notified once approved.
+            </div>
+          )}
 
           <form onSubmit={handleRegister} style={styles.form}>
             {/* Personal Information Section */}
@@ -154,7 +279,7 @@ function Register() {
               </div>
 
               <div style={styles.inputGroup}>
-                <label style={styles.label}>Nickname (optional)</label>
+                <label style={styles.label}>Username (Do not use real name)</label>
                 <input
                   name="nickname"
                   placeholder="e.g., Haris, Harry"
@@ -241,17 +366,70 @@ function Register() {
               </div>
             )}
 
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>Student ID (optional)</label>
-              <input
-                name="student_id"
-                placeholder="e.g., B012310101"
-                value={form.student_id}
-                onChange={handleChange}
-                style={styles.input}
-                disabled={loading}
-              />
+            <div style={styles.row}>
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Student ID (optional)</label>
+                <input
+                  name="student_id"
+                  placeholder="e.g., B012310101"
+                  value={form.student_id}
+                  onChange={handleChange}
+                  style={styles.input}
+                  disabled={loading}
+                />
+              </div>
             </div>
+
+            {/* ✅ NEW: Faculty and Department Fields */}
+            <div style={styles.row}>
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Faculty (optional)</label>
+                <input
+                  name="faculty"
+                  placeholder="e.g., Faculty of Computer Science"
+                  value={form.faculty}
+                  onChange={handleChange}
+                  style={styles.input}
+                  disabled={loading}
+                />
+              </div>
+
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Department (optional)</label>
+                <input
+                  name="department"
+                  placeholder="e.g., Software Engineering"
+                  value={form.department}
+                  onChange={handleChange}
+                  style={styles.input}
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            {/* ✅ NEW: Consent Section - Only for Students */}
+            {registerAs === "student" && (
+              <div style={styles.consentSection}>
+                <div style={styles.consentHeader}>
+                  <span>🔐 Data Sharing Consent</span>
+                </div>
+                <div style={styles.consentBox}>
+                  <label style={styles.consentLabel}>
+                    <input
+                      type="checkbox"
+                      name="counsellor_consent"
+                      checked={form.counsellor_consent}
+                      onChange={handleChange}
+                      style={styles.consentCheckbox}
+                    />
+                    <span style={styles.consentText}>
+                      I consent to share my data with my university counsellor for the purpose of receiving mental health support. 
+                      <span style={styles.consentNote}> (You can change this anytime in your profile settings)</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            )}
 
             {/* Emergency Contact Section */}
             <div style={styles.sectionTitle}>
@@ -297,6 +475,39 @@ function Register() {
               />
             </div>
 
+            {/* Counsellor Additional Info */}
+            {registerAs === "counsellor" && (
+              <>
+                <div style={styles.sectionTitle}>
+                  <span>🧑‍🏫 Counsellor Information</span>
+                </div>
+
+                <div style={styles.inputGroup}>
+                  <label style={styles.label}>Qualification</label>
+                  <input
+                    name="qualification"
+                    placeholder="e.g., Master's in Counselling Psychology, Licensed Professional Counsellor"
+                    value={form.qualification}
+                    onChange={handleChange}
+                    style={styles.input}
+                    disabled={loading}
+                  />
+                </div>
+
+                <div style={styles.inputGroup}>
+                  <label style={styles.label}>Experience</label>
+                  <input
+                    name="experience"
+                    placeholder="e.g., 5 years of experience in university counselling, worked with students on anxiety and stress management"
+                    value={form.experience}
+                    onChange={handleChange}
+                    style={styles.input}
+                    disabled={loading}
+                  />
+                </div>
+              </>
+            )}
+
             {/* Account Information Section */}
             <div style={styles.sectionTitle}>
               <span>🔐 Account Information</span>
@@ -316,40 +527,57 @@ function Register() {
               />
             </div>
 
-            <div style={styles.row}>
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Password *</label>
-                <input
-                  type="password"
-                  name="password"
-                  placeholder="Create a password (min. 6 characters)"
-                  value={form.password}
-                  onChange={handleChange}
-                  style={styles.input}
-                  disabled={loading}
-                  required
-                />
-              </div>
+            {/* ✅ Only show password fields for students */}
+            {registerAs === "student" && (
+              <div style={styles.row}>
+                <div style={styles.inputGroup}>
+                  <label style={styles.label}>Password *</label>
+                  <input
+                    type="password"
+                    name="password"
+                    placeholder="Create a password (min. 6 characters)"
+                    value={form.password}
+                    onChange={handleChange}
+                    style={styles.input}
+                    disabled={loading}
+                    required
+                  />
+                </div>
 
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Confirm Password *</label>
-                <input
-                  type="password"
-                  name="confirmPassword"
-                  placeholder="Confirm your password"
-                  value={form.confirmPassword}
-                  onChange={handleChange}
-                  style={styles.input}
-                  disabled={loading}
-                  required
-                />
+                <div style={styles.inputGroup}>
+                  <label style={styles.label}>Confirm Password *</label>
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    placeholder="Confirm your password"
+                    value={form.confirmPassword}
+                    onChange={handleChange}
+                    style={styles.input}
+                    disabled={loading}
+                    required
+                  />
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* ✅ For counsellors, show a note instead */}
+            {registerAs === "counsellor" && (
+              <div style={{
+                padding: "12px 16px",
+                background: "rgba(102, 126, 234, 0.08)",
+                borderRadius: "10px",
+                fontSize: "13px",
+                color: "#6b7280",
+                marginBottom: "16px"
+              }}>
+                <span>🔑 You will receive login credentials via email upon approval.</span>
+              </div>
+            )}
 
             {error && <div style={styles.error}>{error}</div>}
 
             <button type="submit" style={styles.button} disabled={loading}>
-              {loading ? "Creating account..." : "Create Account"}
+              {loading ? "Creating account..." : registerAs === "counsellor" ? "Submit Application" : "Create Account"}
             </button>
           </form>
 
@@ -362,12 +590,12 @@ function Register() {
         </div>
       </div>
 
-      {/* Floating Emojis */}
       <FloatingEmojis />
     </div>
   );
 }
 
+// Floating Emojis Component
 function FloatingEmojis() {
   const emojis = ["😊", "😌", "💙", "✨", "🌙", "🫶", "🌸", "🌟", "🌿", "🕯️"];
 
@@ -375,7 +603,6 @@ function FloatingEmojis() {
     <div style={styles.emojiLayer}>
       {Array.from({ length: 25 }).map((_, i) => {
         const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-
         return (
           <span
             key={i}
@@ -397,6 +624,21 @@ function FloatingEmojis() {
 }
 
 const styles = {
+  textarea: {
+    width: "100%",
+    padding: "12px 14px",
+    borderRadius: "12px",
+    border: "1.5px solid #e5e7eb",
+    fontSize: "14px",
+    transition: "all 0.2s",
+    outline: "none",
+    fontFamily: "inherit",
+    boxSizing: "border-box",
+    background: "white",
+    minHeight: "80px",
+    resize: "vertical",
+    lineHeight: "1.5",
+  },
   container: {
     width: "100%",
     minHeight: "100vh",
@@ -408,7 +650,6 @@ const styles = {
     justifyContent: "center",
     padding: "40px 20px",
   },
-
   bgDecoration: {
     position: "fixed",
     top: 0,
@@ -419,7 +660,6 @@ const styles = {
     pointerEvents: "none",
     overflow: "hidden",
   },
-
   blob1: {
     position: "absolute",
     top: "-20%",
@@ -430,7 +670,6 @@ const styles = {
     background: "radial-gradient(circle, rgba(255,255,255,0.15), rgba(255,255,255,0.05))",
     filter: "blur(80px)",
   },
-
   blob2: {
     position: "absolute",
     bottom: "-20%",
@@ -441,7 +680,6 @@ const styles = {
     background: "radial-gradient(circle, rgba(255,255,255,0.1), rgba(255,255,255,0.03))",
     filter: "blur(70px)",
   },
-
   blob3: {
     position: "absolute",
     top: "40%",
@@ -452,14 +690,12 @@ const styles = {
     background: "radial-gradient(circle, rgba(255,255,255,0.08), rgba(255,255,255,0.02))",
     filter: "blur(60px)",
   },
-
   contentWrapper: {
     position: "relative",
     zIndex: 2,
     width: "100%",
     maxWidth: "850px",
   },
-
   card: {
     margin: "0 auto",
     padding: "40px",
@@ -469,7 +705,6 @@ const styles = {
     boxShadow: "0 25px 50px rgba(0,0,0,0.2)",
     position: "relative",
   },
-
   backBtn: {
     position: "absolute",
     top: "20px",
@@ -481,7 +716,6 @@ const styles = {
     cursor: "pointer",
     fontWeight: "500",
   },
-
   logoSection: {
     display: "flex",
     alignItems: "center",
@@ -490,7 +724,6 @@ const styles = {
     marginBottom: "12px",
     marginTop: "8px",
   },
-
   logoIcon: { fontSize: "36px" },
   logo: {
     fontSize: "32px",
@@ -498,22 +731,25 @@ const styles = {
     background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
+    backgroundClip: "text",
     margin: 0,
   },
-
   subtitle: {
     fontSize: "14px",
     color: "#6b7280",
     marginBottom: "32px",
     textAlign: "center",
   },
-
+  roleSelector: {
+    display: "flex",
+    gap: "12px",
+    marginBottom: "24px",
+  },
   form: {
     display: "flex",
     flexDirection: "column",
     gap: "18px",
   },
-
   sectionTitle: {
     fontSize: "16px",
     fontWeight: "600",
@@ -523,24 +759,20 @@ const styles = {
     paddingBottom: "8px",
     borderBottom: "2px solid #e5e7eb",
   },
-
   sectionHint: {
     fontSize: "11px",
     fontWeight: "normal",
     color: "#9ca3af",
     marginTop: "4px",
   },
-
   row: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
     gap: "16px",
   },
-
   inputGroup: {
     textAlign: "left",
   },
-
   label: {
     display: "block",
     fontSize: "13px",
@@ -548,7 +780,6 @@ const styles = {
     color: "#374151",
     marginBottom: "8px",
   },
-
   input: {
     width: "100%",
     padding: "12px 14px",
@@ -559,12 +790,8 @@ const styles = {
     outline: "none",
     fontFamily: "inherit",
     boxSizing: "border-box",
-    ":focus": {
-      borderColor: "#667eea",
-      boxShadow: "0 0 0 3px rgba(102,126,234,0.1)",
-    },
+    background: "white",
   },
-
   select: {
     width: "100%",
     padding: "12px 14px",
@@ -577,7 +804,49 @@ const styles = {
     backgroundColor: "white",
     cursor: "pointer",
   },
-
+  // ✅ New Consent Styles
+  consentSection: {
+    marginTop: "8px",
+  },
+  consentHeader: {
+    fontSize: "16px",
+    fontWeight: "600",
+    color: "#1f2937",
+    marginBottom: "12px",
+    paddingBottom: "8px",
+    borderBottom: "2px solid #e5e7eb",
+  },
+  consentBox: {
+    padding: "16px",
+    background: "rgba(102, 126, 234, 0.05)",
+    borderRadius: "12px",
+    border: "1px solid rgba(102, 126, 234, 0.2)",
+  },
+  consentLabel: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "12px",
+    cursor: "pointer",
+  },
+  consentCheckbox: {
+    marginTop: "3px",
+    width: "18px",
+    height: "18px",
+    cursor: "pointer",
+    flexShrink: 0,
+  },
+  consentText: {
+    fontSize: "14px",
+    color: "#374151",
+    lineHeight: "1.5",
+  },
+  consentNote: {
+    display: "block",
+    fontSize: "12px",
+    color: "#9ca3af",
+    marginTop: "4px",
+    fontStyle: "italic",
+  },
   button: {
     marginTop: "12px",
     padding: "14px",
@@ -590,7 +859,6 @@ const styles = {
     cursor: "pointer",
     transition: "all 0.2s",
   },
-
   error: {
     color: "#ef4444",
     fontSize: "13px",
@@ -598,20 +866,17 @@ const styles = {
     backgroundColor: "#fef2f2",
     borderRadius: "10px",
   },
-
   footer: {
     marginTop: "24px",
     fontSize: "13px",
     color: "#6b7280",
     textAlign: "center",
   },
-
   link: {
     color: "#667eea",
     cursor: "pointer",
     fontWeight: "600",
   },
-
   emojiLayer: {
     position: "fixed",
     width: "100%",
@@ -622,13 +887,11 @@ const styles = {
     zIndex: 1,
     overflow: "hidden",
   },
-
   emoji: {
     position: "absolute",
     bottom: "-50px",
     animation: "floatUp linear infinite",
   },
-
   loadingText: {
     fontSize: "13px",
     color: "#6b7280",

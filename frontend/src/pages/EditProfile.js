@@ -1,4 +1,4 @@
-// pages/EditProfile.js
+// frontend/src/pages/EditProfile.js
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
@@ -13,7 +13,9 @@ import {
   Building,
   Lock,
   Calendar,
-  Users
+  Users,
+  GraduationCap,
+  Shield
 } from "lucide-react";
 
 function EditProfile() {
@@ -32,6 +34,9 @@ function EditProfile() {
     university: "",
     university_id: "",
     student_id: "",
+    faculty: "",           // ✅ New field
+    department: "",        // ✅ New field
+    counsellor_consent: 0, // ✅ New field - consent (0 or 1)
     emergency_contact_name: "",
     emergency_contact_phone: "",
     emergency_contact_relationship: "",
@@ -79,6 +84,9 @@ function EditProfile() {
           university: res.data.university || "",
           university_id: matchedUni?.id || "",
           student_id: res.data.student_id || "",
+          faculty: res.data.faculty || "",           // ✅ New field
+          department: res.data.department || "",     // ✅ New field
+          counsellor_consent: res.data.counsellor_consent || 0, // ✅ New field
           emergency_contact_name: res.data.emergency_contact_name || "",
           emergency_contact_phone: res.data.emergency_contact_phone || "",
           emergency_contact_relationship: res.data.emergency_contact_relationship || "",
@@ -103,8 +111,11 @@ function EditProfile() {
   }, [user_id, navigate, universities]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
+    const { name, value, type, checked } = e.target;
+    setForm({ 
+      ...form, 
+      [name]: type === 'checkbox' ? (checked ? 1 : 0) : value 
+    });
     setError("");
     
     if (name === "university_id") {
@@ -141,6 +152,9 @@ function EditProfile() {
       gender: form.gender,
       university_id: form.university_id || null,
       student_id: form.student_id,
+      faculty: form.faculty || null,              // ✅ New field
+      department: form.department || null,        // ✅ New field
+      counsellor_consent: form.counsellor_consent, // ✅ New field
       emergency_contact_name: form.emergency_contact_name,
       emergency_contact_phone: form.emergency_contact_phone,
       emergency_contact_relationship: form.emergency_contact_relationship,
@@ -175,15 +189,6 @@ function EditProfile() {
       </div>
 
       <div className="content-wrapper-no-sidebar">
-        {/* Top Bar */}
-        <div className="top-bar">
-          <div className="user-profile">
-            <div className="user-avatar"><User size={18} /></div>
-            <span className="user-name-top">{userNickname || "User"}</span>
-            <div className="logout-icon" onClick={logout}><LogOut size={16} /></div>
-          </div>
-        </div>
-
         {/* Page Header */}
         <div className="page-header">
           <button onClick={() => navigate("/profile")} className="back-arrow-btn">
@@ -211,7 +216,7 @@ function EditProfile() {
               </div>
 
               <div className="input-group">
-                <label className="input-label">Nickname</label>
+                <label className="input-label">Username (Do not use real name)</label>
                 <input name="nickname" value={form.nickname} onChange={handleChange} className="input-field" placeholder="e.g., Emma" />
               </div>
             </div>
@@ -284,6 +289,83 @@ function EditProfile() {
                 className="input-field"
                 placeholder="e.g., B012310101"
               />
+            </div>
+
+            {/* ✅ NEW: Faculty and Department */}
+            <div className="form-row">
+              <div className="input-group">
+                <label className="input-label">Faculty (optional)</label>
+                <input
+                  name="faculty"
+                  value={form.faculty}
+                  onChange={handleChange}
+                  className="input-field"
+                  placeholder="e.g., Faculty of Computer Science"
+                />
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Department (optional)</label>
+                <input
+                  name="department"
+                  value={form.department}
+                  onChange={handleChange}
+                  className="input-field"
+                  placeholder="e.g., Software Engineering"
+                />
+              </div>
+            </div>
+
+            {/* ✅ NEW: Privacy & Consent Section */}
+            <div className="form-section-title">
+              <Shield size={14} style={{ display: "inline", marginRight: "8px" }} />
+              Privacy & Consent
+              <p className="form-section-hint">Control how your data is shared</p>
+            </div>
+
+            <div style={{ 
+              padding: "16px", 
+              background: "rgba(102, 126, 234, 0.05)", 
+              borderRadius: "12px", 
+              border: "1px solid rgba(102, 126, 234, 0.2)",
+              marginBottom: "16px"
+            }}>
+              <label style={{ 
+                display: "flex", 
+                alignItems: "flex-start", 
+                gap: "12px", 
+                cursor: "pointer" 
+              }}>
+                <input
+                  type="checkbox"
+                  name="counsellor_consent"
+                  checked={form.counsellor_consent === 1}
+                  onChange={handleChange}
+                  style={{
+                    marginTop: "3px",
+                    width: "18px",
+                    height: "18px",
+                    cursor: "pointer",
+                    flexShrink: 0
+                  }}
+                />
+                <div>
+                  <span style={{ fontSize: "14px", color: "#374151", lineHeight: "1.5" }}>
+                    I consent to share my mood, sleep, journal entries, and assessment data with my university counsellor for the purpose of receiving mental health support.
+                  </span>
+                  <span style={{ 
+                    display: "block", 
+                    fontSize: "12px", 
+                    color: "#9ca3af", 
+                    marginTop: "4px",
+                    fontStyle: "italic" 
+                  }}>
+                    {form.counsellor_consent === 1 
+                      ? "✅ You have given consent. Your counsellor can see your data." 
+                      : "❌ You have not given consent. Your counsellor cannot see your data."}
+                  </span>
+                </div>
+              </label>
             </div>
 
             {/* Emergency Contact */}

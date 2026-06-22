@@ -1,9 +1,9 @@
 // backend/services/aiService.js
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const Groq = require("groq-sdk");
 require('dotenv').config();
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Initialize Groq AI
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 // Few-shot examples from mental health conversation datasets
 const getFewShotExamples = () => {
@@ -58,9 +58,6 @@ const getFewShotExamples = () => {
  */
 async function processChatMessage(userMessage, conversationHistory = []) {
   try {
-    // ✅ FIXED: Use "gemini-pro" (not gemini-1.5-flash)
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    
     // Build conversation context (last 10 messages for better context)
     const recentMessages = conversationHistory.slice(-10);
     const context = recentMessages.map(msg => 
@@ -108,8 +105,15 @@ async function processChatMessage(userMessage, conversationHistory = []) {
       Return ONLY the JSON, no other text.
     `;
     
-    const result = await model.generateContent(prompt);
-    const response = result.response.text();
+    // Groq API call
+    const chatCompletion = await groq.chat.completions.create({
+      messages: [{ role: "user", content: prompt }],
+      model: "llama-3.3-70b-versatile",
+      temperature: 0.7,
+      max_tokens: 1024,
+    });
+    
+    const response = chatCompletion.choices[0]?.message?.content || "";
     
     // Clean the response - remove any markdown code blocks
     let cleanResponse = response.trim();
@@ -153,9 +157,6 @@ async function processChatMessage(userMessage, conversationHistory = []) {
  */
 async function generateJournalSummary(conversationHistory, detectedMood, primaryEmotion) {
   try {
-    // ✅ FIXED: Use "gemini-pro" (not gemini-1.5-flash)
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    
     const conversationText = conversationHistory.map(msg => 
       `${msg.role === 'user' ? 'User' : 'Lumora'}: ${msg.content}`
     ).join('\n');
@@ -189,8 +190,15 @@ async function generateJournalSummary(conversationHistory, detectedMood, primary
       Return ONLY the journal entry text, no quotes or extra formatting.
     `;
     
-    const result = await model.generateContent(prompt);
-    const summary = result.response.text();
+    // Groq API call
+    const chatCompletion = await groq.chat.completions.create({
+      messages: [{ role: "user", content: prompt }],
+      model: "llama-3.3-70b-versatile",
+      temperature: 0.7,
+      max_tokens: 512,
+    });
+    
+    const summary = chatCompletion.choices[0]?.message?.content || "";
     
     return summary.trim();
     

@@ -1,13 +1,27 @@
 // pages/Dashboard.js
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import api from "../utils/api";
 import AICompanion from "./components/AICompanion";
+import Layout from "./components/Layout";
+import AssessmentModal from "./components/AssessmentModal";
+import Recommendations from "./components/Recommendations";
+import { showSuccessToast, showErrorToast, showInfoToast } from "./components/ToastNotification";
+import AnimatedCard, { AnimatedButton, PageTransition } from "./components/AnimatedWrapper";
+import ExportButton from "./components/ExportButton";
+import { 
+  MoodChart, 
+  SleepChart, 
+  CorrelationChart,
+  StatsCard 
+} from "./components/EnhancedCharts";
+import StressForecast from "./components/StressForecast";
+import { requireStudent } from "../utils/roleAuth";
 import {
   Calendar,
   Moon,
   Smile,
-  Activity,
   BookOpen,
   MessageCircle,
   LogOut,
@@ -15,16 +29,17 @@ import {
   ChevronLeft,
   ChevronRight,
   TrendingUp,
-  Heart,
-  Menu
+  BarChart3,
+  Activity,
+  RefreshCw
 } from "lucide-react";
 
 function Dashboard() {
   const navigate = useNavigate();
   const user_id = localStorage.getItem("user_id");
   const [userNickname, setUserNickname] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showAICompanion, setShowAICompanion] = useState(false);
+  const [showAssessment, setShowAssessment] = useState(null);
 
   const [bedtime, setBedtime] = useState("");
   const [wakeTime, setWakeTime] = useState("");
@@ -33,18 +48,54 @@ function Dashboard() {
   const [todaySleep, setTodaySleep] = useState(null);
   const [isUpdatingSleep, setIsUpdatingSleep] = useState(false);
   const [isUpdatingMood, setIsUpdatingMood] = useState(false);
-  const [showMoodOptions, setShowMoodOptions] = useState(false);
   const [selectedMood, setSelectedMood] = useState(null);
 
   const [moodsData, setMoodsData] = useState([]);
   const [sleepData, setSleepData] = useState([]);
   const [journals, setJournals] = useState([]);
+  const [journalTotal, setJournalTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedDateJournals, setSelectedDateJournals] = useState([]);
   const [showDateModal, setShowDateModal] = useState(false);
+  const [chartView, setChartView] = useState("mood");
+
+  // Role check - redirect admin to admin panel
+  useEffect(() => {
+    if (!requireStudent(navigate)) {
+      return;
+    }
+  }, [navigate]);
+
+  // Event listener for opening assessment from recommendations
+  useEffect(() => {
+    const handleOpenAssessment = (e) => {
+      setShowAssessment(e.detail.type);
+    };
+    
+    window.addEventListener('openAssessment', handleOpenAssessment);
+    
+    return () => {
+      window.removeEventListener('openAssessment', handleOpenAssessment);
+    };
+  }, []);
+
+  // Event listener for opening article from recommendations
+  useEffect(() => {
+    const handleOpenArticle = (e) => {
+      console.log("Open article:", e.detail.article);
+      navigate(`/mental-health?article=${e.detail.article.id}`);
+    };
+    
+    window.addEventListener('openArticle', handleOpenArticle);
+    
+    return () => {
+      window.removeEventListener('openArticle', handleOpenArticle);
+    };
+  }, [navigate]);
 
   const moodOptionsList = [
     { value: 1, label: "Terrible", emoji: "😢", color: "#ef4444" },
@@ -59,8 +110,10 @@ function Dashboard() {
       const res = await api.get(`/profile/${user_id}`);
       if (res.data.nickname) {
         setUserNickname(res.data.nickname);
+        localStorage.setItem("user_nickname", res.data.nickname);
       } else {
         setUserNickname(res.data.name.split(" ")[0]);
+        localStorage.setItem("user_nickname", res.data.name.split(" ")[0]);
       }
     } catch (err) {
       console.log("Profile fetch error:", err);
@@ -70,7 +123,8 @@ function Dashboard() {
   const fetchJournals = async () => {
     try {
       const res = await api.get(`/journal/${user_id}`);
-      setJournals(res.data.slice(0, 3));
+      setJournalTotal(res.data.length);
+      setJournals(res.data.slice(0, 5));
     } catch (err) {
       console.log("Fetch journals error:", err);
     }
@@ -145,9 +199,17 @@ function Dashboard() {
       await fetchJournals();
     } catch (err) {
       console.log("Fetch error:", err);
+      showErrorToast("Failed to load dashboard data");
     } finally {
       setLoading(false);
     }
+  };
+
+  const refreshData = async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+    showSuccessToast("Dashboard refreshed!");
   };
 
   useEffect(() => {
@@ -165,10 +227,10 @@ function Dashboard() {
       setSelectedMood(moodValue);
       await fetchTodayEntries();
       await fetchData();
-      setShowMoodOptions(false);
+      showSuccessToast(`Mood updated to ${moodOptionsList.find(m => m.value === moodValue)?.label}! 🌟`);
     } catch (err) {
       console.error("Manual mood update error:", err);
-      alert("Failed to update mood");
+      showErrorToast("Failed to update mood. Please try again.");
     } finally {
       setIsUpdatingMood(false);
     }
@@ -183,7 +245,10 @@ function Dashboard() {
   };
 
   const saveSleep = async () => {
-    if (!bedtime || !wakeTime) return;
+    if (!bedtime || !wakeTime) {
+      showErrorToast("Please enter both bedtime and wake time");
+      return;
+    }
 
     const cleanBedtime = bedtime.split(':').slice(0, 2).join(':');
     const cleanWakeTime = wakeTime.split(':').slice(0, 2).join(':');
@@ -207,46 +272,64 @@ function Dashboard() {
       
       await fetchTodayEntries();
       await fetchData();
+      showSuccessToast(`Sleep logged! ${duration} hours of rest 💤`);
     } catch (err) {
       console.log("Save sleep error:", err.response?.data || err.message);
-      alert("Failed to save sleep. Please try again.");
+      showErrorToast("Failed to save sleep. Please try again.");
     } finally {
       setIsUpdatingSleep(false);
     }
   };
 
   const getLast7DaysTrend = () => {
-  const last7Days = [];
-  const today = new Date();
-  
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date(today);
-    date.setDate(today.getDate() - i);
-    const dateStr = date.toISOString().split('T')[0];
+    const last7Days = [];
+    const today = new Date();
     
-    const mood = moodsData.find(m => {
-      const moodDate = new Date(m.created_at);
-      return moodDate.toISOString().split('T')[0] === dateStr;
-    });
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const mood = moodsData.find(m => {
+        const moodDate = new Date(m.created_at);
+        const moodDateStr = moodDate.toISOString().split('T')[0];
+        return moodDateStr === dateStr;
+      });
+      
+      const sleep = sleepData.find(s => {
+        const sleepDate = new Date(s.created_at);
+        const sleepDateStr = sleepDate.toISOString().split('T')[0];
+        return sleepDateStr === dateStr;
+      });
+      
+      last7Days.push({
+        date: dateStr,
+        dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        mood: mood ? Number(mood.mood) : null,
+        sleepQuality: sleep ? Number(sleep.quality) : null,
+        sleepHours: sleep ? Number(sleep.duration) : null,
+      });
+    }
     
-    const sleep = sleepData.find(s => {
-      const sleepDate = new Date(s.created_at);
-      return sleepDate.toISOString().split('T')[0] === dateStr;
-    });
-    
-    last7Days.push({
-      date: date,
-      dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
-      mood: mood ? mood.mood : null,
-      sleepQuality: sleep ? sleep.quality : null,
-    });
-  }
-  return last7Days;
-};
+    return last7Days;
+  };
 
   const trendData = getLast7DaysTrend();
-  const hasMoodData = trendData.some(d => d.mood !== null);
-  const hasSleepData = trendData.some(d => d.sleepQuality !== null);
+  
+  const moodsList = moodsData.map(m => m.mood);
+  const averageMood = moodsList.length > 0 
+    ? (moodsList.reduce((a, b) => a + b, 0) / moodsList.length).toFixed(1)
+    : 0;
+  
+  const sleepQualities = sleepData.map(s => s.quality);
+  const averageSleepQuality = sleepQualities.length > 0 
+    ? (sleepQualities.reduce((a, b) => a + b, 0) / sleepQualities.length).toFixed(1)
+    : 0;
+  
+  const sleepDurations = sleepData.map(s => parseFloat(s.duration));
+  const averageSleepDuration = sleepDurations.length > 0
+    ? (sleepDurations.reduce((a, b) => a + b, 0) / sleepDurations.length).toFixed(1)
+    : 0;
 
   const getMoodForDate = (date) => {
     const year = date.getFullYear();
@@ -324,6 +407,7 @@ function Dashboard() {
   const logout = () => {
     localStorage.clear();
     navigate("/");
+    showInfoToast("You've been logged out. Take care! 💙");
   };
 
   const getGreeting = () => {
@@ -350,481 +434,478 @@ function Dashboard() {
 
   if (loading) {
     return (
-      <div className="loading-container">
-        <div className="spinner"></div>
-        <p className="loading-text">Loading your dashboard...</p>
-      </div>
+      <Layout>
+        <div className="loading-container">
+          <div className="spinner"></div>
+          <p className="loading-text">Loading your dashboard...</p>
+        </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="app-container">
-      <div className="bg-decoration">
-        <div className="blob1"></div>
-        <div className="blob2"></div>
-        <div className="blob3"></div>
-      </div>
-
-      {/* Hamburger Menu */}
-      <div className="hamburger-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
-        <Menu size={20} />
-      </div>
-
-      {/* Sidebar */}
-      <div className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
-        <div className="sidebar-header">
-          <span className="sidebar-logo">Lumora</span>
-          <button className="close-sidebar" onClick={() => setSidebarOpen(false)}>✕</button>
-        </div>
-        <nav className="sidebar-nav">
-          <button className={`sidebar-item ${window.location.pathname === "/dashboard" ? "active" : ""}`} onClick={() => navigate("/dashboard")}>
-            <Activity size={18} />
-            <span>Dashboard</span>
-          </button>
-          <button className={`sidebar-item ${window.location.pathname === "/journal" ? "active" : ""}`} onClick={() => navigate("/journal")}>
-            <BookOpen size={18} />
-            <span>Journal</span>
-          </button>
-          <button className={`sidebar-item ${window.location.pathname === "/mental-health" ? "active" : ""}`} onClick={() => navigate("/mental-health")}>
-            <Heart size={18} />
-            <span>Mental Health</span>
-          </button>
-          <button className={`sidebar-item ${window.location.pathname === "/student-support" ? "active" : ""}`} onClick={() => navigate("/student-support")}>
-            <TrendingUp size={18} />
-            <span>Student Support</span>
-          </button>
-          <button className={`sidebar-item ${window.location.pathname === "/profile" ? "active" : ""}`} onClick={() => navigate("/profile")}>
-            <User size={18} />
-            <span>Profile</span>
-          </button>
-          <button className="sidebar-item-logout" onClick={logout}>
-            <LogOut size={18} />
-            <span>Logout</span>
-          </button>
-        </nav>
-      </div>
-
-      {sidebarOpen && <div className="overlay" onClick={() => setSidebarOpen(false)}></div>}
-
-      {/* Chat Bubble */}
-      <div className="chat-bubble" onClick={() => setShowAICompanion(true)}>
-        <div className="chat-bubble-icon">
-          <MessageCircle size={20} />
-        </div>
-        <span className="chat-bubble-text">How are you feeling now?</span>
-      </div>
-
-      <div className="content-wrapper">
-        {/* Top Bar with Profile */}
-        <div className="top-bar">
-          <div className="user-profile">
-            <div className="user-avatar">
-              <User size={14} />
-            </div>
-            <span className="user-name">{userNickname || "User"}</span>
-            <div className="logout-icon" onClick={logout}>
-              <LogOut size={16} />
-            </div>
-          </div>
-        </div>
-
-        {/* Welcome Section */}
-        <div className="welcome-section">
-          <div className="welcome-row">
-            <div>
-              <div className="welcome-badge">
-                <span>{getGreeting()}</span>
-              </div>
-              <h1 className="welcome-title">
-                Welcome back, <span className="user-name">{userNickname || "Friend"}</span>
-              </h1>
-              <p className="quote-text">{getMotivationalQuote()}</p>
-            </div>
-            <div className="today-mood-quick">
-              <span className="today-mood-icon">{todayMoodDetails?.emoji || "❓"}</span>
+    <PageTransition>
+      <Layout>
+        {/* WELCOME SECTION */}
+        <AnimatedCard delay={0.1}>
+          <div className="welcome-section">
+            <div className="welcome-row">
               <div>
-                <p className="today-mood-label">Today's Mood</p>
-                <p className="today-mood-value">{todayMoodDetails?.label || "Not logged"}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Large Calendar */}
-        <div className="calendar-large">
-          <div className="calendar-header">
-            <h3 className="calendar-title">
-              <Calendar size={18} /> {formatMonthYear()}
-            </h3>
-            <div className="calendar-nav">
-              <button onClick={() => changeMonth(-1)} className="calendar-nav-btn">
-                <ChevronLeft size={16} />
-              </button>
-              <button onClick={() => changeMonth(1)} className="calendar-nav-btn">
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-          
-          <div className="weekday-header">
-            {weekDays.map(day => (
-              <div key={day} className="weekday-cell">{day}</div>
-            ))}
-          </div>
-          
-          <div className="calendar-grid">
-            {calendarDays.map((day, index) => {
-              const mood = getMoodForDate(day.date);
-              const moodDetails = mood ? getMoodDetails(mood) : null;
-              const isToday = day.date.toDateString() === new Date().toDateString();
-              
-              return (
-                <div
-                  key={index}
-                  className={`calendar-day ${!day.isCurrentMonth ? 'other-month' : ''}`}
-                  style={{
-                    backgroundColor: !day.isCurrentMonth ? 'transparent' : 'var(--bg-secondary)',
-                    border: isToday ? `2px solid var(--accent-primary)` : '1px solid transparent',
-                  }}
-                  onClick={() => handleDateClick(day.date, day.isCurrentMonth)}
-                >
-                  <span className="calendar-day-number">
-                    {day.date.getDate()}
-                  </span>
-                  {day.isCurrentMonth && mood && (
-                    <div className="calendar-mood" title={moodDetails.label}>
-                      <span>{moodDetails.emoji}</span>
-                    </div>
-                  )}
+                <div className="welcome-badge">
+                  <span>{getGreeting()}</span>
                 </div>
-              );
-            })}
+                <h1 className="welcome-title" style={{ fontSize: '32px', fontWeight: 700 }}>
+                  Welcome back, <span style={{ fontSize: '32px', fontWeight: 700 }}>{userNickname || "Friend"}</span>
+                </h1>
+                <p className="quote-text">{getMotivationalQuote()}</p>
+              </div>
+              <div className="today-mood-quick">
+                <span className="today-mood-icon">{todayMoodDetails?.emoji || "❓"}</span>
+                <div>
+                  <p className="today-mood-label">Today's Mood</p>
+                  <p className="today-mood-value">{todayMoodDetails?.label || "Not logged"}</p>
+                </div>
+              </div>
+            </div>
           </div>
-          
-          <div className="calendar-legend">
-            <span>Legend:</span>
-            {moodOptionsList.map(mood => (
-              <span key={mood.value}>
-                <span>{mood.emoji}</span> {mood.label}
-              </span>
-            ))}
-          </div>
-        </div>
+        </AnimatedCard>
 
-        {/* Two Column Row - Mood & Sleep Cards */}
-        <div className="two-column-row">
-          {/* Mood Card */}
-          <div className="mood-card">
-            <div className="mood-card-header">
-              <Smile size={24} color="var(--accent-primary)" />
-              <div>
-                <h3 className="card-title">Today's Mood</h3>
-                <p className="card-subtitle">How are you feeling today?</p>
+        {/* STATS CARDS */}
+        <motion.div 
+          className="stats-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '20px',
+            marginBottom: '28px'
+          }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.3 }}
+        >
+          <StatsCard 
+            title="Average Mood" 
+            value={`${averageMood}/5`} 
+            icon="😊" 
+            color="#6366f1"
+            subtitle={`Based on ${moodsList.length} entries`}
+          />
+          <StatsCard 
+            title="Sleep Quality" 
+            value={`${averageSleepQuality}/5`} 
+            icon="💤" 
+            color="#10b981"
+            subtitle={`${averageSleepDuration}h avg`}
+          />
+          <StatsCard 
+            title="Average Sleep" 
+            value={`${averageSleepDuration}h`} 
+            icon="🌙" 
+            color="#f59e0b"
+            subtitle={`From ${sleepDurations.length} sleep logs`}
+          />
+          <StatsCard 
+            title="Journal Entries" 
+            value={journalTotal} 
+            icon="📓" 
+            color="#8b5cf6"
+            subtitle="Your reflections"
+          />
+        </motion.div>
+
+        {/* RECOMMENDATIONS SECTION */}
+        <Recommendations userId={user_id} />
+
+        {/* ✅ STRESS FORECAST SECTION */}
+        <StressForecast userId={user_id} />
+
+        {/* LARGE CALENDAR */}
+        <AnimatedCard delay={0.3}>
+          <div className="calendar-large">
+            <div className="calendar-header">
+              <h3 className="calendar-title"><Calendar size={18} /> {formatMonthYear()}</h3>
+              <div className="calendar-nav">
+                <button onClick={() => changeMonth(-1)} className="calendar-nav-btn"><ChevronLeft size={16} /></button>
+                <button onClick={() => changeMonth(1)} className="calendar-nav-btn"><ChevronRight size={16} /></button>
               </div>
             </div>
             
-            {!showMoodOptions ? (
-              <>
-                <div className="mood-options">
-                  {moodOptionsList.map(mood => (
-                    <div
-                      key={mood.value}
-                      className={`mood-option ${selectedMood === mood.value ? 'selected' : ''}`}
-                      onClick={() => setSelectedMood(mood.value)}
-                    >
-                      <span className="mood-option-emoji">{mood.emoji}</span>
-                      <span className="mood-option-label">{mood.label}</span>
-                    </div>
-                  ))}
-                </div>
-                <button className="primary-btn" onClick={() => updateMoodManually(selectedMood)} disabled={!selectedMood || isUpdatingMood}>
-                  {isUpdatingMood ? "Saving..." : (todayMood ? "Update Mood" : "Log Mood")}
-                </button>
-              </>
-            ) : (
-              <div className="mood-quick-options">
-                {moodOptionsList.map(mood => (
-                  <button
-                    key={mood.value}
-                    className="mood-quick-option"
-                    onClick={() => updateMoodManually(mood.value)}
-                    disabled={isUpdatingMood}
+            <div className="weekday-header">
+              {weekDays.map(day => <div key={day} className="weekday-cell">{day}</div>)}
+            </div>
+            
+            <div className="calendar-grid">
+              {calendarDays.map((day, index) => {
+                const mood = getMoodForDate(day.date);
+                const moodDetails = mood ? getMoodDetails(mood) : null;
+                const isToday = day.date.toDateString() === new Date().toDateString();
+                
+                return (
+                  <motion.div
+                    key={index}
+                    className={`calendar-day ${!day.isCurrentMonth ? 'other-month' : ''}`}
+                    style={{
+                      backgroundColor: !day.isCurrentMonth ? 'transparent' : 'var(--bg-secondary)',
+                      border: isToday ? `2px solid var(--accent-primary)` : '1px solid transparent',
+                    }}
+                    onClick={() => handleDateClick(day.date, day.isCurrentMonth)}
+                    whileHover={{ scale: 1.02, y: -2 }}
+                    transition={{ duration: 0.15 }}
                   >
-                    <span>{mood.emoji}</span>
-                    <span>{mood.label}</span>
-                  </button>
+                    <span className="calendar-day-number">{day.date.getDate()}</span>
+                    {day.isCurrentMonth && mood && (
+                      <div className="calendar-mood" title={moodDetails.label}>
+                        <span>{moodDetails.emoji}</span>
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+            
+            <div className="calendar-legend">
+              <span>Legend:</span>
+              {moodOptionsList.map(mood => (
+                <span key={mood.value}><span>{mood.emoji}</span> {mood.label}</span>
+              ))}
+            </div>
+          </div>
+        </AnimatedCard>
+
+        {/* TWO COLUMN ROW - MOOD & SLEEP LOGGING */}
+        <div className="two-column-row">
+          <AnimatedCard delay={0.4}>
+            <div className="mood-card">
+              <div className="mood-card-header">
+                <Smile size={24} color="var(--accent-primary)" />
+                <div>
+                  <h3 className="card-title">Today's Mood</h3>
+                  <p className="card-subtitle">How are you feeling today?</p>
+                </div>
+              </div>
+              
+              <div className="mood-options">
+                {moodOptionsList.map(mood => (
+                  <motion.div 
+                    key={mood.value} 
+                    className={`mood-option ${selectedMood === mood.value ? 'selected' : ''}`} 
+                    onClick={() => setSelectedMood(mood.value)}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <span className="mood-option-emoji">{mood.emoji}</span>
+                    <span className="mood-option-label">{mood.label}</span>
+                  </motion.div>
                 ))}
-                <button className="mood-quick-cancel" onClick={() => setShowMoodOptions(false)}>Cancel</button>
               </div>
+              <AnimatedButton 
+                className="primary-btn" 
+                onClick={() => updateMoodManually(selectedMood)} 
+                disabled={!selectedMood || isUpdatingMood}
+              >
+                {isUpdatingMood ? "Saving..." : (todayMood ? "Update Mood" : "Log Mood")}
+              </AnimatedButton>
+            </div>
+          </AnimatedCard>
+
+          <AnimatedCard delay={0.5}>
+            <div className="sleep-card">
+              <div className="sleep-card-header">
+                <Moon size={24} color="var(--accent-primary)" />
+                <div>
+                  <h3 className="card-title">Sleep Tracking</h3>
+                  <p className="card-subtitle">Log your sleep hours</p>
+                </div>
+              </div>
+
+              <div className="sleep-input-row">
+                <div className="sleep-input-group">
+                  <label className="input-label">Bedtime</label>
+                  <input type="time" value={bedtime} onChange={(e) => setBedtime(e.target.value)} className="sleep-input" />
+                </div>
+                <div className="sleep-input-group">
+                  <label className="input-label">Wake time</label>
+                  <input type="time" value={wakeTime} onChange={(e) => setWakeTime(e.target.value)} className="sleep-input" />
+                </div>
+              </div>
+
+              <AnimatedButton className="primary-btn" onClick={saveSleep} disabled={!bedtime || !wakeTime || isUpdatingSleep}>
+                {isUpdatingSleep ? "Saving..." : (todaySleep ? "Update Sleep" : "Log Sleep")}
+              </AnimatedButton>
+            </div>
+          </AnimatedCard>
+        </div>
+
+        {/* CHARTS SECTION */}
+        <AnimatedCard delay={0.6}>
+          <div className="graph-card">
+            <div className="graph-header">
+              <BarChart3 size={20} color="var(--accent-primary)" />
+              <h3 className="graph-title">Mood Analytics</h3>
+            </div>
+            
+            <div className="chart-selector" style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+              <button 
+                className={`chart-type-btn ${chartView === 'mood' ? 'active' : ''}`}
+                onClick={() => setChartView('mood')}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '40px',
+                  border: chartView === 'mood' ? 'none' : '1px solid var(--border-light)',
+                  background: chartView === 'mood' ? 'var(--accent-gradient)' : 'var(--card-bg-glass)',
+                  color: chartView === 'mood' ? 'white' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Smile size={16} /> Mood Trend
+              </button>
+              <button 
+                className={`chart-type-btn ${chartView === 'sleep' ? 'active' : ''}`}
+                onClick={() => setChartView('sleep')}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '40px',
+                  border: chartView === 'sleep' ? 'none' : '1px solid var(--border-light)',
+                  background: chartView === 'sleep' ? 'var(--accent-gradient)' : 'var(--card-bg-glass)',
+                  color: chartView === 'sleep' ? 'white' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Moon size={16} /> Sleep Quality
+              </button>
+              <button 
+                className={`chart-type-btn ${chartView === 'correlation' ? 'active' : ''}`}
+                onClick={() => setChartView('correlation')}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '40px',
+                  border: chartView === 'correlation' ? 'none' : '1px solid var(--border-light)',
+                  background: chartView === 'correlation' ? 'var(--accent-gradient)' : 'var(--card-bg-glass)',
+                  color: chartView === 'correlation' ? 'white' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <TrendingUp size={16} /> Mood vs Sleep
+              </button>
+            </div>
+            
+            {/* ✅ NEW: Export section below chart selector */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px',
+              marginBottom: '16px',
+              padding: '10px 16px',
+              background: 'var(--bg-secondary)',
+              borderRadius: '12px',
+              border: '1px solid var(--border-light)'
+            }}>
+              <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                📊 Export your weekly data
+              </span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <ExportButton 
+                  type="mood" 
+                  userId={parseInt(user_id)} 
+                  label="Mood CSV"
+                  icon={<Activity size={14} />}
+                  variant="primary"
+                />
+                <ExportButton 
+                  type="sleep" 
+                  userId={parseInt(user_id)} 
+                  label="Sleep CSV"
+                  icon={<Moon size={14} />}
+                  variant="primary"
+                />
+              </div>
+            </div>
+            
+            {chartView === 'mood' && (
+              <>
+                <p className="trend-subtitle">Your emotional journey over the last 7 days</p>
+                <MoodChart data={trendData} height={320} />
+              </>
+            )}
+            
+            {chartView === 'sleep' && (
+              <>
+                <p className="trend-subtitle">Sleep quality rating over the last 7 days</p>
+                <SleepChart data={trendData} height={320} />
+              </>
+            )}
+            
+            {chartView === 'correlation' && (
+              <>
+                <p className="trend-subtitle">How sleep quality affects your mood</p>
+                <CorrelationChart data={trendData} height={320} />
+              </>
             )}
           </div>
+        </AnimatedCard>
 
-          {/* Sleep Card */}
-          <div className="sleep-card">
-            <div className="sleep-card-header">
-              <Moon size={24} color="var(--accent-primary)" />
+        {/* JOURNAL CARD */}
+        <AnimatedCard delay={0.7}>
+          <div className="journal-card-full">
+            <div className="journal-header">
+              <BookOpen size={24} color="var(--accent-primary)" />
               <div>
-                <h3 className="card-title">Sleep Tracking</h3>
-                <p className="card-subtitle">Log your sleep hours</p>
+                <h3 className="journal-title">Recent Journal Entries</h3>
+                <p className="card-subtitle">{journalTotal > 0 ? `Showing ${journals.length} of ${journalTotal} entries` : "Reflect, write, and grow"}</p>
               </div>
             </div>
-
-            <div className="sleep-input-row">
-              <div className="sleep-input-group">
-                <label className="input-label">Bedtime</label>
-                <input 
-                  type="time" 
-                  value={bedtime} 
-                  onChange={(e) => setBedtime(e.target.value)} 
-                  className="sleep-input" 
-                />
-              </div>
-              <div className="sleep-input-group">
-                <label className="input-label">Wake time</label>
-                <input 
-                  type="time" 
-                  value={wakeTime} 
-                  onChange={(e) => setWakeTime(e.target.value)} 
-                  className="sleep-input" 
-                />
-              </div>
-            </div>
-
-            <button className="primary-btn" onClick={saveSleep} disabled={!bedtime || !wakeTime || isUpdatingSleep}>
-              {isUpdatingSleep ? "Saving..." : (todaySleep ? "Update Sleep" : "Log Sleep")}
-            </button>
-          </div>
-        </div>
-
-        {/* Graphs Row */}
-        <div className="graphs-row">
-          {/* Sleep Quality Graph */}
-          <div className="graph-card">
-            <div className="graph-header">
-              <Moon size={18} color="var(--accent-primary)" />
-              <h3 className="graph-title">Sleep Quality Trend</h3>
-            </div>
-            <p className="trend-subtitle">Last 7 days</p>
-            
-            <div className="line-graph-container">
-              <div className="y-axis">
-                <span>5</span><span>4</span><span>3</span><span>2</span><span>1</span>
-              </div>
-              <div className="graph-area">
-                <svg viewBox="0 0 500 150" preserveAspectRatio="none" className="svg-graph">
-                  <line x1="0" y1="0" x2="500" y2="0" stroke="#e2e8f0" strokeWidth="1" />
-                  <line x1="0" y1="37.5" x2="500" y2="37.5" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
-                  <line x1="0" y1="75" x2="500" y2="75" stroke="#e2e8f0" strokeWidth="1" />
-                  <line x1="0" y1="112.5" x2="500" y2="112.5" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
-                  <line x1="0" y1="150" x2="500" y2="150" stroke="#e2e8f0" strokeWidth="1" />
-                  
-                  {hasSleepData && (
-                    <>
-                      <defs>
-                        <linearGradient id="sleepGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#6d5acf" stopOpacity="0.35" />
-                          <stop offset="100%" stopColor="#6d5acf" stopOpacity="0.03" />
-                        </linearGradient>
-                      </defs>
-                      
-                      <polygon
-                        points={trendData.map((day, idx) => {
-                          if (!day.sleepQuality) return null;
-                          const x = (idx / (trendData.length - 1)) * 500;
-                          const y = 150 - (day.sleepQuality / 5) * 150;
-                          return `${x},${y}`;
-                        }).filter(p => p !== null).join(" ") + `, 500,150, 0,150`}
-                        fill="url(#sleepGradient)"
-                      />
-                      
-                      <polyline
-                        points={trendData.map((day, idx) => {
-                          if (!day.sleepQuality) return null;
-                          const x = (idx / (trendData.length - 1)) * 500;
-                          const y = 150 - (day.sleepQuality / 5) * 150;
-                          return `${x},${y}`;
-                        }).filter(p => p !== null).join(" ")}
-                        fill="none"
-                        stroke="#6d5acf"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      
-                      {trendData.map((day, idx) => {
-                        if (!day.sleepQuality) return null;
-                        const x = (idx / (trendData.length - 1)) * 500;
-                        const y = 150 - (day.sleepQuality / 5) * 150;
-                        return (
-                          <circle key={idx} cx={x} cy={y} r="4" fill="#6d5acf" stroke="white" strokeWidth="2" />
-                        );
-                      })}
-                    </>
-                  )}
-                </svg>
-                <div className="x-axis-labels">
-                  {trendData.map((day, idx) => (
-                    <span key={idx} className="x-axis-label">{day.dayName}</span>
-                  ))}
+            <div className="recent-entries-list">
+              {journals.length === 0 ? (
+                <div className="no-entries">
+                  <p>No journal entries yet. Start writing your first entry! ✍️</p>
                 </div>
-              </div>
-            </div>
-            {!hasSleepData && <div className="no-data-message">No sleep data yet. Start tracking! 🌙</div>}
-          </div>
-
-          {/* Mood Graph */}
-          <div className="graph-card">
-            <div className="graph-header">
-              <Smile size={18} color="var(--accent-primary)" />
-              <h3 className="graph-title">Mood Trend</h3>
-            </div>
-            <p className="trend-subtitle">Last 7 days</p>
-            
-            <div className="line-graph-container">
-              <div className="y-axis">
-                <span>5</span><span>4</span><span>3</span><span>2</span><span>1</span>
-              </div>
-              <div className="graph-area">
-                <svg viewBox="0 0 500 150" preserveAspectRatio="none" className="svg-graph">
-                  <line x1="0" y1="0" x2="500" y2="0" stroke="#e2e8f0" strokeWidth="1" />
-                  <line x1="0" y1="37.5" x2="500" y2="37.5" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
-                  <line x1="0" y1="75" x2="500" y2="75" stroke="#e2e8f0" strokeWidth="1" />
-                  <line x1="0" y1="112.5" x2="500" y2="112.5" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
-                  <line x1="0" y1="150" x2="500" y2="150" stroke="#e2e8f0" strokeWidth="1" />
-                  
-                  {hasMoodData && (
-                    <>
-                      <defs>
-                        <linearGradient id="moodGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#10b981" stopOpacity="0.35" />
-                          <stop offset="100%" stopColor="#10b981" stopOpacity="0.03" />
-                        </linearGradient>
-                      </defs>
-                      
-                      <polygon
-                        points={trendData.map((day, idx) => {
-                          if (!day.mood) return null;
-                          const x = (idx / (trendData.length - 1)) * 500;
-                          const y = 150 - (day.mood / 5) * 150;
-                          return `${x},${y}`;
-                        }).filter(p => p !== null).join(" ") + `, 500,150, 0,150`}
-                        fill="url(#moodGradient)"
-                      />
-                      
-                      <polyline
-                        points={trendData.map((day, idx) => {
-                          if (!day.mood) return null;
-                          const x = (idx / (trendData.length - 1)) * 500;
-                          const y = 150 - (day.mood / 5) * 150;
-                          return `${x},${y}`;
-                        }).filter(p => p !== null).join(" ")}
-                        fill="none"
-                        stroke="#10b981"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      
-                      {trendData.map((day, idx) => {
-                        if (!day.mood) return null;
-                        const x = (idx / (trendData.length - 1)) * 500;
-                        const y = 150 - (day.mood / 5) * 150;
-                        return (
-                          <circle key={idx} cx={x} cy={y} r="4" fill="#10b981" stroke="white" strokeWidth="2" />
-                        );
-                      })}
-                    </>
-                  )}
-                </svg>
-                <div className="x-axis-labels">
-                  {trendData.map((day, idx) => (
-                    <span key={idx} className="x-axis-label">{day.dayName}</span>
-                  ))}
-                </div>
-              </div>
-            </div>
-            {!hasMoodData && <div className="no-data-message">No mood data yet. Log your mood to see trends! 😊</div>}
-          </div>
-        </div>
-
-        {/* Journal Card - Full Width */}
-        <div className="journal-card-full">
-          <div className="journal-header">
-            <BookOpen size={24} color="var(--accent-primary)" />
-            <div>
-              <h3 className="journal-title">Recent Journal Entries</h3>
-              <p className="card-subtitle">Reflect, write, and grow</p>
-            </div>
-          </div>
-          
-          <div className="recent-entries-list">
-            {journals.length === 0 ? (
-              <div className="no-entries">
-                <p>No journal entries yet</p>
-              </div>
-            ) : (
-              journals.map((entry, idx) => (
-                <div key={idx} className="recent-entry-item">
-                  <div className="recent-entry-date">
-                    {new Date(entry.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </div>
-                  <p className="recent-entry-text">
-                    {entry.content.length > 100 ? entry.content.substring(0, 100) + "..." : entry.content}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-          
-          <button onClick={() => navigate("/journal")} className="primary-btn">
-            Write in Journal
-          </button>
-        </div>
-      </div>
-
-      {/* Date Modal */}
-      {showDateModal && selectedDate && (
-        <div className="modal-overlay" onClick={() => setShowDateModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>{selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</h3>
-              <button className="modal-close" onClick={() => setShowDateModal(false)}>✕</button>
-            </div>
-            <div className="modal-content">
-              <h4>Journal Entries</h4>
-              {selectedDateJournals.length === 0 ? (
-                <p className="modal-empty">No journal entries for this day</p>
               ) : (
-                selectedDateJournals.map((journal, idx) => (
-                  <div key={idx} className="modal-journal-entry">
-                    <div className="modal-journal-time">
-                      {new Date(journal.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                journals.map((entry, idx) => (
+                  <motion.div 
+                    key={idx} 
+                    className="recent-entry-item"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                  >
+                    <div className="recent-entry-date">
+                      {new Date(entry.created_at).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                      })}
                     </div>
-                    <p className="modal-journal-content">{journal.content}</p>
-                  </div>
+                    <p className="recent-entry-text">
+                      {entry.content.length > 120 ? entry.content.substring(0, 120) + "..." : entry.content}
+                    </p>
+                  </motion.div>
                 ))
               )}
             </div>
+            <AnimatedButton onClick={() => navigate("/journal")} className="primary-btn">
+              Write in Journal
+            </AnimatedButton>
           </div>
-        </div>
-      )}
+        </AnimatedCard>
 
-      {/* AI Companion */}
-      {showAICompanion && (
-        <AICompanion
-          onClose={() => {
-            setShowAICompanion(false);
-            fetchTodayEntries();
-            fetchData();
+        {/* CHAT BUBBLE */}
+        <motion.div 
+          className="chat-bubble" 
+          onClick={() => setShowAICompanion(true)}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          animate={{ 
+            y: [0, -5, 0],
+            transition: { duration: 2, repeat: Infinity, repeatType: "reverse" }
           }}
-          onJournalSaved={() => {
-            fetchTodayEntries();
-            fetchData();
-            fetchJournals();
-          }}
-        />
-      )}
-    </div>
+        >
+          <div className="chat-bubble-icon"><MessageCircle size={20} /></div>
+          <span className="chat-bubble-text">How are you feeling now?</span>
+        </motion.div>
+
+        {/* DATE MODAL */}
+        <AnimatePresence>
+          {showDateModal && selectedDate && (
+            <motion.div 
+              className="modal-overlay" 
+              onClick={() => setShowDateModal(false)}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <motion.div 
+                className="modal" 
+                onClick={(e) => e.stopPropagation()}
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+              >
+                <div className="modal-header">
+                  <div>
+                    <h3>
+                      {selectedDate.toLocaleDateString('en-US', { 
+                        weekday: 'long', 
+                        month: 'long', 
+                        day: 'numeric',
+                        year: 'numeric' 
+                      })}
+                    </h3>
+                  </div>
+                  <button className="modal-close" onClick={() => setShowDateModal(false)}>✕</button>
+                </div>
+                <div className="modal-content">
+                  {selectedDateJournals.length === 0 ? (
+                    <p className="modal-empty">No journal entries for this day</p>
+                  ) : (
+                    selectedDateJournals.map((journal, idx) => (
+                      <div key={idx} className="modal-journal-entry">
+                        <div className="modal-journal-time">
+                          {new Date(journal.created_at).toLocaleTimeString('en-US', { 
+                            hour: 'numeric', 
+                            minute: '2-digit' 
+                          })}
+                        </div>
+                        <p className="modal-journal-content">{journal.content}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* AI COMPANION */}
+        <AnimatePresence>
+          {showAICompanion && (
+            <AICompanion 
+              onClose={() => { 
+                setShowAICompanion(false); 
+                fetchTodayEntries(); 
+                fetchData(); 
+              }} 
+              onJournalSaved={() => { 
+                fetchTodayEntries(); 
+                fetchData(); 
+                fetchJournals();
+                showSuccessToast("Journal entry saved from AI conversation! ✨");
+              }} 
+            />
+          )}
+        </AnimatePresence>
+
+        {/* ASSESSMENT MODAL */}
+        <AnimatePresence>
+          {showAssessment && (
+            <AssessmentModal 
+              type={showAssessment} 
+              onClose={() => setShowAssessment(null)}
+              onComplete={() => {
+                showSuccessToast("Assessment completed! Check your insights.");
+                refreshData();
+              }}
+            />
+          )}
+        </AnimatePresence>
+      </Layout>
+    </PageTransition>
   );
 }
 

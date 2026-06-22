@@ -3,26 +3,54 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const verifyToken = require("../middleware/authmiddleware");
+const sendAdminNotification = require("../utilityAdmin/notificationHelper");
+
+// Helper function to get online resources from database
+function getOnlineResourcesFromDB(callback) {
+  db.query(
+    "SELECT id, name, url, description, display_order FROM support_resources WHERE type = 'online_resource' AND is_active = 1 ORDER BY display_order",
+    (err, results) => {
+      if (err) {
+        console.error("Fetch online resources error:", err);
+        callback([]);
+        return;
+      }
+      callback(results);
+    }
+  );
+}
+
+// Helper function to get crisis resources from database
+function getCrisisResourcesFromDB(callback) {
+  db.query(
+    "SELECT id, name, number, description, hours, display_order FROM support_resources WHERE type = 'crisis_resource' AND is_active = 1 ORDER BY display_order",
+    (err, results) => {
+      if (err) {
+        console.error("Fetch crisis resources error:", err);
+        callback([]);
+        return;
+      }
+      callback(results);
+    }
+  );
+}
+
+// ❌ REMOVED: Public crisis-resources route (moved to publicResources.js)
+// ❌ REMOVED: Public online-resources route (moved to publicResources.js)
 
 /**
  * GET /api/support/:user_id
- * Get support resources for the user's university
+ * Get support resources for the user's university (AUTHENTICATED)
  */
 router.get("/:user_id", verifyToken, (req, res) => {
   const userId = parseInt(req.params.user_id);
   
-  console.log("=== SUPPORT API CALLED ===");
-  console.log("User ID:", userId);
-  
-  // Verify user ownership
   if (req.user.id !== userId) {
-    console.log("Unauthorized: user mismatch");
     return res.status(403).json({ msg: "Unauthorized" });
   }
   
-  // Get user's university_id from their profile (removed 'university' column)
   db.query(
-    "SELECT university_id FROM users WHERE id = ?",  // ← Removed 'university' column
+    "SELECT university_id FROM users WHERE id = ?",
     [userId],
     (err, userResults) => {
       if (err) {
@@ -31,24 +59,30 @@ router.get("/:user_id", verifyToken, (req, res) => {
       }
       
       if (!userResults.length) {
-        console.log("User not found");
         return res.status(404).json({ msg: "User not found" });
       }
       
       const userUniversityId = userResults[0].university_id;
-      console.log("User university_id:", userUniversityId);
       
       if (!userUniversityId) {
-        console.log("No university selected for user");
-        return res.json({
-          hasUniversity: false,
-          universityName: null,
-          resources: getGeneralResources(),
-          message: "No university selected. Please update your profile to see university-specific resources."
+        getOnlineResourcesFromDB((onlineResources) => {
+          getCrisisResourcesFromDB((crisisResources) => {
+            return res.json({
+              hasUniversity: false,
+              universityName: null,
+              resources: {
+                general: {
+                  onlineResources: onlineResources,
+                  crisisResources: crisisResources
+                }
+              },
+              message: "No university selected. Please update your profile to see university-specific resources."
+            });
+          });
         });
+        return;
       }
       
-      // Get university details with support resources
       db.query(
         `SELECT id, name, short_name, 
                 counselling_contact, counselling_email, counselling_website,
@@ -62,46 +96,50 @@ router.get("/:user_id", verifyToken, (req, res) => {
             return res.status(500).json({ msg: "Failed to fetch support resources" });
           }
           
-          console.log("University query results:", uniResults);
-          
-          if (!uniResults.length) {
-            console.log("University not found in database");
-            return res.json({
-              hasUniversity: true,
-              universityId: userUniversityId,
-              hasCustomResources: false,
-              resources: getGeneralResources(),
-              message: "University found but no specific resources available yet."
+          getOnlineResourcesFromDB((onlineResources) => {
+            getCrisisResourcesFromDB((crisisResources) => {
+              if (!uniResults.length) {
+                return res.json({
+                  hasUniversity: true,
+                  universityId: userUniversityId,
+                  hasCustomResources: false,
+                  resources: {
+                    general: {
+                      onlineResources: onlineResources,
+                      crisisResources: crisisResources
+                    }
+                  },
+                  message: "University found but no specific resources available yet."
+                });
+              }
+              
+              const university = uniResults[0];
+              const hasCustomResources = !!(university.counselling_contact || 
+                                             university.counselling_email || 
+                                             university.counselling_website);
+              
+              res.json({
+                hasUniversity: true,
+                universityId: university.id,
+                universityName: university.name,
+                universityShortName: university.short_name,
+                hasCustomResources: hasCustomResources,
+                resources: {
+                  university: {
+                    counselling_contact: university.counselling_contact,
+                    counselling_email: university.counselling_email,
+                    counselling_website: university.counselling_website,
+                    hotline: university.hotline,
+                    emergency_contact: university.emergency_contact,
+                    support_notes: university.support_notes
+                  },
+                  general: {
+                    onlineResources: onlineResources,
+                    crisisResources: crisisResources
+                  }
+                }
+              });
             });
-          }
-          
-          const university = uniResults[0];
-          console.log("University data:", university);
-          
-          // Check if university has custom resources
-          const hasCustomResources = !!(university.counselling_contact || 
-                                         university.counselling_email || 
-                                         university.counselling_website);
-          
-          console.log("Has custom resources:", hasCustomResources);
-          
-          res.json({
-            hasUniversity: true,
-            universityId: university.id,
-            universityName: university.name,
-            universityShortName: university.short_name,
-            hasCustomResources: hasCustomResources,
-            resources: {
-              university: {
-                counselling_contact: university.counselling_contact,
-                counselling_email: university.counselling_email,
-                counselling_website: university.counselling_website,
-                hotline: university.hotline,
-                emergency_contact: university.emergency_contact,
-                support_notes: university.support_notes
-              },
-              general: getGeneralResources()
-            }
           });
         }
       );
@@ -109,34 +147,62 @@ router.get("/:user_id", verifyToken, (req, res) => {
   );
 });
 
-/**
- * General mental health resources for all students
- */
-function getGeneralResources() {
-  return {
-    nationalHotlines: [
-      { name: "Talian Kasih (24/7)", number: "15999", description: "General crisis support helpline" },
-      { name: "Talian HEAL", number: "15555", hours: "8.30 am – 11.59 pm", description: "Mental health crisis helpline" },
-      { name: "Befrienders KL (24/7)", number: "+603-7627 2929", description: "Emotional support and crisis intervention" },
-      { name: "Mental Health Psychosocial Support", number: "03-2935 9935", description: "MHPSS helpline" }
-    ],
-    emergency: {
-      police: "999",
-      ambulance: "999",
-      fire: "999"
-    },
-    onlineResources: [
-      { name: "Mental Health Malaysia", url: "https://mentalhealthmalaysia.my/", description: "Mental health resources and information" },
-      { name: "Relate Malaysia", url: "https://relate.com.my/", description: "Online counselling services" },
-      { name: "The Mind", url: "https://themind.org.my/", description: "Mental health advocacy and support" }
-    ],
-    tips: [
-      "Reach out to someone you trust",
-      "Practice self-care and rest",
-      "Seek professional help when needed - it's a sign of strength",
-      "You are not alone in this journey"
-    ]
-  };
-}
+// ====================
+// ISSUE REPORTING
+// ====================
+
+// POST /api/support/report-issue
+router.post("/report-issue", verifyToken, (req, res) => {
+  const { user_id, subject, message, type } = req.body;
+  
+  if (req.user.id !== user_id) {
+    return res.status(403).json({ msg: "Unauthorized" });
+  }
+
+  // Create table if not exists
+  const createTableQuery = `
+    CREATE TABLE IF NOT EXISTS issue_reports (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      user_id INT NOT NULL,
+      subject VARCHAR(255) NOT NULL,
+      message TEXT NOT NULL,
+      type VARCHAR(50) DEFAULT 'bug',
+      status ENUM('pending', 'resolved') DEFAULT 'pending',
+      admin_response TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `;
+  
+  db.query(createTableQuery, (err) => {
+    if (err) {
+      console.error("Create table error:", err);
+    }
+    
+    db.query(
+      `INSERT INTO issue_reports (user_id, subject, message, type, status, created_at) 
+       VALUES (?, ?, ?, ?, 'pending', NOW())`,
+      [user_id, subject, message, type],
+      async (err, result) => {
+        if (err) {
+          console.error("Report issue error:", err);
+          return res.status(500).json({ msg: "Failed to submit report" });
+        }
+        
+        // Send admin notification using imported helper
+        await sendAdminNotification(
+          'report_issue',
+          'New Issue Report',
+          `User reported an issue: ${subject}`,
+          '/admin/issues',
+          result.insertId
+        );
+        
+        res.json({ msg: "Report submitted successfully", id: result.insertId });
+      }
+    );
+  });
+});
 
 module.exports = router;

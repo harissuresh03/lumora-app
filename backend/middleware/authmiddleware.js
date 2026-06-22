@@ -1,3 +1,4 @@
+// backend/middleware/authmiddleware.js
 const jwt = require("jsonwebtoken");
 
 const JWT_SECRET = "lumora_secret_key";

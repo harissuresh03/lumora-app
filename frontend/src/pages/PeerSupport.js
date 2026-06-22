@@ -1,0 +1,1226 @@
+// frontend/src/pages/PeerSupport.js
+import { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { db } from "../utils/firebase";
+import api from "../utils/api";
+import {
+  collection,
+  addDoc,
+  query,
+  orderBy,
+  onSnapshot,
+  updateDoc,
+  doc,
+  increment,
+  arrayUnion,
+  arrayRemove,
+  limit,
+  deleteDoc,
+  getDoc,
+  getDocs,
+  where,
+  setDoc
+} from "firebase/firestore";
+import Layout from "./components/Layout";
+import ModerationStatus from "./components/ModerationStatus";
+import {
+  User,
+  Heart,
+  AlertTriangle,
+  Send,
+  Sparkles,
+  Flag,
+  MessageCircle,
+  Users,
+  ArrowLeft,
+  Home,
+  MoreHorizontal,
+  ThumbsUp,
+  Trash2,
+  Plus,
+  Search,
+  X,
+  DoorOpen,
+  Crown,
+  Lock,
+  Globe
+} from "lucide-react";
+import { showSuccessToast, showErrorToast, showWarningToast } from "./components/ToastNotification";
+
+// ============================================
+// MODERATION FUNCTION (Calls Backend API)
+// ============================================
+
+async function moderatePost(content) {
+  try {
+    const response = await api.post('/ai/moderate', { content });
+    console.log('✅ Moderation API response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ AI moderation error:', error);
+    console.error('❌ Error response:', error.response);
+    console.error('❌ Error message:', error.message);
+    
+    // ✅ Don't auto-approve on error - block instead for safety
+    return {
+      action: 'blocked',
+      reason: 'Moderation service unavailable. Please try again.',
+      score: 1.0,
+      isError: true
+    };
+  }
+}
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
+
+function PeerSupport() {
+  const navigate = useNavigate();
+  const user_id = localStorage.getItem("user_id");
+  const userIdNumber = parseInt(user_id, 10);
+
+  console.log("USER_ID RAW:", user_id);
+  console.log("USER_ID NUMBER:", userIdNumber);
+  
+  const [userNickname, setUserNickname] = useState("");
+  const [posts, setPosts] = useState([]);
+  const [newPost, setNewPost] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [dailyPrompt, setDailyPrompt] = useState("");
+  const [showCrisisAlert, setShowCrisisAlert] = useState(false);
+  const [warningCount, setWarningCount] = useState(0);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportingPost, setReportingPost] = useState(null);
+  const [reportReason, setReportReason] = useState("");
+  const [showComments, setShowComments] = useState({});
+  const [commentText, setCommentText] = useState({});
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const [activeTab, setActiveTab] = useState("feed");
+  
+  // Moderation State
+  const [moderationStatus, setModerationStatus] = useState(null);
+  const [moderationScore, setModerationScore] = useState(0);
+  const [moderationReason, setModerationReason] = useState("");
+  const [isModerating, setIsModerating] = useState(false);
+  const [commentModeration, setCommentModeration] = useState({});
+const [commentModerationStatus, setCommentModerationStatus] = useState({});
+const [commentModerationReason, setCommentModerationReason] = useState({});
+const [commentModerationScore, setCommentModerationScore] = useState({});
+  
+  // Groups State
+  const [myGroups, setMyGroups] = useState([]);
+  const [publicGroups, setPublicGroups] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [groupMessages, setGroupMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
+  const [showJoinRequests, setShowJoinRequests] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupDescription, setNewGroupDescription] = useState("");
+  const [newGroupIsPublic, setNewGroupIsPublic] = useState(true);
+  const [groupSearchTerm, setGroupSearchTerm] = useState("");
+  const [groupUnreadCounts, setGroupUnreadCounts] = useState({});
+  const messagesEndRef = useRef(null);
+
+  // Generate random avatar color based on nickname
+  const getAvatarColor = (nickname) => {
+    const colors = [
+      "#ef4444", "#f97316", "#eab308", "#22c55e", "#16a34a",
+      "#3b82f6", "#8b5cf6", "#ec4899", "#f43f5e", "#06b6d4"
+    ];
+    const index = (nickname?.length || 0) % colors.length;
+    return colors[index];
+  };
+
+  // Get initial letter for avatar
+  const getInitial = (name) => {
+    return name?.charAt(0).toUpperCase() || "?";
+  };
+
+  // Fetch user profile
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const res = await api.get(`/profile/${user_id}`);
+        if (res.data.nickname) setUserNickname(res.data.nickname);
+        else setUserNickname(res.data.name.split(" ")[0]);
+      } catch (err) { console.log("Profile fetch error:", err); }
+    };
+    
+    const fetchWarningStatus = async () => {
+      try {
+        const res = await api.get(`/peer-support/warnings/${user_id}`);
+        setWarningCount(res.data.count);
+        setIsBlocked(res.data.isBlocked);
+      } catch (err) { console.error("Warning fetch error:", err); }
+    };
+    
+    const fetchDailyPrompt = async () => {
+      try {
+        const res = await api.get("/peer-support/daily-prompt");
+        setDailyPrompt(res.data.prompt);
+      } catch (err) { console.error("Prompt fetch error:", err); }
+    };
+    
+    fetchUserProfile();
+    fetchWarningStatus();
+    fetchDailyPrompt();
+  }, [user_id]);
+
+  // Fetch posts
+  useEffect(() => {
+  const q = query(
+    collection(db, "posts"),
+    orderBy("createdAt", "desc"),
+    limit(50)
+  );
+
+  const unsubscribe = onSnapshot(
+    q,
+    (snapshot) => {
+      console.log("SNAPSHOT SIZE:", snapshot.size);
+
+      const postsData = [];
+
+      snapshot.forEach((doc) => {
+        const postData = {
+          id: doc.id,
+          ...doc.data()
+        };
+
+        console.log("POST DOC:", postData);
+
+        const reportedBy = Array.isArray(postData.reportedBy)
+          ? postData.reportedBy.filter(Boolean).map(Number)
+          : [];
+
+        if (!reportedBy.includes(userIdNumber)) {
+          postsData.push(postData);
+        }
+      });
+
+      console.log("POSTS AFTER FILTER:", postsData);
+
+      setPosts(postsData);
+      setLoading(false);
+    },
+    (error) => {
+      console.error("Firestore error:", error);
+      setLoading(false);
+    }
+  );
+
+  return () => unsubscribe();
+}, [userIdNumber]);
+
+  // Fetch groups
+  useEffect(() => {
+    const q = query(collection(db, "groups"), where("members", "array-contains", userIdNumber));
+    const unsubscribeGroups = onSnapshot(q, (snapshot) => {
+      const groupsData = [];
+      snapshot.forEach((doc) => {
+        groupsData.push({ id: doc.id, ...doc.data() });
+      });
+      setMyGroups(groupsData);
+      setLoading(false);
+    });
+    
+    const publicQuery = query(collection(db, "groups"), where("isPublic", "==", true));
+    const unsubscribePublic = onSnapshot(publicQuery, (snapshot) => {
+      const publicGroupsData = [];
+      snapshot.forEach((doc) => {
+        const groupData = { id: doc.id, ...doc.data() };
+        if (!groupData.members?.includes(userIdNumber)) {
+          publicGroupsData.push(groupData);
+        }
+      });
+      setPublicGroups(publicGroupsData);
+    });
+    
+    return () => {
+      unsubscribeGroups();
+      unsubscribePublic();
+    };
+  }, [userIdNumber]);
+
+  // Fetch group messages when a group is selected
+  useEffect(() => {
+    if (!selectedGroup) return;
+    
+    const messagesQuery = query(
+      collection(db, `groups/${selectedGroup.id}/messages`),
+      orderBy("createdAt", "asc"),
+      limit(100)
+    );
+    
+    const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+      const messagesData = [];
+      snapshot.forEach((doc) => {
+        messagesData.push({ id: doc.id, ...doc.data() });
+      });
+      setGroupMessages(messagesData);
+      
+      if (messagesData.length > 0 && messagesData[messagesData.length - 1].createdAt) {
+        const lastMessageId = messagesData[messagesData.length - 1].id;
+        const lastReadRef = doc(db, `groups/${selectedGroup.id}/lastRead/${userIdNumber}`);
+        setDoc(lastReadRef, { lastReadId: lastMessageId, updatedAt: new Date() }, { merge: true });
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [selectedGroup, userIdNumber]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [groupMessages]);
+
+  // Update unread counts
+  useEffect(() => {
+    const fetchUnreadCounts = async () => {
+      const counts = {};
+      for (const group of myGroups) {
+        const lastReadRef = doc(db, `groups/${group.id}/lastRead/${userIdNumber}`);
+        const lastReadDoc = await getDoc(lastReadRef);
+        const lastReadId = lastReadDoc.data()?.lastReadId;
+        
+        const messagesQuery = query(
+          collection(db, `groups/${group.id}/messages`),
+          orderBy("createdAt", "desc"),
+          limit(1)
+        );
+        const snapshot = await getDocs(messagesQuery);
+        let hasUnread = false;
+        snapshot.forEach((doc) => {
+          if (doc.id !== lastReadId) hasUnread = true;
+        });
+        counts[group.id] = hasUnread ? 1 : 0;
+      }
+      setGroupUnreadCounts(counts);
+    };
+    fetchUnreadCounts();
+  }, [myGroups, groupMessages, userIdNumber]);
+
+  // ============================================
+  // HANDLE ADD POST WITH MODERATION
+  // ============================================
+  const handleAddPost = async () => {
+    if (!newPost.trim() || sending || isBlocked) return;
+    
+    // Show moderation status
+    setIsModerating(true);
+    setModerationStatus('checking');
+    setModerationReason('Analyzing your post content...');
+    setSending(true);
+
+    try {
+  // AI Moderation (calls backend API)
+  const moderationResult = await moderatePost(newPost);
+  
+  console.log('📊 Moderation result:', moderationResult);
+  
+  // ✅ Check if there was an error
+  if (moderationResult.isError) {
+    showErrorToast(moderationResult.reason || 'Moderation service unavailable. Please try again.');
+    setModerationStatus(null);
+    setSending(false);
+    setIsModerating(false);
+    return;
+  }
+  
+  setModerationScore(moderationResult.score || 0);
+  setModerationReason(moderationResult.reason || '');
+
+  if (moderationResult.action === 'blocked') {
+    setModerationStatus('blocked');
+    
+    // Increment warning
+    const res = await api.post("/peer-support/increment-warning", { user_id: userIdNumber });
+    setWarningCount(res.data.count);
+    if (res.data.isBlocked) {
+      setIsBlocked(true);
+      setSending(false);
+      setIsModerating(false);
+      showErrorToast('Your account has been blocked for multiple violations.');
+      return;
+    }
+    
+    showErrorToast(`Your post was not approved: ${moderationResult.reason}. Warning ${res.data.count}/3.`);
+    setSending(false);
+    setIsModerating(false);
+    
+    setTimeout(() => {
+      setModerationStatus(null);
+    }, 8000);
+    return;
+  }
+      
+      if (moderationResult.action === 'crisis') {
+        setModerationStatus('crisis');
+        setModerationReason(moderationResult.reason || 'We noticed you might be going through a difficult time. Help is available.');
+        
+        // ✅ Show crisis alert modal with resources
+        setShowCrisisAlert(true);
+        
+        // ✅ Show a more compassionate message
+        showWarningToast('We noticed you might be going through a difficult time. Support is available.');
+        
+        setSending(false);
+        setIsModerating(false);
+        
+        setTimeout(() => {
+          setModerationStatus(null);
+        }, 8000);
+        return;
+      }
+      
+      if (moderationResult.action === 'flagged') {
+        setModerationStatus('flagged');
+        showWarningToast('Your post has been flagged for review by our moderators.');
+      } else {
+        setModerationStatus('approved');
+        showSuccessToast('Your post has been shared! 💙');
+      }
+      
+      // Post is approved (or flagged but still posted)
+      await addDoc(collection(db, "posts"), {
+        content: newPost.trim(),
+        user_id: userIdNumber,
+        nickname: userNickname,
+        avatarColor: getAvatarColor(userNickname),
+        createdAt: new Date(),
+        reactions: { relate: 0, strength: 0 },
+        usersRelated: [],
+        usersStrengthened: [],
+        comments: [],
+        status: moderationResult.action === 'flagged' ? 'flagged' : 'active',
+        moderationReason: moderationResult.action === 'flagged' ? moderationResult.reason : null,
+        moderationScore: moderationResult.score || 0,
+        reportedBy: []
+      });
+      
+      setNewPost("");
+      
+      setTimeout(() => {
+        setModerationStatus(null);
+      }, 3000);
+      
+    } catch (error) {
+      console.error("Error posting:", error);
+      showErrorToast("Failed to post. Please try again.");
+      setModerationStatus(null);
+    } finally {
+      setSending(false);
+      setIsModerating(false);
+    }
+  };
+
+  const handleReact = async (postId, reactionType) => {
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    
+    const hasRelated = post.usersRelated?.includes(userIdNumber);
+    const hasStrengthened = post.usersStrengthened?.includes(userIdNumber);
+    
+    let updateData = {};
+    
+    if (reactionType === 'relate') {
+      if (hasRelated) {
+        updateData = { 'usersRelated': arrayRemove(userIdNumber), 'reactions.relate': increment(-1) };
+      } else {
+        updateData = { 'usersRelated': arrayUnion(userIdNumber), 'reactions.relate': increment(1) };
+        if (hasStrengthened) {
+          updateData['usersStrengthened'] = arrayRemove(userIdNumber);
+          updateData['reactions.strength'] = increment(-1);
+        }
+      }
+    } else if (reactionType === 'strength') {
+      if (hasStrengthened) {
+        updateData = { 'usersStrengthened': arrayRemove(userIdNumber), 'reactions.strength': increment(-1) };
+      } else {
+        updateData = { 'usersStrengthened': arrayUnion(userIdNumber), 'reactions.strength': increment(1) };
+        if (hasRelated) {
+          updateData['usersRelated'] = arrayRemove(userIdNumber);
+          updateData['reactions.relate'] = increment(-1);
+        }
+      }
+    }
+    
+    try {
+      await updateDoc(doc(db, "posts", postId), updateData);
+    } catch (error) { console.error("Error reacting:", error); }
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (window.confirm("Are you sure you want to delete this post? This action cannot be undone.")) {
+      try {
+        await deleteDoc(doc(db, "posts", postId));
+        setOpenDropdown(null);
+      } catch (error) { console.error("Error deleting post:", error); alert("Failed to delete post."); }
+    }
+  };
+
+  const handleDeleteComment = async (postId, commentId) => {
+  const post = posts.find(p => p.id === postId);
+
+  if (!post) {
+    showErrorToast("Post not found");
+    return;
+  }
+
+  const comment = (post.comments || []).find(
+    c => c.id === commentId
+  );
+
+  if (!comment) {
+    showErrorToast("Comment not found");
+    return;
+  }
+
+  // Rule 1 & Rule 3
+  const canDelete =
+    post.user_id === userIdNumber ||      // post owner
+    comment.user_id === userIdNumber;     // comment owner
+
+  if (!canDelete) {
+    showErrorToast("You are not allowed to delete this comment.");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    "Are you sure you want to delete this comment?"
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const updatedComments = (post.comments || []).filter(
+      c => c.id !== commentId
+    );
+
+    await updateDoc(
+      doc(db, "posts", postId),
+      {
+        comments: updatedComments
+      }
+    );
+
+    showSuccessToast("Comment deleted successfully");
+  } catch (error) {
+    console.error("Delete comment error:", error);
+    showErrorToast("Failed to delete comment");
+  }
+};
+
+  const handleReportPost = async (post) => {
+    setReportingPost(post);
+    setShowReportModal(true);
+    setOpenDropdown(null);
+  };
+
+  const submitReport = async () => {
+    if (!reportReason.trim()) {
+      showErrorToast("Please provide a reason for reporting");
+      return;
+    }
+    
+    try {
+      await api.post("/peer-support/report", {
+        reported_content: reportingPost?.content,
+        reason: reportReason,
+        post_id: reportingPost?.id,
+        reported_user_id: reportingPost?.user_id
+      });
+      
+      showSuccessToast("Report submitted. Thank you for helping keep the community safe.");
+      setShowReportModal(false);
+      setReportingPost(null);
+      setReportReason("");
+    } catch (err) {
+      console.error("Report error:", err);
+      if (err.response?.data?.msg) {
+        showErrorToast(err.response.data.msg);
+      } else {
+        showErrorToast("Failed to submit report");
+      }
+    }
+  };
+
+  // Group Functions
+  const createGroup = async () => {
+    if (!newGroupName.trim()) { 
+      alert("Please enter a group name"); 
+      return; 
+    }
+    if (newGroupName.length > 50) { 
+      alert("Group name must be less than 50 characters"); 
+      return; 
+    }
+    if (newGroupDescription.length > 200) { 
+      alert("Description must be less than 200 characters"); 
+      return; 
+    }
+    
+    try {
+      const groupData = {
+        name: newGroupName.trim(),
+        description: newGroupDescription.trim(),
+        createdBy: userIdNumber,
+        createdAt: new Date(),
+        isPublic: newGroupIsPublic,
+        members: [userIdNumber],
+        pendingRequests: [],
+        memberCount: 1,
+        status: 'active',
+        reportedBy: []
+      };
+      
+      await addDoc(collection(db, "groups"), groupData);
+      
+      setShowCreateGroupModal(false);
+      setNewGroupName("");
+      setNewGroupDescription("");
+      setNewGroupIsPublic(true);
+      alert("Group created successfully!");
+      
+    } catch (error) { 
+      console.error("Error creating group:", error); 
+      alert("Failed to create group: " + error.message);
+    }
+  };
+
+  const joinGroup = async (groupId, isPublic) => {
+    const groupRef = doc(db, "groups", groupId);
+    const group = myGroups.find(g => g.id === groupId) || publicGroups.find(g => g.id === groupId);
+    
+    if (isPublic) {
+      await updateDoc(groupRef, {
+        members: arrayUnion(userIdNumber),
+        memberCount: increment(1)
+      });
+      alert("Joined group successfully!");
+    } else {
+      await updateDoc(groupRef, {
+        pendingRequests: arrayUnion(userIdNumber)
+      });
+      
+      alert("Join request sent! The group creator will review your request.");
+    }
+  };
+
+  const leaveGroup = async (groupId) => {
+    if (window.confirm("Are you sure you want to leave this group?")) {
+      const groupRef = doc(db, "groups", groupId);
+      await updateDoc(groupRef, {
+        members: arrayRemove(userIdNumber),
+        memberCount: increment(-1)
+      });
+      if (selectedGroup?.id === groupId) setSelectedGroup(null);
+      alert("You have left the group");
+    }
+  };
+
+  const deleteGroup = async (groupId) => {
+    if (window.confirm("Are you sure you want to delete this group? This action cannot be undone.")) {
+      try {
+        await deleteDoc(doc(db, "groups", groupId));
+        if (selectedGroup?.id === groupId) setSelectedGroup(null);
+        alert("Group deleted successfully");
+      } catch (error) { console.error("Error deleting group:", error); alert("Failed to delete group"); }
+    }
+  };
+
+  const handleJoinRequest = async (groupId, requestUserId, action) => {
+    const groupRef = doc(db, "groups", groupId);
+    const group = myGroups.find(g => g.id === groupId);
+    
+    if (action === 'accept') {
+      await updateDoc(groupRef, {
+        members: arrayUnion(requestUserId),
+        pendingRequests: arrayRemove(requestUserId),
+        memberCount: increment(1)
+      });
+      
+      alert(`User has been added to the group`);
+    } else {
+      await updateDoc(groupRef, {
+        pendingRequests: arrayRemove(requestUserId)
+      });
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !selectedGroup) return;
+    
+    try {
+      await addDoc(collection(db, `groups/${selectedGroup.id}/messages`), {
+        userId: userIdNumber,
+        nickname: userNickname,
+        avatarColor: getAvatarColor(userNickname),
+        content: newMessage.trim(),
+        createdAt: new Date(),
+        type: 'text'
+      });
+      setNewMessage("");
+    } catch (error) { console.error("Error sending message:", error); }
+  };
+
+  const reportGroup = async (groupId) => {
+    if (window.confirm("Report this group? The group will be hidden from your view and reviewed by admin.")) {
+      const groupRef = doc(db, "groups", groupId);
+      await updateDoc(groupRef, {
+        reportedBy: arrayUnion(userIdNumber),
+        status: 'reported'
+      });
+      await api.post("/peer-support/report-group", { group_id: groupId, reported_by: userIdNumber });
+      alert("Group reported. It has been hidden from your view.");
+    }
+  };
+
+  const handleAddComment = async (postId) => {
+  if (!commentText[postId]?.trim()) return;
+  
+  const commentContent = commentText[postId].trim();
+  
+  // ✅ Show moderation status for this comment
+  setCommentModerationStatus(prev => ({ ...prev, [postId]: 'checking' }));
+  setCommentModerationReason(prev => ({ ...prev, [postId]: 'Analyzing your comment...' }));
+  setCommentModeration(prev => ({ ...prev, [postId]: true }));
+  
+  try {
+    // ✅ Moderate the comment through backend
+    const moderationResponse = await api.post('/peer-support/moderate-comment', {
+      content: commentContent,
+      post_id: postId
+    });
+    
+    const moderationResult = moderationResponse.data;
+    console.log('📝 Comment moderation result:', moderationResult);
+    
+    setCommentModerationScore(prev => ({ ...prev, [postId]: moderationResult.score || 0 }));
+    
+    // ✅ If crisis is detected
+    if (moderationResult.action === 'crisis') {
+      setCommentModerationStatus(prev => ({ ...prev, [postId]: 'crisis' }));
+      setCommentModerationReason(prev => ({ ...prev, [postId]: moderationResult.reason || 'We noticed you might be going through a difficult time.' }));
+      setShowCrisisAlert(true);
+      showWarningToast('We noticed you might be going through a difficult time. Support is available.');
+      setCommentText(prev => ({ ...prev, [postId]: "" }));
+      
+      setTimeout(() => {
+        setCommentModeration(prev => ({ ...prev, [postId]: false }));
+      }, 5000);
+      return;
+    }
+    
+    // ❌ If blocked
+    if (moderationResult.action === 'blocked') {
+      setCommentModerationStatus(prev => ({ ...prev, [postId]: 'blocked' }));
+      setCommentModerationReason(prev => ({ ...prev, [postId]: moderationResult.reason || 'Comment contains inappropriate content.' }));
+      
+      showErrorToast(`Comment blocked: ${moderationResult.reason || 'Inappropriate content'}`);
+      
+      if (moderationResult.warningCount >= 3) {
+        setIsBlocked(true);
+        showErrorToast('Your account has been blocked for multiple violations.');
+      }
+      setCommentText(prev => ({ ...prev, [postId]: "" }));
+      
+      setTimeout(() => {
+        setCommentModeration(prev => ({ ...prev, [postId]: false }));
+      }, 5000);
+      return;
+    }
+    
+    // ✅ Comment is approved
+    setCommentModerationStatus(prev => ({ ...prev, [postId]: 'approved' }));
+    setCommentModerationReason(prev => ({ ...prev, [postId]: 'Comment approved!' }));
+    
+    // Add comment to Firebase
+    const postRef = doc(db, "posts", postId);
+    const post = posts.find(p => p.id === postId);
+    
+    if (!post) {
+      showErrorToast("Post not found");
+      setCommentModeration(prev => ({ ...prev, [postId]: false }));
+      return;
+    }
+    
+    const newComment = {
+      id: Date.now(),
+      user_id: userIdNumber,
+      nickname: userNickname,
+      avatarColor: getAvatarColor(userNickname),
+      content: commentContent,
+      createdAt: new Date(),
+      reactions: { like: 0 }
+    };
+    
+    const updatedComments = [...(post.comments || []), newComment];
+    await updateDoc(postRef, { comments: updatedComments });
+    
+    setCommentText(prev => ({ ...prev, [postId]: "" }));
+    showSuccessToast("Comment added!");
+    
+    setTimeout(() => {
+      setCommentModeration(prev => ({ ...prev, [postId]: false }));
+    }, 3000);
+    
+  } catch (error) {
+    console.error("Error adding comment:", error);
+    setCommentModerationStatus(prev => ({ ...prev, [postId]: 'blocked' }));
+    setCommentModerationReason(prev => ({ ...prev, [postId]: error.response?.data?.reason || 'Failed to add comment' }));
+    
+    if (error.response?.data?.action === 'blocked') {
+      showErrorToast(error.response.data.reason || 'Comment blocked');
+    } else {
+      showErrorToast("Failed to add comment");
+    }
+    setCommentText(prev => ({ ...prev, [postId]: "" }));
+    
+    setTimeout(() => {
+      setCommentModeration(prev => ({ ...prev, [postId]: false }));
+    }, 5000);
+  }
+};
+
+  const toggleComments = (postId) => {
+    setShowComments(prev => ({ ...prev, [postId]: !prev[postId] }));
+  };
+
+  const formatTimeAgo = (date) => {
+    if (!date) return "";
+    const seconds = Math.floor((new Date() - date.toDate()) / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d`;
+    return date.toDate().toLocaleDateString();
+  };
+
+  const formatMessageTime = (date) => {
+    if (!date) return "";
+    const d = date.toDate();
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  if (loading) return <Layout><div className="loading-container"><div className="spinner"></div><p className="loading-text">Loading community...</p></div></Layout>;
+
+  if (isBlocked) {
+    return (
+      <Layout>
+        <div className="card" style={{ textAlign: "center", padding: "60px" }}>
+          <AlertTriangle size={64} color="var(--accent-primary)" style={{ marginBottom: "20px" }} />
+          <h2>Account Restricted</h2>
+          <p style={{ color: "var(--text-secondary)", marginTop: "10px" }}>You have been blocked from posting due to multiple violations of community guidelines.</p>
+          <button className="primary-btn" onClick={() => navigate("/dashboard")} style={{ marginTop: "30px", width: "auto", padding: "10px 30px" }}>Return to Dashboard</button>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      {/* Header */}
+      <div style={{ marginBottom: '20px' }}>
+        <h1 className="peer-title" style={{ fontSize: '28px', fontWeight: 700, margin: 0 }}>Community Connect</h1>
+        <p className="page-subtitle" style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>Connect, share, and grow together in a safe, supportive community</p>
+      </div>
+
+      {/* Warning Banner */}
+      {warningCount > 0 && warningCount < 3 && (
+        <div className="warning-banner"><AlertTriangle size={14} /><span>Warning: {warningCount}/3. Please follow community guidelines.</span></div>
+      )}
+
+      {/* Crisis Alert Modal */}
+      {showCrisisAlert && (
+        <div className="modal-overlay" onClick={() => setShowCrisisAlert(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header" style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)" }}>
+              <h3>We're here for you ❤️</h3><button className="modal-close" onClick={() => setShowCrisisAlert(false)}>✕</button>
+            </div>
+            <div className="modal-content">
+              <p>Your message contains words that suggest you might be going through a difficult time.</p>
+              <p style={{ marginTop: "16px" }}>You're not alone. Help is available:</p>
+              <div className="crisis-hotlines">
+                <p><strong>📞 Talian Kasih:</strong> 15999 (24/7)</p>
+                <p><strong>📞 Befrienders KL:</strong> 03-7627 2929 (24/7)</p>
+                <p><strong>📞 Talian HEAL:</strong> 15555 (8am - 12am)</p>
+              </div>
+              <button className="primary-btn" onClick={() => setShowCrisisAlert(false)} style={{ marginTop: "20px" }}>I understand, close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report Modal */}
+      {showReportModal && reportingPost && (
+        <div className="modal-overlay" onClick={() => setShowReportModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header"><h3>Report Post</h3><button className="modal-close" onClick={() => setShowReportModal(false)}>✕</button></div>
+            <div className="modal-content">
+              <p style={{ marginBottom: "16px" }}>Why are you reporting this post?</p>
+              <textarea value={reportReason} onChange={(e) => setReportReason(e.target.value)} placeholder="e.g., Harassment, inappropriate content, spam..." className="peer-textarea" rows="3" />
+              <div className="modal-actions"><button className="peer-btn-primary" onClick={submitReport}>Submit Report</button><button className="peer-btn-secondary" onClick={() => setShowReportModal(false)}>Cancel</button></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Group Modal */}
+      {showCreateGroupModal && (
+        <div className="modal-overlay" onClick={() => setShowCreateGroupModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "450px" }}>
+            <div className="modal-header"><h3>Create New Group</h3><button className="modal-close" onClick={() => setShowCreateGroupModal(false)}>✕</button></div>
+            <div className="modal-content">
+              <input type="text" placeholder="Group Name *" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} className="peer-input" maxLength="50" />
+              <textarea placeholder="Description (optional)" value={newGroupDescription} onChange={(e) => setNewGroupDescription(e.target.value)} className="peer-textarea" rows="3" maxLength="200" />
+              <div className="group-privacy">
+                <label><input type="radio" checked={newGroupIsPublic} onChange={() => setNewGroupIsPublic(true)} /> Public (anyone can join)</label>
+                <label><input type="radio" checked={!newGroupIsPublic} onChange={() => setNewGroupIsPublic(false)} /> Private (require approval)</label>
+              </div>
+              <button className="peer-btn-primary" onClick={createGroup}>Create Group</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab Navigation */}
+      <div className="support-tab-container">
+        <button className={`support-tab ${activeTab === "feed" ? "support-tab-active" : ""}`} onClick={() => setActiveTab("feed")}><MessageCircle size={14} style={{ marginRight: "6px" }} /> Feed</button>
+        <button className={`support-tab ${activeTab === "groups" ? "support-tab-active" : ""}`} onClick={() => setActiveTab("groups")}><Users size={14} style={{ marginRight: "6px" }} /> Groups</button>
+      </div>
+
+      {/* FEED TAB */}
+      {activeTab === "feed" && (
+        <>
+          <div className="create-post-card">
+            <div className="create-post-header">
+              <div className="peer-avatar" style={{ backgroundColor: getAvatarColor(userNickname) }}>{getInitial(userNickname)}</div>
+              <div className="create-post-input" onClick={() => document.getElementById("postInput").focus()}>
+                <input id="postInput" type="text" value={newPost} onChange={(e) => setNewPost(e.target.value)} placeholder={`What's on your mind, ${userNickname || "there"}?`} className="create-post-field" disabled={sending} />
+              </div>
+            </div>
+            <div className="create-post-actions">
+              <div className="daily-prompt-chip"><Sparkles size={14} /><span>{dailyPrompt}</span></div>
+              <button className="post-btn" onClick={handleAddPost} disabled={!newPost.trim() || sending}><Send size={16} /> {sending ? "Posting..." : "Post"}</button>
+            </div>
+
+            {/* ✅ Moderation Status */}
+            {moderationStatus && (
+              <ModerationStatus 
+                status={moderationStatus}
+                reason={moderationReason}
+                score={moderationScore}
+              />
+            )}
+          </div>
+
+          <div className="peer-feed">
+            {posts.length === 0 ? (
+              <div className="empty-feed"><MessageCircle size={48} /><h3>No posts yet</h3><p>Be the first to share something with the community</p></div>
+            ) : (
+              posts.map((post) => (
+                <div key={post.id} className="feed-post">
+                  <div className="post-header">
+                    <div className="post-user">
+                      <div className="post-avatar" style={{ backgroundColor: post.avatarColor || getAvatarColor(post.nickname) }}>{getInitial(post.nickname)}</div>
+                      <div className="post-user-info"><span className="post-username">{post.nickname || "Anonymous"}</span><span className="post-time">{formatTimeAgo(post.createdAt)}</span></div>
+                    </div>
+                    <div className="dropdown-container">
+                      <button className="post-more" onClick={(e) => { e.stopPropagation(); setOpenDropdown(openDropdown === post.id ? null : post.id); }}><MoreHorizontal size={18} /></button>
+                      {openDropdown === post.id && (
+                        <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                          <button className="dropdown-item" onClick={() => handleReportPost(post)}><Flag size={16} /><span>Report</span></button>
+                          {post.user_id === userIdNumber && <button className="dropdown-item delete" onClick={() => handleDeletePost(post.id)}><Trash2 size={16} /><span>Delete</span></button>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="post-content"><p>{post.content}</p></div>
+                  <div className="post-stats">
+                    <button className={`reaction-btn relate-btn ${post.usersRelated?.includes(userIdNumber) ? "active" : ""}`} onClick={() => handleReact(post.id, 'relate')}><ThumbsUp size={16} /><span>{post.reactions?.relate || 0}</span></button>
+                    <button className={`reaction-btn strength-btn ${post.usersStrengthened?.includes(userIdNumber) ? "active" : ""}`} onClick={() => handleReact(post.id, 'strength')}><Heart size={16} /><span>{post.reactions?.strength || 0}</span></button>
+                    <button className="stats-btn" onClick={() => toggleComments(post.id)}><MessageCircle size={16} /><span>{(post.comments?.length || 0)}</span></button>
+                  </div>
+                  <div className="post-actions">
+                    <button className={`action-btn relate-action ${post.usersRelated?.includes(userIdNumber) ? "active" : ""}`} onClick={() => handleReact(post.id, 'relate')}><ThumbsUp size={18} /><span>Relate</span></button>
+                    <button className={`action-btn strength-action ${post.usersStrengthened?.includes(userIdNumber) ? "active" : ""}`} onClick={() => handleReact(post.id, 'strength')}><Heart size={18} /><span>Strength</span></button>
+                    <button className="action-btn" onClick={() => toggleComments(post.id)}><MessageCircle size={18} /><span>Comment</span></button>
+                  </div>
+                  {showComments[post.id] && (
+                    <div className="comments-section">
+                      {/* Comment Input with Moderation Status */}
+                      <div className="comment-input-wrapper">
+                        <div className="comment-avatar" style={{ backgroundColor: getAvatarColor(userNickname) }}>
+                          {getInitial(userNickname)}
+                        </div>
+                        <div className="comment-input-container">
+                          <input 
+                            type="text" 
+                            value={commentText[post.id] || ""}
+                            onChange={(e) => setCommentText(prev => ({ ...prev, [post.id]: e.target.value }))}
+                            placeholder="Write a comment..." 
+                            className="comment-input" 
+                            onKeyPress={(e) => e.key === 'Enter' && handleAddComment(post.id)}
+                            disabled={commentModeration[post.id]}
+                          />
+                          <button 
+                            className="comment-send" 
+                            onClick={() => handleAddComment(post.id)}
+                            disabled={!commentText[post.id]?.trim() || commentModeration[post.id]}
+                          >
+                            {commentModeration[post.id] ? (
+                              <span className="spinning" style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</span>
+                            ) : (
+                              <Send size={14} />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* ✅ Comment Moderation Status */}
+                      {commentModeration[post.id] && (
+                        <ModerationStatus 
+                          status={commentModerationStatus[post.id]}
+                          reason={commentModerationReason[post.id]}
+                          score={commentModerationScore[post.id]}
+                        />
+                      )}
+
+                      {/* Existing Comments */}
+                      {(post.comments || []).slice().reverse().map((comment) => {
+                        const canDeleteComment =
+                          post.user_id === userIdNumber ||
+                          comment.user_id === userIdNumber;
+
+                        return (
+                          <div
+                            key={comment.id}
+                            className="comment-item"
+                            style={{
+                              display: "flex",
+                              alignItems: "flex-start",
+                              gap: "10px"
+                            }}
+                          >
+                            <div
+                              className="comment-avatar small"
+                              style={{
+                                backgroundColor:
+                                  comment.avatarColor ||
+                                  getAvatarColor(comment.nickname)
+                              }}
+                            >
+                              {getInitial(comment.nickname)}
+                            </div>
+
+                            <div
+                              className="comment-bubble"
+                              style={{
+                                flex: 1,
+                                position: "relative"
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "flex-start",
+                                  gap: "10px"
+                                }}
+                              >
+                                <div className="comment-username">
+                                  {comment.nickname}
+                                </div>
+
+                                {canDeleteComment && (
+                                  <button
+                                    onClick={() =>
+                                      handleDeleteComment(post.id, comment.id)
+                                    }
+                                    title="Delete Comment"
+                                    style={{
+                                      background: "transparent",
+                                      border: "none",
+                                      cursor: "pointer",
+                                      color: "#ef4444",
+                                      padding: "2px",
+                                      display: "flex",
+                                      alignItems: "center"
+                                    }}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="comment-text">
+                                {comment.content}
+                              </div>
+
+                              <div className="comment-time">
+                                {formatTimeAgo(comment.createdAt)}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+
+      {/* GROUPS TAB */}
+      {activeTab === "groups" && (
+        <div className="groups-container">
+          {!selectedGroup ? (
+            <>
+              <div className="groups-header">
+                <button className="create-group-btn" onClick={() => setShowCreateGroupModal(true)}><Plus size={18} /> Create Group</button>
+                <div className="groups-search">
+                  <Search size={16} />
+                  <input type="text" placeholder="Search groups..." value={groupSearchTerm} onChange={(e) => setGroupSearchTerm(e.target.value)} />
+                </div>
+              </div>
+
+              {/* My Groups Section */}
+              <div className="groups-section">
+                <h3>My Groups ({myGroups.length})</h3>
+                {myGroups.length === 0 ? (
+                  <div className="empty-groups"><Users size={40} /><p>You haven't joined any groups yet</p><button className="peer-btn-primary" onClick={() => setActiveTab("discover")}>Discover Groups</button></div>
+                ) : (
+                  <div className="groups-grid">
+                    {myGroups.map(group => (
+                      <div key={group.id} className="group-card" onClick={() => setSelectedGroup(group)}>
+                        <div className="group-card-header">
+                          <div className="group-avatar"><Users size={24} /></div>
+                          <div className="group-info"><h4>{group.name}</h4><p>{group.memberCount} members</p></div>
+                          {groupUnreadCounts[group.id] > 0 && <span className="unread-badge">{groupUnreadCounts[group.id]}</span>}
+                        </div>
+                        <p className="group-description">{group.description || "No description"}</p>
+                        <div className="group-tags">
+                          {group.createdBy === userIdNumber && <span className="group-tag owner"><Crown size={12} /> Owner</span>}
+                          {!group.isPublic && <span className="group-tag private"><Lock size={12} /> Private</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Discover Groups Section */}
+              <div className="groups-section">
+                <h3>Discover Groups</h3>
+                {publicGroups.filter(g => g.name.toLowerCase().includes(groupSearchTerm.toLowerCase())).length === 0 ? (
+                  <div className="empty-groups"><Globe size={40} /><p>No public groups found</p></div>
+                ) : (
+                  <div className="groups-grid">
+                    {publicGroups.filter(g => g.name.toLowerCase().includes(groupSearchTerm.toLowerCase())).map(group => (
+                      <div key={group.id} className="group-card discover-card">
+                        <div className="group-card-header">
+                          <div className="group-avatar"><Users size={24} /></div>
+                          <div className="group-info"><h4>{group.name}</h4><p>{group.memberCount} members</p></div>
+                        </div>
+                        <p className="group-description">{group.description || "No description"}</p>
+                        <div className="group-tags">
+                          {!group.isPublic && <span className="group-tag private"><Lock size={12} /> Private</span>}
+                          <span className="group-tag"><Users size={12} /> {group.memberCount}/50</span>
+                        </div>
+                        <button className="join-group-btn" onClick={(e) => { e.stopPropagation(); joinGroup(group.id, group.isPublic); }}>Join Group</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            // Group Chat Interface
+            <div className="group-chat-container">
+              <div className="group-chat-header">
+                <button className="back-to-groups" onClick={() => setSelectedGroup(null)}><ArrowLeft size={20} /></button>
+                <div className="group-chat-info">
+                  <h3>{selectedGroup.name}</h3>
+                  <p>{selectedGroup.memberCount} members • {selectedGroup.isPublic ? 'Public' : 'Private'}</p>
+                </div>
+                <div className="group-chat-actions">
+                  <button className="group-action-btn" onClick={() => setShowJoinRequests(!showJoinRequests)}><Users size={18} /></button>
+                  {selectedGroup.createdBy === userIdNumber && (
+                    <button className="group-action-btn" onClick={() => deleteGroup(selectedGroup.id)}><Trash2 size={18} /></button>
+                  )}
+                  <button className="group-action-btn" onClick={() => leaveGroup(selectedGroup.id)}><DoorOpen size={18} /></button>
+                  <button className="group-action-btn" onClick={() => reportGroup(selectedGroup.id)}><Flag size={18} /></button>
+                </div>
+              </div>
+
+              {/* Join Requests Panel (Owner only) */}
+              {showJoinRequests && selectedGroup.createdBy === userIdNumber && (
+                <div className="join-requests-panel">
+                  <h4>Join Requests ({selectedGroup.pendingRequests?.length || 0})</h4>
+                  {selectedGroup.pendingRequests?.length === 0 ? (
+                    <p>No pending requests</p>
+                  ) : (
+                    selectedGroup.pendingRequests.map(requestId => (
+                      <div key={requestId} className="join-request-item">
+                        <span>User ID: {requestId}</span>
+                        <div className="request-actions">
+                          <button className="accept-btn" onClick={() => handleJoinRequest(selectedGroup.id, requestId, 'accept')}>Accept</button>
+                          <button className="reject-btn" onClick={() => handleJoinRequest(selectedGroup.id, requestId, 'reject')}>Decline</button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* Messages */}
+              <div className="group-messages">
+                {groupMessages.map((msg) => (
+                  <div key={msg.id} className={`group-message ${msg.userId === userIdNumber ? 'own-message' : 'other-message'}`}>
+                    {msg.userId !== userIdNumber && (
+                      <div className="message-avatar" style={{ backgroundColor: msg.avatarColor || getAvatarColor(msg.nickname) }}>
+                        {getInitial(msg.nickname)}
+                      </div>
+                    )}
+                    <div className="message-bubble">
+                      {msg.userId !== userIdNumber && <div className="message-sender">{msg.nickname}</div>}
+                      <div className="message-text">{msg.content}</div>
+                      <div className="message-time">{formatMessageTime(msg.createdAt)}</div>
+                    </div>
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Message Input */}
+              <div className="group-message-input">
+                <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Type a message..." onKeyPress={(e) => e.key === 'Enter' && sendMessage()} />
+                <button onClick={sendMessage} disabled={!newMessage.trim()}><Send size={18} /></button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Mobile Bottom Nav */}
+      <div className="mobile-bottom-nav">
+        <button className="mobile-nav-item" onClick={() => navigate("/dashboard")}><Home size={22} /></button>
+        <button className="mobile-nav-item active" onClick={() => setActiveTab("feed")}><MessageCircle size={22} /></button>
+        <button className="mobile-nav-item" onClick={() => setActiveTab("groups")}><Users size={22} /></button>
+        <button className="mobile-nav-item" onClick={() => navigate("/profile")}><User size={22} /></button>
+      </div>
+    </Layout>
+  );
+}
+
+export default PeerSupport;

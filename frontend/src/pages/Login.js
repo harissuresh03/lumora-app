@@ -29,8 +29,16 @@ function Login() {
 
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("user_id", res.data.user_id);
+      localStorage.setItem("user_role", res.data.role);
+      localStorage.setItem("user_name", res.data.name);
+      localStorage.setItem("user_nickname", res.data.nickname || "");
 
-      navigate("/dashboard");
+      // Redirect based on role
+      if (res.data.role === 'admin') {
+        navigate("/admin");
+      } else {
+        navigate("/dashboard");
+      }
     } catch (err) {
       console.error("Login error:", err);
       setError(err.response?.data?.msg || "We couldn't log you in 🌙");
@@ -41,7 +49,6 @@ function Login() {
 
   return (
     <div style={styles.container}>
-      {/* Background Decoration */}
       <div style={styles.bgDecoration}>
         <div style={styles.blob1}></div>
         <div style={styles.blob2}></div>
@@ -97,7 +104,6 @@ function Login() {
         </div>
       </div>
 
-      {/* Floating Emojis */}
       <FloatingEmojis />
     </div>
   );
@@ -110,7 +116,6 @@ function FloatingEmojis() {
     <div style={styles.emojiLayer}>
       {Array.from({ length: 20 }).map((_, i) => {
         const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-
         return (
           <span
             key={i}
@@ -142,7 +147,6 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
   },
-
   bgDecoration: {
     position: "fixed",
     top: 0,
@@ -153,7 +157,6 @@ const styles = {
     pointerEvents: "none",
     overflow: "hidden",
   },
-
   blob1: {
     position: "absolute",
     top: "-20%",
@@ -164,7 +167,6 @@ const styles = {
     background: "radial-gradient(circle, rgba(255,255,255,0.15), rgba(255,255,255,0.05))",
     filter: "blur(80px)",
   },
-
   blob2: {
     position: "absolute",
     bottom: "-20%",
@@ -175,7 +177,6 @@ const styles = {
     background: "radial-gradient(circle, rgba(255,255,255,0.1), rgba(255,255,255,0.03))",
     filter: "blur(70px)",
   },
-
   blob3: {
     position: "absolute",
     top: "40%",
@@ -186,14 +187,12 @@ const styles = {
     background: "radial-gradient(circle, rgba(255,255,255,0.08), rgba(255,255,255,0.02))",
     filter: "blur(60px)",
   },
-
   contentWrapper: {
     position: "relative",
     zIndex: 2,
     width: "100%",
     padding: "20px",
   },
-
   card: {
     maxWidth: "440px",
     margin: "0 auto",
@@ -203,9 +202,7 @@ const styles = {
     backdropFilter: "blur(20px)",
     boxShadow: "0 25px 50px rgba(0,0,0,0.2)",
     textAlign: "center",
-    transition: "transform 0.3s ease",
   },
-
   logoSection: {
     display: "flex",
     alignItems: "center",
@@ -213,11 +210,7 @@ const styles = {
     gap: "8px",
     marginBottom: "12px",
   },
-
-  logoIcon: {
-    fontSize: "36px",
-  },
-
+  logoIcon: { fontSize: "36px" },
   logo: {
     fontSize: "32px",
     fontWeight: "700",
@@ -227,23 +220,19 @@ const styles = {
     backgroundClip: "text",
     margin: 0,
   },
-
   subtitle: {
     fontSize: "14px",
     color: "#6b7280",
     marginBottom: "32px",
   },
-
   form: {
     display: "flex",
     flexDirection: "column",
     gap: "20px",
   },
-
   inputGroup: {
     textAlign: "left",
   },
-
   label: {
     display: "block",
     fontSize: "13px",
@@ -251,7 +240,6 @@ const styles = {
     color: "#374151",
     marginBottom: "8px",
   },
-
   input: {
     width: "100%",
     padding: "14px 16px",
@@ -262,16 +250,7 @@ const styles = {
     outline: "none",
     fontFamily: "inherit",
     boxSizing: "border-box",
-    ":focus": {
-      borderColor: "#667eea",
-      boxShadow: "0 0 0 3px rgba(102,126,234,0.1)",
-    },
-    ":disabled": {
-      backgroundColor: "#f9fafb",
-      cursor: "not-allowed",
-    },
   },
-
   button: {
     marginTop: "8px",
     padding: "14px",
@@ -283,20 +262,7 @@ const styles = {
     fontWeight: "600",
     cursor: "pointer",
     transition: "all 0.2s",
-    ":hover": {
-      transform: "translateY(-2px)",
-      boxShadow: "0 8px 20px rgba(102,126,234,0.4)",
-    },
-    ":active": {
-      transform: "translateY(0)",
-    },
-    ":disabled": {
-      opacity: 0.6,
-      cursor: "not-allowed",
-      transform: "none",
-    },
   },
-
   error: {
     color: "#ef4444",
     fontSize: "13px",
@@ -305,24 +271,16 @@ const styles = {
     borderRadius: "10px",
     marginTop: "-8px",
   },
-
   footer: {
     marginTop: "28px",
     fontSize: "13px",
     color: "#6b7280",
   },
-
   link: {
     color: "#667eea",
     cursor: "pointer",
     fontWeight: "600",
-    transition: "color 0.2s",
-    ":hover": {
-      color: "#764ba2",
-      textDecoration: "underline",
-    },
   },
-
   emojiLayer: {
     position: "fixed",
     width: "100%",
@@ -333,7 +291,6 @@ const styles = {
     zIndex: 1,
     overflow: "hidden",
   },
-
   emoji: {
     position: "absolute",
     bottom: "-50px",
@@ -341,7 +298,6 @@ const styles = {
   },
 };
 
-// Add keyframes for floating animation
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
   @keyframes floatUp {

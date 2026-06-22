@@ -1,30 +1,36 @@
-// pages/Journal.js
+// frontend/src/pages/Journal.js
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import api from "../utils/api";
+import Layout from "./components/Layout";
+import ExportButton from "./components/ExportButton";
+import { showSuccessToast, showErrorToast } from "./components/ToastNotification";
 import {
   BookOpen,
   PenLine,
   Trash2,
   Sparkles,
   ArrowLeft,
-  Menu,
   LogOut,
   User,
   Clock,
   Brain,
+  Heart,
   Activity,
   TrendingUp,
-  Heart
+  Calendar,
+  ChevronRight,
+  FileText
 } from "lucide-react";
 
 function Journal() {
   const navigate = useNavigate();
   const user_id = localStorage.getItem("user_id");
   const [userNickname, setUserNickname] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [entries, setEntries] = useState([]);
+  const [filteredEntries, setFilteredEntries] = useState([]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState(null);
@@ -32,6 +38,22 @@ function Journal() {
   
   const [selectedAiAnalysis, setSelectedAiAnalysis] = useState(null);
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+
+  // ✅ Filter state
+  const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear());
+  const [availableYears, setAvailableYears] = useState([]);
+
+  // Weekly Reflection Prompt
+  const [weeklyPrompt, setWeeklyPrompt] = useState(null);
+  const [showPrompt, setShowPrompt] = useState(true);
+
+  // Stats
+  const [stats, setStats] = useState({
+    totalEntries: 0,
+    streak: 0,
+    averageLength: 0
+  });
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -48,30 +70,126 @@ function Journal() {
     };
     fetchUserProfile();
     fetchEntries();
+    fetchWeeklyPrompt();
+    fetchJournalStats();
   }, []);
 
+  // ✅ Filter entries when month/year changes or entries update
+  useEffect(() => {
+    filterEntries();
+  }, [entries, filterMonth, filterYear]);
+
   const fetchEntries = () => {
-    api
-      .get(`/journal/${user_id}`)
-      .then((res) => setEntries(res.data))
-      .catch((err) => console.log(err));
+    api.get(`/journal/${user_id}`).then((res) => {
+      setEntries(res.data);
+      calculateStats(res.data);
+      
+      // Extract available years from entries
+      const years = [...new Set(res.data.map(e => new Date(e.created_at).getFullYear()))];
+      setAvailableYears(years.sort((a, b) => b - a));
+      if (years.length > 0 && !years.includes(filterYear)) {
+        setFilterYear(years[0]);
+      }
+    }).catch((err) => console.log(err));
+  };
+
+  // ✅ Filter entries by month and year
+  const filterEntries = () => {
+    if (!entries.length) {
+      setFilteredEntries([]);
+      return;
+    }
+
+    const filtered = entries.filter(entry => {
+      const entryDate = new Date(entry.created_at);
+      const entryMonth = entryDate.getMonth() + 1;
+      const entryYear = entryDate.getFullYear();
+      return entryMonth === filterMonth && entryYear === filterYear;
+    });
+    
+    setFilteredEntries(filtered);
+  };
+
+  // ✅ Get month name
+  const getMonthName = (month) => {
+    return new Date(2024, month - 1).toLocaleString('default', { month: 'long' });
+  };
+
+  const calculateStats = (entriesData) => {
+    const total = entriesData.length;
+    
+    let streak = 0;
+    const entryDates = entriesData.map(e => new Date(e.created_at).toISOString().split('T')[0]);
+    const uniqueDates = [...new Set(entryDates)].sort().reverse();
+    
+    for (let i = 0; i < uniqueDates.length; i++) {
+      const expectedDate = new Date();
+      expectedDate.setDate(expectedDate.getDate() - i);
+      const expectedDateStr = expectedDate.toISOString().split('T')[0];
+      if (uniqueDates[i] === expectedDateStr) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    
+    const avgLength = total > 0 ? Math.round(entriesData.reduce((sum, e) => sum + e.content.length, 0) / total) : 0;
+    
+    setStats({ totalEntries: total, streak, averageLength: avgLength });
+  };
+
+  const fetchWeeklyPrompt = async () => {
+    const prompts = [
+      { question: "What went well this week?", focus: "positive", emoji: "🌟" },
+      { question: "What was the biggest challenge you faced?", focus: "growth", emoji: "💪" },
+      { question: "What did you learn about yourself?", focus: "reflection", emoji: "🪞" },
+      { question: "What are you grateful for this week?", focus: "gratitude", emoji: "🙏" },
+      { question: "What would you do differently next week?", focus: "improvement", emoji: "📈" },
+      { question: "Who or what supported you this week?", focus: "connection", emoji: "🤝" },
+      { question: "What made you feel proud this week?", focus: "achievement", emoji: "🏆" },
+      { question: "What emotion did you feel most this week?", focus: "emotional", emoji: "❤️" },
+      { question: "What's one thing you want to let go of?", focus: "release", emoji: "🍃" },
+      { question: "What's one intention for next week?", focus: "intention", emoji: "🎯" }
+    ];
+    
+    const weekNumber = Math.floor(new Date().getTime() / (7 * 24 * 60 * 60 * 1000));
+    const promptIndex = weekNumber % prompts.length;
+    setWeeklyPrompt(prompts[promptIndex]);
+    
+    const lastPromptUsed = localStorage.getItem(`prompt_used_${weekNumber}`);
+    if (lastPromptUsed) {
+      setShowPrompt(false);
+    }
+  };
+
+  const fetchJournalStats = async () => {
+    try {
+      const res = await api.get(`/journal/stats/${user_id}`);
+      if (res.data) {
+        setStats(res.data);
+      }
+    } catch (err) {
+      console.log("Fetch stats error:", err);
+    }
   };
 
   const addEntry = async () => {
     if (!text.trim()) return;
-
+    
     try {
       setLoading(true);
-      await api.post("/journal", {
-        user_id: parseInt(user_id),
-        content: text,
-      });
-
+      await api.post("/journal", { user_id: parseInt(user_id), content: text });
       setText("");
       fetchEntries();
+      showSuccessToast("Journal entry saved! ✨");
+      
+      if (weeklyPrompt) {
+        const weekNumber = Math.floor(new Date().getTime() / (7 * 24 * 60 * 60 * 1000));
+        localStorage.setItem(`prompt_used_${weekNumber}`, 'true');
+      }
     } catch (err) {
       console.log(err);
-      alert("Failed to save journal entry");
+      showErrorToast("Failed to save journal entry");
     } finally {
       setLoading(false);
     }
@@ -83,9 +201,10 @@ function Journal() {
         await api.delete(`/journal/${id}`);
         fetchEntries();
         setIsModalOpen(false);
+        showSuccessToast("Entry deleted");
       } catch (err) {
         console.log(err);
-        alert("Failed to delete entry");
+        showErrorToast("Failed to delete entry");
       }
     }
   };
@@ -102,11 +221,11 @@ function Journal() {
         setSelectedAiAnalysis(res.data);
         setShowAnalysisModal(true);
       } else {
-        alert("No AI analysis available for this entry");
+        showErrorToast("No AI analysis available for this entry");
       }
     } catch (err) {
       console.error("Fetch AI analysis error:", err);
-      alert("Could not load AI analysis");
+      showErrorToast("Could not load AI analysis");
     }
   };
 
@@ -116,10 +235,16 @@ function Journal() {
   };
 
   const getEmotionColor = (emotion) => {
-    const colors = {
-      anxiety: "#f59e0b", sadness: "#3b82f6", frustration: "#ef4444",
-      hope: "#10b981", joy: "#fbbf24", neutral: "#6b7280",
-      anger: "#dc2626", fear: "#8b5cf6", loneliness: "#8b5cf6"
+    const colors = { 
+      anxiety: "#f59e0b", 
+      sadness: "#3b82f6", 
+      frustration: "#ef4444", 
+      hope: "#10b981", 
+      joy: "#fbbf24", 
+      neutral: "#6b7280", 
+      anger: "#dc2626", 
+      fear: "#8b5cf6", 
+      loneliness: "#8b5cf6" 
     };
     return colors[emotion?.toLowerCase()] || "#6b7280";
   };
@@ -132,202 +257,472 @@ function Journal() {
   const logout = () => {
     localStorage.clear();
     navigate("/");
+    showSuccessToast("Logged out successfully. Take care! 💙");
+  };
+
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
   };
 
   return (
-    <div className="app-container">
-      <div className="bg-decoration">
-        <div className="blob1"></div>
-        <div className="blob2"></div>
-        <div className="blob3"></div>
-      </div>
+    <Layout>
 
-      <div className="hamburger-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
-        <Menu size={20} />
-      </div>
-
-      <div className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
-        <div className="sidebar-header">
-          <span className="sidebar-logo">Lumora</span>
-          <button className="close-sidebar" onClick={() => setSidebarOpen(false)}>✕</button>
+      {/* PAGE HEADER */}
+      <div className="page-header">
+        <button onClick={() => navigate("/dashboard")} className="back-arrow-btn">
+          <ArrowLeft size={18} />
+        </button>
+        <div style={{ flex: 1 }}>
+          <h1 className="page-title">Journal</h1>
+          <p className="page-subtitle">A space for your thoughts and reflections</p>
         </div>
-        <nav className="sidebar-nav">
-          <button className={`sidebar-item ${window.location.pathname === "/dashboard" ? "active" : ""}`} onClick={() => navigate("/dashboard")}>
-            <Activity size={18} /><span>Dashboard</span>
-          </button>
-          <button className={`sidebar-item ${window.location.pathname === "/journal" ? "active" : ""}`} onClick={() => navigate("/journal")}>
-            <BookOpen size={18} /><span>Journal</span>
-          </button>
-          <button className={`sidebar-item ${window.location.pathname === "/mental-health" ? "active" : ""}`} onClick={() => navigate("/mental-health")}>
-            <Heart size={18} /><span>Mental Health</span>
-          </button>
-          <button className={`sidebar-item ${window.location.pathname === "/student-support" ? "active" : ""}`} onClick={() => navigate("/student-support")}>
-            <TrendingUp size={18} /><span>Student Support</span>
-          </button>
-          <button className={`sidebar-item ${window.location.pathname === "/profile" ? "active" : ""}`} onClick={() => navigate("/profile")}>
-            <User size={18} /><span>Profile</span>
-          </button>
-          <button className="sidebar-item-logout" onClick={logout}>
-            <LogOut size={18} /><span>Logout</span>
-          </button>
-        </nav>
-      </div>
-
-      {sidebarOpen && <div className="overlay" onClick={() => setSidebarOpen(false)}></div>}
-
-      <div className="content-wrapper">
-        {/* Top Bar */}
-        <div className="top-bar">
-          <div className="user-profile">
-            <div className="user-avatar"><User size={18} /></div>
-            <span className="user-name-top">{userNickname || "User"}</span>
-            <div className="logout-icon" onClick={logout}><LogOut size={16} /></div>
+        
+        {/* ✅ Filter and Export Section */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '10px', 
+          alignItems: 'center', 
+          flexWrap: 'wrap',
+          marginLeft: 'auto'
+        }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <label style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Filter:</label>
+            <select 
+              value={filterMonth} 
+              onChange={(e) => setFilterMonth(parseInt(e.target.value))}
+              style={{ 
+                padding: '8px 12px', 
+                borderRadius: '8px', 
+                border: '1px solid var(--border-light)', 
+                background: 'var(--card-bg-glass)',
+                fontSize: '13px',
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                <option key={m} value={m}>{getMonthName(m)}</option>
+              ))}
+            </select>
+            <select 
+              value={filterYear} 
+              onChange={(e) => setFilterYear(parseInt(e.target.value))}
+              style={{ 
+                padding: '8px 12px', 
+                borderRadius: '8px', 
+                border: '1px solid var(--border-light)', 
+                background: 'var(--card-bg-glass)',
+                fontSize: '13px',
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              {availableYears.length > 0 ? (
+                availableYears.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))
+              ) : (
+                <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>
+              )}
+            </select>
           </div>
-        </div>
-
-        {/* Page Header - Only ONE title */}
-        <div className="page-header">
-          <button onClick={() => navigate("/dashboard")} className="back-arrow-btn">
-            <ArrowLeft size={18} />
-          </button>
-          <div>
-            <h1 className="page-title">Journal</h1>
-            <p className="page-subtitle">A space for your thoughts and reflections</p>
-          </div>
-        </div>
-
-        {/* Previous Entries Section */}
-        <div className="journal-entries-section">
-          <h3 className="card-title" style={{ marginBottom: "16px" }}>Previous entries</h3>
           
-          {entries.length === 0 ? (
-            <div className="journal-empty-state">
-              <BookOpen size={48} color="var(--text-muted)" />
-              <h4>No journal entries yet</h4>
-              <p>Write your first entry below.</p>
-            </div>
-          ) : (
-            <div className="journal-entries-grid">
-              {entries.map((entry) => (
-                <div key={entry.id} className="journal-entry-card" onClick={() => openEntry(entry)}>
-                  <div className="journal-entry-header">
-                    <div className="journal-entry-date">
-                      {new Date(entry.created_at).toLocaleDateString('en-US', {
-                        month: 'short', day: 'numeric', year: 'numeric'
-                      })}
-                    </div>
-                  </div>
-                  <p className="journal-entry-preview">
-                    {entry.content.length > 120 ? entry.content.substring(0, 120) + "..." : entry.content}
-                  </p>
-                  <div className="journal-entry-footer">
-                    <span className="journal-read-more">Read more →</span>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); fetchAiAnalysis(entry.id); }} 
-                      className="journal-ai-insights-btn"
-                    >
-                      <Sparkles size={12} /> AI Insights
-                    </button>
+          <ExportButton 
+            type="journal" 
+            userId={parseInt(user_id)} 
+            label="Export PDF"
+            month={filterMonth}
+            year={filterYear}
+            icon={<FileText size={16} />}
+            variant="secondary"
+          />
+        </div>
+      </div>
+
+      {/* Journal Stats */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+          gap: '16px',
+          marginBottom: '28px'
+        }}
+      >
+        <div style={{ background: 'var(--card-bg-glass)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
+          <BookOpen size={20} style={{ marginBottom: '8px', color: 'var(--accent-primary)' }} />
+          <div style={{ fontSize: '24px', fontWeight: 700 }}>{stats.totalEntries}</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Total Entries</div>
+        </div>
+        <div style={{ background: 'var(--card-bg-glass)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
+          <Calendar size={20} style={{ marginBottom: '8px', color: 'var(--accent-primary)' }} />
+          <div style={{ fontSize: '24px', fontWeight: 700 }}>{stats.streak}</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Day Streak</div>
+        </div>
+        <div style={{ background: 'var(--card-bg-glass)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
+          <PenLine size={20} style={{ marginBottom: '8px', color: 'var(--accent-primary)' }} />
+          <div style={{ fontSize: '24px', fontWeight: 700 }}>{stats.averageLength}</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Avg Characters</div>
+        </div>
+      </motion.div>
+
+      {/* Filter Info */}
+      <div style={{ 
+        fontSize: '13px', 
+        color: 'var(--text-muted)', 
+        marginBottom: '16px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '8px'
+      }}>
+        <span>
+          Showing {filteredEntries.length} entries for {getMonthName(filterMonth)} {filterYear}
+        </span>
+        {entries.length > 0 && filteredEntries.length === 0 && (
+          <span style={{ color: '#f59e0b' }}>
+            No entries found for this month
+          </span>
+        )}
+      </div>
+
+      {/* Weekly Reflection Prompt */}
+      {showPrompt && weeklyPrompt && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          style={{
+            background: 'linear-gradient(135deg, var(--accent-soft), rgba(139, 92, 246, 0.05))',
+            borderRadius: '16px',
+            padding: '18px 20px',
+            marginBottom: '24px',
+            border: '1px solid var(--border-glass)',
+            position: 'relative'
+          }}
+        >
+          <button
+            onClick={() => setShowPrompt(false)}
+            style={{ 
+              position: 'absolute', 
+              top: '12px', 
+              right: '12px', 
+              background: 'none', 
+              border: 'none', 
+              cursor: 'pointer', 
+              color: 'var(--text-muted)',
+              fontSize: '14px'
+            }}
+          >
+            ✕
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+            <span style={{ fontSize: '24px' }}>{weeklyPrompt.emoji}</span>
+            <strong style={{ fontSize: '14px', color: 'var(--accent-primary)' }}>Weekly Reflection</strong>
+          </div>
+          <p style={{ fontSize: '16px', marginBottom: '14px', lineHeight: 1.5 }}>
+            {weeklyPrompt.question}
+          </p>
+          <button
+            onClick={() => {
+              setText(weeklyPrompt.question + "\n\n");
+              setShowPrompt(false);
+            }}
+            style={{
+              fontSize: '12px',
+              padding: '8px 18px',
+              background: 'var(--accent-gradient)',
+              border: 'none',
+              borderRadius: '30px',
+              color: 'white',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <PenLine size={14} /> Write about this
+          </button>
+        </motion.div>
+      )}
+
+      {/* PREVIOUS ENTRIES */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="journal-entries-section"
+      >
+        <h3 className="card-title" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Clock size={18} /> Entries ({filteredEntries.length})
+        </h3>
+        
+        {filteredEntries.length === 0 ? (
+          <div className="journal-empty-state" style={{ 
+            textAlign: "center", 
+            padding: "60px", 
+            background: "var(--card-bg-glass)", 
+            borderRadius: "20px",
+            border: "1px solid var(--border-glass)"
+          }}>
+            <BookOpen size={48} color="var(--text-muted)" style={{ marginBottom: "16px" }} />
+            <h4>No journal entries for {getMonthName(filterMonth)} {filterYear}</h4>
+            <p style={{ color: "var(--text-muted)", marginTop: "8px" }}>
+              {entries.length > 0 ? 'Try selecting a different month' : 'Write your first entry below.'}
+            </p>
+          </div>
+        ) : (
+          <div className="journal-entries-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "20px" }}>
+            {filteredEntries.map((entry, idx) => (
+              <motion.div
+                key={entry.id}
+                className="journal-entry-card"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: idx * 0.05 }}
+                whileHover={{ y: -3 }}
+                onClick={() => openEntry(entry)}
+                style={{
+                  background: "var(--card-bg-glass)",
+                  backdropFilter: "var(--glass-blur)",
+                  borderRadius: "16px",
+                  padding: "20px",
+                  cursor: "pointer",
+                  border: "1px solid var(--border-glass)",
+                  transition: "all 0.2s"
+                }}
+              >
+                <div className="journal-entry-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                  <div className="journal-entry-date" style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                    {formatDate(entry.created_at)}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Writing Section */}
-        <div className="journal-writing-card">
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-            <PenLine size={24} color="var(--accent-primary)" />
-            <h3 className="card-title" style={{ margin: 0 }}>Write your thoughts</h3>
+                <p className="journal-entry-preview" style={{ fontSize: "14px", lineHeight: 1.5, color: "var(--text-secondary)", margin: "12px 0" }}>
+                  {entry.content.length > 120 ? entry.content.substring(0, 120) + "..." : entry.content}
+                </p>
+                <div className="journal-entry-footer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--border-light)" }}>
+                  <span className="journal-read-more" style={{ fontSize: "12px", color: "var(--accent-primary)" }}>Read more →</span>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); fetchAiAnalysis(entry.id); }} 
+                    className="journal-ai-insights-btn"
+                    style={{ 
+                      background: "none", 
+                      border: "1px solid var(--border-light)", 
+                      color: "var(--accent-primary)", 
+                      fontSize: "11px", 
+                      padding: "5px 12px", 
+                      borderRadius: "20px", 
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px"
+                    }}
+                  >
+                    <Sparkles size={12} /> AI Insights
+                  </button>
+                </div>
+              </motion.div>
+            ))}
           </div>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="What's on your mind today? Write freely, without judgment..."
-            className="journal-textarea"
-          />
-          <button onClick={addEntry} disabled={loading || !text.trim()} className="journal-save-btn">
+        )}
+      </motion.div>
+
+      {/* WRITING SECTION */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="journal-writing-card"
+        style={{
+          background: "var(--card-bg-glass)",
+          backdropFilter: "var(--glass-blur)",
+          borderRadius: "24px",
+          padding: "28px",
+          marginTop: "32px",
+          border: "1px solid var(--border-glass)"
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+          <PenLine size={24} color="var(--accent-primary)" />
+          <h3 className="card-title" style={{ margin: 0 }}>Write your thoughts</h3>
+        </div>
+        
+        <textarea 
+          value={text} 
+          onChange={(e) => setText(e.target.value)} 
+          placeholder="What's on your mind today? Write freely, without judgment..." 
+          className="journal-textarea"
+          style={{
+            width: "100%",
+            minHeight: "220px",
+            padding: "16px",
+            borderRadius: "16px",
+            border: "1px solid var(--border-light)",
+            fontSize: "14px",
+            lineHeight: "1.6",
+            resize: "vertical",
+            background: "var(--bg-secondary)"
+          }}
+        />
+        
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "20px" }}>
+          <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+            {text.length} characters
+          </div>
+          <button 
+            onClick={addEntry} 
+            disabled={loading || !text.trim()} 
+            className="journal-save-btn"
+            style={{
+              padding: "12px 28px",
+              background: "var(--accent-gradient)",
+              color: "white",
+              border: "none",
+              borderRadius: "40px",
+              fontWeight: 600,
+              cursor: "pointer",
+              opacity: loading || !text.trim() ? 0.6 : 1,
+              transition: "all 0.2s"
+            }}
+          >
             {loading ? "Saving..." : "Save to journal"}
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Modal for viewing full entry */}
-      {isModalOpen && selectedEntry && (
-        <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <h3>{new Date(selectedEntry.created_at).toLocaleDateString('en-US', {
-                  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                })}</h3>
-                <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>
-                  <Clock size={12} style={{ display: "inline", marginRight: "4px" }} />
-                  {new Date(selectedEntry.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                </p>
+      {/* ENTRY DETAIL MODAL */}
+      <AnimatePresence>
+        {isModalOpen && selectedEntry && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="modal-overlay"
+            onClick={() => setIsModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="modal"
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: "550px" }}
+            >
+              <div className="modal-header">
+                <div>
+                  <h3>{new Date(selectedEntry.created_at).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h3>
+                </div>
+                <button className="modal-close" onClick={() => setIsModalOpen(false)}>✕</button>
               </div>
-              <button className="modal-close" onClick={() => setIsModalOpen(false)}>✕</button>
-            </div>
-            <div className="modal-content">
-              <p style={{ whiteSpace: "pre-wrap", lineHeight: "1.6" }}>{selectedEntry.content}</p>
-            </div>
-            <div style={{ padding: "20px", borderTop: "1px solid var(--border-light)", display: "flex", justifyContent: "flex-end", gap: "12px" }}>
-              <button onClick={() => fetchAiAnalysis(selectedEntry.id)} className="primary-btn" style={{ width: "auto", padding: "8px 16px" }}>
-                <Sparkles size={14} style={{ marginRight: "6px" }} /> AI Analysis
-              </button>
-              <button onClick={() => deleteEntry(selectedEntry.id)} style={{ padding: "8px 16px", background: "#fee2e2", color: "#ef4444", border: "none", borderRadius: "8px", cursor: "pointer" }}>
-                <Trash2 size={14} style={{ marginRight: "6px" }} /> Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              <div className="modal-content">
+                <p style={{ whiteSpace: "pre-wrap", lineHeight: "1.6" }}>{selectedEntry.content}</p>
+              </div>
+              <div style={{ padding: "20px", borderTop: "1px solid var(--border-light)", display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+                <button 
+                  onClick={() => fetchAiAnalysis(selectedEntry.id)} 
+                  className="primary-btn" 
+                  style={{ width: "auto", padding: "8px 16px", background: "var(--accent-gradient)" }}
+                >
+                  <Sparkles size={14} style={{ marginRight: "6px" }} /> AI Analysis
+                </button>
+                <button 
+                  onClick={() => deleteEntry(selectedEntry.id)} 
+                  style={{ padding: "8px 16px", background: "#fee2e2", color: "#ef4444", border: "none", borderRadius: "8px", cursor: "pointer" }}
+                >
+                  <Trash2 size={14} style={{ marginRight: "6px" }} /> Delete
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* AI Analysis Modal */}
-      {showAnalysisModal && selectedAiAnalysis && (
-        <div className="modal-overlay" onClick={() => setShowAnalysisModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3><Brain size={18} style={{ marginRight: "8px" }} /> AI Analysis</h3>
-              <button className="modal-close" onClick={() => setShowAnalysisModal(false)}>✕</button>
-            </div>
-            <div className="modal-content">
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}>
-                <span>Detected Mood:</span>
-                <strong style={{ background: getMoodColor(selectedAiAnalysis.detected_mood), padding: "4px 12px", borderRadius: "20px", color: selectedAiAnalysis.detected_mood <= 2 ? "white" : "#1f2937" }}>
-                  {getMoodLabel(selectedAiAnalysis.detected_mood)}
-                </strong>
+      {/* AI ANALYSIS MODAL */}
+      <AnimatePresence>
+        {showAnalysisModal && selectedAiAnalysis && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="modal-overlay"
+            onClick={() => setShowAnalysisModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="modal"
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: "500px" }}
+            >
+              <div className="modal-header">
+                <h3 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Brain size={18} /> AI Analysis
+                </h3>
+                <button className="modal-close" onClick={() => setShowAnalysisModal(false)}>✕</button>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}>
-                <span>Primary Emotion:</span>
-                <strong style={{ textTransform: "capitalize", color: getEmotionColor(selectedAiAnalysis.primary_emotion) }}>
-                  {selectedAiAnalysis.primary_emotion}
-                </strong>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px", alignItems: "center" }}>
-                <span>Intensity:</span>
-                <div style={{ width: "120px", height: "6px", background: "#e5e7eb", borderRadius: "3px", overflow: "hidden" }}>
-                  <div style={{ width: `${selectedAiAnalysis.intensity * 20}%`, height: "100%", background: "linear-gradient(90deg, #f59e0b, #ef4444)" }}></div>
+              <div className="modal-content">
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px", padding: "12px", background: "var(--bg-secondary)", borderRadius: "12px" }}>
+                  <span>Detected Mood:</span>
+                  <strong style={{ 
+                    background: getMoodColor(selectedAiAnalysis.detected_mood), 
+                    padding: "4px 12px", 
+                    borderRadius: "20px", 
+                    color: selectedAiAnalysis.detected_mood <= 2 ? "white" : "#1f2937" 
+                  }}>
+                    {getMoodLabel(selectedAiAnalysis.detected_mood)}
+                  </strong>
+                </div>
+                
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px", padding: "12px", background: "var(--bg-secondary)", borderRadius: "12px" }}>
+                  <span>Primary Emotion:</span>
+                  <strong style={{ textTransform: "capitalize", color: getEmotionColor(selectedAiAnalysis.primary_emotion) }}>
+                    {selectedAiAnalysis.primary_emotion}
+                  </strong>
+                </div>
+                
+                <div style={{ marginBottom: "16px", padding: "12px", background: "var(--bg-secondary)", borderRadius: "12px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                    <span>Intensity:</span>
+                    <span style={{ fontWeight: "600" }}>{selectedAiAnalysis.intensity}/5</span>
+                  </div>
+                  <div style={{ width: "100%", height: "8px", background: "#e5e7eb", borderRadius: "4px", overflow: "hidden" }}>
+                    <div style={{ 
+                      width: `${selectedAiAnalysis.intensity * 20}%`, 
+                      height: "100%", 
+                      background: "linear-gradient(90deg, #f59e0b, #ef4444)" 
+                    }}></div>
+                  </div>
+                </div>
+                
+                <div style={{ marginBottom: "16px", padding: "12px", background: "var(--bg-secondary)", borderRadius: "12px" }}>
+                  <span>Themes: </span>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
+                    {selectedAiAnalysis.themes?.map((theme, i) => (
+                      <span key={i} style={{ background: "var(--accent-soft)", color: "var(--accent-primary)", padding: "4px 10px", borderRadius: "20px", fontSize: "11px" }}>
+                        #{theme}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "12px", background: "var(--bg-secondary)", borderRadius: "12px" }}>
+                  <span>Confidence:</span>
+                  <span style={{ fontWeight: "600", color: "#10b981" }}>{Math.round(selectedAiAnalysis.confidence * 100)}%</span>
                 </div>
               </div>
-              <div style={{ marginBottom: "16px" }}>
-                <span>Themes: </span>
-                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
-                  {selectedAiAnalysis.themes?.map((theme, i) => (
-                    <span key={i} style={{ background: "#ede8fc", color: "#6d5acf", padding: "4px 10px", borderRadius: "20px", fontSize: "11px" }}>#{theme}</span>
-                  ))}
-                </div>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>Confidence:</span>
-                <span style={{ fontWeight: "600", color: "#10b981" }}>{Math.round(selectedAiAnalysis.confidence * 100)}%</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Layout>
   );
 }
 
