@@ -39,28 +39,31 @@ function AdminNotificationBell({ userId }) {
   }, [userId]);
 
   const fetchUnreadNotifications = async () => {
-    try {
-      const res = await api.get(`/admin/notifications/unread`);
-      setNotifications(res.data || []);
-    } catch (err) {
-      console.error("Fetch unread notifications error:", err);
-    }
-  };
+  try {
+    console.log("🔔 Fetching unread notifications..."); // ✅ ADD LOGGING
+    const res = await api.get(`/admin-notifications/unread`);
+    console.log("📨 Notifications response:", res.data); // ✅ ADD LOGGING
+    setNotifications(res.data || []);
+  } catch (err) {
+    console.error("Fetch unread notifications error:", err);
+  }
+};
 
-  const fetchUnreadCount = async () => {
-    try {
-      const res = await api.get(`/admin/notifications/unread-count`);
-      setUnreadCount(res.data.count || 0);
-    } catch (err) {
-      console.error("Fetch unread count error:", err);
-    }
-  };
+const fetchUnreadCount = async () => {
+  try {
+    const res = await api.get(`/admin-notifications/unread-count`);
+    console.log("📊 Unread count:", res.data); // ✅ ADD LOGGING
+    setUnreadCount(res.data.count || 0);
+  } catch (err) {
+    console.error("Fetch unread count error:", err);
+  }
+};
 
   const markAsRead = async (id, e) => {
     e.stopPropagation();
     try {
       setLoading(true);
-      await api.put(`/admin/notifications/${id}/read`);
+      await api.put(`/admin-notifications/${id}/read`);
       
       setNotifications(prev => prev.filter(n => n.id !== id));
       setUnreadCount(prev => Math.max(0, prev - 1));
@@ -80,7 +83,7 @@ function AdminNotificationBell({ userId }) {
     
     try {
       setLoading(true);
-      await api.put(`/admin/notifications/mark-all-read`);
+      await api.put(`/admin-notifications/mark-all-read`);
       
       setNotifications([]);
       setUnreadCount(0);

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import api from "../utils/api";
 import Layout from "./components/Layout";
 import ExportButton from "./components/ExportButton";
-import { showSuccessToast, showErrorToast } from "./components/ToastNotification";
+import { showSuccessToast, showErrorToast, showWarningToast } from "./components/ToastNotification";
 import {
   BookOpen,
   PenLine,
@@ -174,26 +174,37 @@ function Journal() {
   };
 
   const addEntry = async () => {
-    if (!text.trim()) return;
+  if (!text.trim()) return;
+  
+  try {
+    setLoading(true);
+    const response = await api.post("/journal", { 
+      user_id: parseInt(user_id), 
+      content: text 
+    });
     
-    try {
-      setLoading(true);
-      await api.post("/journal", { user_id: parseInt(user_id), content: text });
-      setText("");
-      fetchEntries();
-      showSuccessToast("Journal entry saved! ✨");
-      
-      if (weeklyPrompt) {
-        const weekNumber = Math.floor(new Date().getTime() / (7 * 24 * 60 * 60 * 1000));
-        localStorage.setItem(`prompt_used_${weekNumber}`, 'true');
-      }
-    } catch (err) {
-      console.log(err);
-      showErrorToast("Failed to save journal entry");
-    } finally {
-      setLoading(false);
+    setText("");
+    fetchEntries();
+    showSuccessToast("Journal entry saved! ✨");
+    
+    // ✅ SHOW CRISIS MESSAGE IF DETECTED
+    if (response.data.crisisDetected) {
+      showWarningToast("We're here for you. 💙 Support is available.");
+      // Optionally open crisis modal
+      // setShowCrisisModal(true);
     }
-  };
+    
+    if (weeklyPrompt) {
+      const weekNumber = Math.floor(new Date().getTime() / (7 * 24 * 60 * 60 * 1000));
+      localStorage.setItem(`prompt_used_${weekNumber}`, 'true');
+    }
+  } catch (err) {
+    console.log(err);
+    showErrorToast("Failed to save journal entry");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const deleteEntry = async (id) => {
     if (window.confirm("Are you sure you want to delete this entry?")) {

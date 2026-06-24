@@ -8,6 +8,7 @@ const {
   generateJournalSummary, 
   updateMoodFromAI 
 } = require("../services/aiService");
+const { createCrisisAlert, quickCrisisCheck } = require("../services/ModerationService");
 
 // Helper function to get mood label
 function getMoodLabel(mood) {
@@ -20,6 +21,13 @@ function getMoodLabel(mood) {
   };
   return labels[mood] || "Okay";
 }
+
+// Crisis resources to return when crisis is detected
+const CRISIS_RESOURCES = [
+  { name: "Talian Kasih", number: "15999", hours: "24/7" },
+  { name: "Befrienders KL", number: "03-7627 2929", hours: "24/7" },
+  { name: "Talian HEAL", number: "15555", hours: "8.30 am – 11.59 pm" }
+];
 
 /**
  * POST /api/ai/chat
@@ -51,11 +59,28 @@ router.post("/chat", verifyToken, async (req, res) => {
       });
     }
     
+    // ✅ CHECK FOR CRISIS CONTENT IN CHAT MESSAGE
+    const crisisCheck = quickCrisisCheck(message);
+    
+    if (crisisCheck.hasCrisis) {
+      console.log("🚨 Crisis detected in chat message for user:", user_id);
+      console.log("🔑 Crisis keywords found:", crisisCheck.crisisKeywords);
+      
+      // ✅ Create crisis alert (this will send email + dashboard notification)
+      await createCrisisAlert(
+        user_id, 
+        message, 
+        null, // Auto-finds counsellor
+        'chat' // Source: chat
+      );
+    }
+    
     let moodSaved = false;
     if (autoSaveMood && aiAnalysis.detectedMood) {
       moodSaved = await updateMoodFromAI(user_id, aiAnalysis.detectedMood);
     }
     
+    // ✅ Return response with crisis flag and resources
     res.json({
       success: true,
       response: aiAnalysis.response,
@@ -67,12 +92,13 @@ router.post("/chat", verifyToken, async (req, res) => {
         keyThemes: aiAnalysis.keyThemes,
         confidence: aiAnalysis.confidence
       },
-      moodAutoSaved: moodSaved
+      moodAutoSaved: moodSaved,
+      crisisDetected: crisisCheck.hasCrisis || false,
+      crisisResources: crisisCheck.hasCrisis ? CRISIS_RESOURCES : undefined
     });
     
   } catch (error) {
     console.error("AI Chat Error:", error);
-    // Don't save anything to database on error
     res.status(503).json({ 
       success: false,
       msg: "AI service is currently unavailable. Please try again later.",

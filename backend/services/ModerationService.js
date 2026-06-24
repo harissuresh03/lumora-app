@@ -1,6 +1,7 @@
 // backend/services/ModerationService.js
 const Groq = require("groq-sdk");
 const db = require("../db");
+const { sendCrisisAlertEmail } = require("./emailService");
 
 // Initialize Groq
 let groq;
@@ -200,40 +201,104 @@ async function moderatePost(content) {
 }
 
 // Helper function to create crisis alert for counsellor
-async function createCrisisAlert(studentId, content, counsellorId = null) {
+async function createCrisisAlert(studentId, content, counsellorId = null, source = 'unknown') {
   try {
-    // Find counsellor for this student if not provided
-    if (!counsellorId) {
-      const [student] = await db.promise().query(
-        "SELECT university_id FROM users WHERE id = ?",
-        [studentId]
+    // Get student info
+    const [student] = await db.promise().query(
+      "SELECT name, nickname, university_id FROM users WHERE id = ?",
+      [studentId]
+    );
+    
+    if (!student.length) {
+      console.log("⚠️ Student not found for crisis alert:", studentId);
+      return;
+    }
+    
+    const studentInfo = student[0];
+    
+    // Find counsellor for this student
+    let counsellorInfo = null;
+    
+    if (counsellorId) {
+      const [counsellor] = await db.promise().query(
+        "SELECT id, email, name FROM users WHERE id = ? AND role = 'counsellor'",
+        [counsellorId]
       );
-      
-      if (student.length) {
-        const [counsellor] = await db.promise().query(
-          "SELECT id FROM users WHERE role = 'counsellor' AND university_id = ? LIMIT 1",
-          [student[0].university_id]
-        );
-        if (counsellor.length) {
-          counsellorId = counsellor[0].id;
-        }
+      if (counsellor.length) {
+        counsellorInfo = counsellor[0];
+      }
+    } else {
+      // Auto-find counsellor by university
+      const [counsellor] = await db.promise().query(
+        "SELECT id, email, name FROM users WHERE role = 'counsellor' AND university_id = ? LIMIT 1",
+        [studentInfo.university_id]
+      );
+      if (counsellor.length) {
+        counsellorInfo = counsellor[0];
       }
     }
     
-    if (!counsellorId) {
+    if (!counsellorInfo) {
       console.log("⚠️ No counsellor found for student:", studentId);
       return;
     }
     
-    // Create alert
-    await db.promise().query(
+    // ✅ SEND EMAIL TO COUNSELLOR
+    try {
+      const emailResult = await sendCrisisAlertEmail(
+        counsellorInfo.email,
+        counsellorInfo.name,
+        studentInfo.name,
+        studentInfo.nickname || null,
+        content.substring(0, 500),
+        'Crisis Alert',
+        studentId,
+        source // 'journal', 'chat', 'post', or 'comment'
+      );
+      
+      if (emailResult.success) {
+        console.log(`✅ Crisis alert email sent to ${counsellorInfo.email}`);
+      } else {
+        console.log(`❌ Failed to send crisis alert email: ${emailResult.error}`);
+      }
+    } catch (emailError) {
+      console.error("❌ Crisis email error:", emailError);
+      // Continue execution even if email fails
+    }
+    
+    // ✅ CREATE DASHBOARD NOTIFICATION
+    // Insert into crisis_alerts table
+    const [alertResult] = await db.promise().query(
       `INSERT INTO crisis_alerts 
        (student_id, counsellor_id, alert_type, severity, message, is_resolved, created_at) 
        VALUES (?, ?, ?, ?, ?, 0, NOW())`,
-      [studentId, counsellorId, 'Crisis Post', 'high', content.substring(0, 500)]
+      [
+        studentId, 
+        counsellorInfo.id, 
+        'Crisis Alert', 
+        'high', 
+        content.substring(0, 500)
+      ]
     );
     
-    console.log(`✅ Crisis alert created for student ${studentId}`);
+    console.log(`✅ Crisis alert created for student ${studentId} (ID: ${alertResult.insertId})`);
+    
+    // ✅ ALSO CREATE USER NOTIFICATION FOR COUNSELLOR
+    await db.promise().query(
+      `INSERT INTO user_notifications 
+       (user_id, title, message, type, related_id, created_at) 
+       VALUES (?, ?, ?, ?, ?, NOW())`,
+      [
+        counsellorInfo.id,
+        `🚨 Crisis Alert: ${studentInfo.name}`,
+        `Student ${studentInfo.name} ${studentInfo.nickname ? `(@${studentInfo.nickname})` : ''} needs immediate attention. Source: ${source}`,
+        'crisis',
+        studentId
+      ]
+    );
+    
+    console.log(`✅ Dashboard notification created for counsellor ${counsellorInfo.id}`);
+    
   } catch (error) {
     console.error("❌ Create crisis alert error:", error);
   }

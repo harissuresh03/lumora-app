@@ -262,8 +262,8 @@ router.post("/moderate-comment", verifyToken, async (req, res) => {
     
     // ✅ If crisis is detected in comment
     if (moderationResult.action === 'crisis' && moderationResult.isCrisis) {
-      // Create crisis alert for the comment
-      await createCrisisAlert(userId, content);
+      // ✅ Create crisis alert with source 'comment'
+      await createCrisisAlert(userId, content, null, 'comment');
       
       // Return crisis response
       return res.json({
@@ -325,7 +325,7 @@ router.post("/comment", verifyToken, async (req, res) => {
     
     // ✅ If crisis is detected
     if (moderationResult.action === 'crisis' && moderationResult.isCrisis) {
-      await createCrisisAlert(userId, content);
+      await createCrisisAlert(userId, content, null, 'comment');
       
       return res.json({
         action: 'crisis',

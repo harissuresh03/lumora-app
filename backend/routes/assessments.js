@@ -56,6 +56,56 @@ router.get("/history/:user_id", verifyToken, (req, res) => {
   );
 });
 
+// ✅ NEW: Get assessment history for graphing with comparison
+router.get("/history/graph/:user_id", verifyToken, (req, res) => {
+  const userId = parseInt(req.params.user_id);
+  
+  if (req.user.id !== userId) {
+    return res.status(403).json({ msg: "Unauthorized" });
+  }
+
+  db.query(
+    `SELECT 
+      id,
+      type,
+      score,
+      severity,
+      taken_at,
+      DATE(taken_at) as date
+     FROM assessments 
+     WHERE user_id = ? 
+     ORDER BY taken_at ASC`,
+    [userId],
+    (err, results) => {
+      if (err) {
+        console.error("Fetch assessment history error:", err);
+        return res.status(500).json({ msg: "Failed to fetch assessment history" });
+      }
+      
+      // Separate PHQ-9 and GAD-7 data
+      const phq9Data = results.filter(r => r.type === 'phq9').map(r => ({
+        date: r.date,
+        score: r.score,
+        severity: r.severity,
+        taken_at: r.taken_at
+      }));
+      
+      const gad7Data = results.filter(r => r.type === 'gad7').map(r => ({
+        date: r.date,
+        score: r.score,
+        severity: r.severity,
+        taken_at: r.taken_at
+      }));
+      
+      res.json({
+        phq9: phq9Data,
+        gad7: gad7Data,
+        total: results.length
+      });
+    }
+  );
+});
+
 // Submit PHQ-9 assessment
 router.post("/phq9", verifyToken, (req, res) => {
   const { user_id, answers } = req.body;
@@ -92,7 +142,7 @@ router.post("/phq9", verifyToken, (req, res) => {
       
       // ✅ Return the assessment ID for export
       res.json({
-        id: result.insertId,  // ✅ ADDED - Assessment ID for export
+        id: result.insertId,
         score: totalScore,
         severity,
         maxScore: 27,
@@ -133,7 +183,7 @@ router.post("/gad7", verifyToken, (req, res) => {
       
       // ✅ Return the assessment ID for export
       res.json({
-        id: result.insertId,  // ✅ ADDED - Assessment ID for export
+        id: result.insertId,
         score: totalScore,
         severity,
         maxScore: 21,

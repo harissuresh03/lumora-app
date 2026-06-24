@@ -36,11 +36,28 @@ function AICompanion({ onClose, onJournalSaved }) {
 
       // Check if AI service returned an error
       if (!response.data.success) {
-        // AI service unavailable - show error message without saving anything
         setMessages(prev => [...prev, { 
           role: "ai", 
           content: response.data.response || "I'm sorry, the AI service is currently unavailable. Please try again in a few moments. 🌙"
         }]);
+        setIsLoading(false);
+        return;
+      }
+
+      // ✅ SHOW CRISIS RESOURCES IF DETECTED
+      if (response.data.crisisDetected && response.data.crisisResources) {
+        const crisisMessage = 
+          `💙 I want you to know that you're not alone. What you've shared is important, and there is support available. Here are some resources that can help:\n\n` +
+          response.data.crisisResources.map(r => 
+            `📞 **${r.name}** — ${r.number} (${r.hours})`
+          ).join('\n') +
+          `\n\nYou are not alone. 💙 Please reach out to one of these services if you need immediate support.`;
+        
+        setMessages(prev => [...prev, { 
+          role: "ai", 
+          content: crisisMessage
+        }]);
+        
         setIsLoading(false);
         return;
       }
@@ -105,7 +122,6 @@ function AICompanion({ onClose, onJournalSaved }) {
         if (onJournalSaved) onJournalSaved(response.data.content);
         onClose();
       } else {
-        // Show error message without saving
         alert(response.data.msg || "Failed to save journal entry. AI service may be unavailable.");
       }
     } catch (error) {
@@ -198,7 +214,7 @@ function AICompanion({ onClose, onJournalSaved }) {
                   {msg.role === "user" ? "👤" : "🤖"}
                 </div>
                 <div style={styles.messageBubble}>
-                  <p>{msg.content}</p>
+                  <p style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</p>
                 </div>
               </div>
             ))

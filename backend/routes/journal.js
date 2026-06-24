@@ -2,6 +2,7 @@
 const express = require("express");
 const db = require("../db");
 const verifyToken = require("../middleware/authmiddleware");
+const { quickCrisisCheck, createCrisisAlert } = require("../services/ModerationService");
 
 const router = express.Router();
 
@@ -23,8 +24,8 @@ router.get("/:user_id", verifyToken, (req, res) => {
   );
 });
 
-/* ADD journal */
-router.post("/", verifyToken, (req, res) => {
+/* ADD journal with crisis detection */
+router.post("/", verifyToken, async (req, res) => {
   const { user_id, content } = req.body;
   
   if (req.user.id !== user_id) {
@@ -35,14 +36,52 @@ router.post("/", verifyToken, (req, res) => {
     return res.status(400).json({ msg: "Missing required fields" });
   }
 
-  db.query(
-    "INSERT INTO journals (user_id, content) VALUES (?, ?)",
-    [user_id, content],
-    (err, result) => {
-      if (err) return res.status(500).json(err);
-      res.json({ msg: "Journal saved 🌿", id: result.insertId });
+  try {
+    // ✅ Check for crisis content in journal
+    const crisisCheck = quickCrisisCheck(content);
+    
+    let crisisDetected = false;
+    
+    if (crisisCheck.hasCrisis) {
+      crisisDetected = true;
+      console.log("🚨 Crisis detected in journal entry for user:", user_id);
+      console.log("🔑 Crisis keywords found:", crisisCheck.crisisKeywords);
+      
+      // ✅ Create crisis alert (this will send email + dashboard notification)
+      await createCrisisAlert(
+        user_id, 
+        content, 
+        null, // Auto-finds counsellor
+        'journal' // Source: journal
+      );
     }
-  );
+
+    // ✅ ALWAYS SAVE THE JOURNAL ENTRY (crisis does NOT block)
+    const [result] = await db.promise().query(
+      "INSERT INTO journals (user_id, content) VALUES (?, ?)",
+      [user_id, content]
+    );
+    
+    // If crisis detected, return with warning
+    if (crisisDetected) {
+      return res.json({
+        msg: "Journal saved. We noticed you might be going through a difficult time. Help is available. 💙",
+        id: result.insertId,
+        crisisDetected: true,
+        crisisResources: [
+          { name: "Talian Kasih", number: "15999", hours: "24/7" },
+          { name: "Befrienders KL", number: "03-7627 2929", hours: "24/7" },
+          { name: "Talian HEAL", number: "15555", hours: "8.30 am – 11.59 pm" }
+        ]
+      });
+    }
+    
+    res.json({ msg: "Journal saved 🌿", id: result.insertId });
+    
+  } catch (err) {
+    console.error("Journal save error:", err);
+    res.status(500).json({ msg: "Failed to save journal", error: err.message });
+  }
 });
 
 /* DELETE journal */

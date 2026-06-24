@@ -57,29 +57,19 @@ router.get("/simple-test", verifyAdmin, async (req, res) => {
 // ============================================
 // GET UNSEEN NOTIFICATIONS ONLY
 // ============================================
+// GET UNSEEN NOTIFICATIONS ONLY
 router.get("/unread", verifyAdmin, async (req, res) => {
-  console.log("========================================");
-  console.log("🔍 /unread endpoint STARTED");
-  console.log("========================================");
-  
   try {
     const adminId = req.user.id;
-    console.log("📌 adminId from token:", adminId);
+    console.log("🔍 /unread - Admin ID:", adminId);
     
-    // Check total in table
-    const [totalCount] = await db.promise().query(
-      "SELECT COUNT(*) as total FROM admin_notifications"
-    );
-    console.log("📊 Total in table:", totalCount[0].total);
-    
-    // Check for this admin
-    const [adminCount] = await db.promise().query(
-      "SELECT COUNT(*) as count FROM admin_notifications WHERE admin_id = ?",
+    // Check if the admin exists
+    const [adminCheck] = await db.promise().query(
+      "SELECT id, role FROM users WHERE id = ?",
       [adminId]
     );
-    console.log("📊 For admin", adminId, ":", adminCount[0].count);
-    
-    // Get unseen
+    console.log("👤 Admin check:", adminCheck);
+
     const [notifications] = await db.promise().query(
       `SELECT id, type, title, message, link, related_id, is_read, created_at 
        FROM admin_notifications 
@@ -89,16 +79,15 @@ router.get("/unread", verifyAdmin, async (req, res) => {
       [adminId]
     );
     
-    console.log("📌 Found", notifications.length, "unseen notifications");
-    console.log("========================================");
+    console.log(`📨 Found ${notifications.length} unseen notifications`);
+    console.log("📨 Notifications data:", notifications);
     
     res.json(notifications);
   } catch (error) {
     console.error("❌ Error in /unread:", error);
     res.status(500).json({
       msg: "Failed to fetch unread notifications",
-      error: error.message,
-      stack: error.stack
+      error: error.message
     });
   }
 });

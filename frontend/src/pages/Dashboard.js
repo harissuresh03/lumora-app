@@ -17,6 +17,7 @@ import {
   StatsCard 
 } from "./components/EnhancedCharts";
 import StressForecast from "./components/StressForecast";
+import AssessmentHistoryGraph from "./components/AssessmentHistoryGraph";
 import { requireStudent } from "../utils/roleAuth";
 import {
   Calendar,
@@ -515,6 +516,9 @@ function Dashboard() {
 
         {/* RECOMMENDATIONS SECTION */}
         <Recommendations userId={user_id} />
+
+        {/* Assessment History Graph */}
+        <AssessmentHistoryGraph userId={user_id} />
 
         {/* ✅ STRESS FORECAST SECTION */}
         <StressForecast userId={user_id} />

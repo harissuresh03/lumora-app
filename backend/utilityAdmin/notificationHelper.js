@@ -17,6 +17,8 @@ const sendAdminNotification = async (type, title, message, link, relatedId) => {
       "SELECT id FROM users WHERE role = 'admin' AND is_active = 1"
     );
     
+    console.log("📨 Admin users found:", adminUsers.length); // ✅ ADD LOGGING
+    
     if (adminUsers.length === 0) {
       console.log("⚠️ No active admin users found to notify");
       return { success: false, message: "No active admin users found" };

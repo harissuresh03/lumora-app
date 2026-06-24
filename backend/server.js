@@ -55,7 +55,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/educational", educationalRoutes);
 app.use("/api/counsellor", counsellorRoutes);
 app.use("/api/counsellor-requests", counsellorRequestsRoutes);
-app.use("/api/admin/notifications", adminNotificationRoutes);
+app.use("/api/admin-notifications", adminNotificationRoutes);
 app.use("/api/student-message", studentMessageRoutes);
 app.use("/api/ai", aiModerationRoutes);
 app.use("/api/student-export", studentExportRoutes);

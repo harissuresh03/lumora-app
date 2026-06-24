@@ -381,9 +381,124 @@ const sendAccountApprovalEmail = async (email, name, accountType = 'student') =>
   return await sendEmail({ to: email, subject, html, text });
 };
 
+/**
+ * Send crisis alert email to counsellor
+ * @param {string} counsellorEmail - Counsellor's email address
+ * @param {string} counsellorName - Counsellor's name
+ * @param {string} studentName - Student's name
+ * @param {string} studentNickname - Student's nickname (optional)
+ * @param {string} alertMessage - Crisis alert message
+ * @param {string} alertType - Type of alert (e.g., "Journal Entry", "Chat Message")
+ * @param {number} studentId - Student's ID for link
+ * @param {string} source - Source of the alert (e.g., "journal", "chat")
+ * @returns {Promise<Object>} - Email send result
+ */
+const sendCrisisAlertEmail = async (counsellorEmail, counsellorName, studentName, studentNickname, alertMessage, alertType, studentId, source) => {
+  const subject = `🚨 CRISIS ALERT: ${studentName} Needs Immediate Attention`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Crisis Alert</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8fafc; }
+        .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 32px 30px; text-align: center; border-radius: 12px 12px 0 0; }
+        .header h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+        .header p { margin: 8px 0 0; opacity: 0.9; font-size: 14px; }
+        .content { background: #ffffff; padding: 32px 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .alert-box { background: #fef2f2; padding: 20px; border-radius: 12px; border-left: 4px solid #ef4444; margin: 16px 0; }
+        .alert-box strong { color: #dc2626; }
+        .alert-box p { margin: 8px 0 0; color: #475569; }
+        .button { display: inline-block; padding: 12px 32px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; text-decoration: none; border-radius: 30px; font-weight: 600; margin: 16px 0; transition: transform 0.2s; }
+        .button:hover { transform: scale(1.02); }
+        .crisis-resources { background: #fef3c7; padding: 16px 20px; border-radius: 12px; margin: 16px 0; border-left: 4px solid #f59e0b; }
+        .crisis-resources strong { color: #92400e; }
+        .crisis-resources ul { margin: 8px 0 0; padding-left: 20px; color: #92400e; }
+        .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
+        .footer a { color: #6366f1; text-decoration: none; }
+        .emoji { font-size: 24px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>🚨 Lumora</h1>
+        <p>Crisis Alert System</p>
+      </div>
+      <div class="content">
+        <h2 style="color: #dc2626;">⚠️ Immediate Action Required</h2>
+        <p>Dear <strong>${counsellorName}</strong>,</p>
+        <p>A student has triggered a crisis alert in the Lumora system. Please review and respond as soon as possible.</p>
+
+        <div class="alert-box">
+          <strong>📋 Alert Details:</strong>
+          <p><strong>Student:</strong> ${studentName} ${studentNickname ? `(@${studentNickname})` : ''}</p>
+          <p><strong>Alert Type:</strong> ${alertType || 'Crisis Alert'}</p>
+          <p><strong>Source:</strong> ${source === 'journal' ? '📓 Journal Entry' : source === 'chat' ? '💬 AI Chat' : source === 'post' ? '📢 Peer Support Post' : '⚠️ Unknown'}</p>
+          <p><strong>Message:</strong> ${alertMessage || 'No additional message provided.'}</p>
+        </div>
+
+        <div class="crisis-resources">
+          <strong>📞 Crisis Resources:</strong>
+          <ul>
+            <li>Talian Kasih: 15999 (24/7)</li>
+            <li>Befrienders KL: 03-7627 2929 (24/7)</li>
+            <li>Talian HEAL: 15555 (8.30 am – 11.59 pm)</li>
+          </ul>
+        </div>
+
+        <div style="text-align: center;">
+          <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/counsellor/alerts" class="button">🛡️ View Alerts Dashboard</a>
+        </div>
+
+        <p style="color: #475569; font-size: 14px; margin-top: 16px;">
+          Please log in to the counsellor dashboard to view full details and take appropriate action.
+        </p>
+        <p style="color: #475569; font-size: 14px; margin-bottom: 0;">
+          Warm regards,<br>
+          <strong style="color: #1e293b;">The Lumora Team 💙</strong>
+        </p>
+      </div>
+      <div class="footer">
+        <p>This email was sent to <a href="mailto:${counsellorEmail}">${counsellorEmail}</a> because you are a registered counsellor in the Lumora system.</p>
+        <p>© ${new Date().getFullYear()} Lumora Mental Health Platform. All rights reserved.</p>
+      </div>
+    </html>
+  `;
+
+  const text = `
+    🚨 CRISIS ALERT: ${studentName} Needs Immediate Attention
+
+    Dear ${counsellorName},
+
+    A student has triggered a crisis alert in the Lumora system.
+
+    Alert Details:
+    Student: ${studentName} ${studentNickname ? `(@${studentNickname})` : ''}
+    Alert Type: ${alertType || 'Crisis Alert'}
+    Source: ${source === 'journal' ? '📓 Journal Entry' : source === 'chat' ? '💬 AI Chat' : source === 'post' ? '📢 Peer Support Post' : '⚠️ Unknown'}
+    Message: ${alertMessage || 'No additional message provided.'}
+
+    Crisis Resources:
+    - Talian Kasih: 15999 (24/7)
+    - Befrienders KL: 03-7627 2929 (24/7)
+    - Talian HEAL: 15555 (8.30 am – 11.59 pm)
+
+    Please log in to the counsellor dashboard to view full details and take appropriate action.
+
+    Warm regards,
+    The Lumora Team 💙
+  `;
+
+  return await sendEmail({ to: counsellorEmail, subject, html, text });
+};
+
 module.exports = {
   sendEmail,
   sendCounsellorApprovalEmail,
   sendCounsellorRejectionEmail,
   sendAccountApprovalEmail,
+  sendCrisisAlertEmail,
 };
