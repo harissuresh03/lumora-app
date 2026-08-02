@@ -118,7 +118,6 @@ function CounsellorDashboard() {
 
   const statCards = [
     { title: "Total Students", value: stats?.totalStudents || 0, icon: <Users size={24} />, color: "#6366f1" },
-    { title: "Active Students", value: stats?.activeStudents || 0, icon: <UserCheck size={24} />, color: "#22c55e" },
     { title: "Consented Students", value: stats?.consentedStudents || 0, icon: <CheckCircle size={24} />, color: "#10b981" },
     { title: "Pending Appointments", value: stats?.pendingAppointments || 0, icon: <Calendar size={24} />, color: "#f59e0b" },
     { title: "Pending Alerts", value: stats?.pendingAlerts || 0, icon: <AlertTriangle size={24} />, color: "#ef4444" },
@@ -175,11 +174,11 @@ function CounsellorDashboard() {
           <h3 style={{ fontSize: '16px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Smile size={20} color="#6366f1" /> Mood Distribution (Last 30 Days)
           </h3>
-          <ResponsiveContainer width="100%" height={250}>
+          <ResponsiveContainer width="100%" height={280}>
             <BarChart data={analytics?.moodDistribution || []}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="mood" stroke="#94a3b8" fontSize={11} tickFormatter={(value) => moodLabels[value - 1] || value} />
-              <YAxis stroke="#94a3b8" fontSize={11} />
+              <YAxis stroke="#94a3b8" fontSize={11} domain={[0, 'auto']} allowDecimals={false} />
               <Tooltip formatter={(value, name, props) => [`${value} students`, moodLabels[props.payload.mood - 1] || `Mood ${props.payload.mood}`]} />
               <Bar dataKey="student_count" fill="#6366f1" name="Students" radius={[8, 8, 0, 0]}>
                 {analytics?.moodDistribution?.map((entry, index) => (
@@ -206,11 +205,11 @@ function CounsellorDashboard() {
           <h3 style={{ fontSize: '16px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Moon size={20} color="#10b981" /> Sleep Distribution (Last 30 Days)
           </h3>
-          <ResponsiveContainer width="100%" height={250}>
+          <ResponsiveContainer width="100%" height={280}>
             <BarChart data={analytics?.sleepDistribution || []}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="quality" stroke="#94a3b8" fontSize={11} tickFormatter={(value) => sleepLabels[value - 1] || value} />
-              <YAxis stroke="#94a3b8" fontSize={11} />
+              <YAxis stroke="#94a3b8" fontSize={11} domain={[0, 'auto']} allowDecimals={false} />
               <Tooltip formatter={(value, name, props) => [`${value} students`, sleepLabels[props.payload.quality - 1] || `Quality ${props.payload.quality}`]} />
               <Bar dataKey="student_count" fill="#10b981" name="Students" radius={[8, 8, 0, 0]}>
                 {analytics?.sleepDistribution?.map((entry, index) => (
@@ -239,7 +238,7 @@ function CounsellorDashboard() {
         <h3 style={{ fontSize: '16px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <TrendingUp size={20} color="#8b5cf6" /> Weekly Mood Trend (Last 7 Days)
         </h3>
-        <ResponsiveContainer width="100%" height={250}>
+        <ResponsiveContainer width="100%" height={280}>
           <LineChart data={analytics?.weeklyMoodTrend || []}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
             <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
@@ -367,21 +366,7 @@ function CounsellorDashboard() {
             <Calendar size={32} style={{ marginBottom: '8px', color: '#f59e0b' }} />
             <div style={{ fontWeight: 600 }}>Schedule Session</div>
           </div>
-          <div style={{
-            padding: '16px',
-            background: 'var(--bg-secondary)',
-            borderRadius: '12px',
-            textAlign: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-soft)'}
-          onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
-          onClick={() => window.location.href = '/counsellor/stress-levels'}
-          >
-            <Activity size={32} style={{ marginBottom: '8px', color: '#f59e0b' }} />
-            <div style={{ fontWeight: 600 }}>Stress Level</div>
-          </div>
+          {/* ✅ REMOVED: Stress Level quick action */}
         </div>
       </motion.div>
     </div>

@@ -1,8 +1,8 @@
-// routes/journal.js
+// backend/routes/journal.js
 const express = require("express");
 const db = require("../db");
 const verifyToken = require("../middleware/authmiddleware");
-const { quickCrisisCheck, createCrisisAlert } = require("../services/ModerationService");
+const { detectCrisisWithAI, createCrisisAlert } = require("../services/ModerationService");
 
 const router = express.Router();
 
@@ -24,7 +24,7 @@ router.get("/:user_id", verifyToken, (req, res) => {
   );
 });
 
-/* ADD journal with crisis detection */
+/* ADD journal with AI-based crisis detection */
 router.post("/", verifyToken, async (req, res) => {
   const { user_id, content } = req.body;
   
@@ -37,17 +37,19 @@ router.post("/", verifyToken, async (req, res) => {
   }
 
   try {
-    // ✅ Check for crisis content in journal
-    const crisisCheck = quickCrisisCheck(content);
+    // ✅ Use AI-based crisis detection
+    const crisisCheck = await detectCrisisWithAI(content);
     
     let crisisDetected = false;
     
     if (crisisCheck.hasCrisis) {
       crisisDetected = true;
-      console.log("🚨 Crisis detected in journal entry for user:", user_id);
-      console.log("🔑 Crisis keywords found:", crisisCheck.crisisKeywords);
+      console.log(`🚨 AI detected crisis in journal entry for user: ${user_id}`);
+      console.log(`   Reason: ${crisisCheck.reason}`);
+      console.log(`   Confidence: ${crisisCheck.confidence}%`);
+      console.log(`   Severity: ${crisisCheck.severity}`);
       
-      // ✅ Create crisis alert (this will send email + dashboard notification)
+      // Create crisis alert (this will send email + dashboard notification)
       await createCrisisAlert(
         user_id, 
         content, 
@@ -56,7 +58,7 @@ router.post("/", verifyToken, async (req, res) => {
       );
     }
 
-    // ✅ ALWAYS SAVE THE JOURNAL ENTRY (crisis does NOT block)
+    // ALWAYS SAVE THE JOURNAL ENTRY (crisis does NOT block)
     const [result] = await db.promise().query(
       "INSERT INTO journals (user_id, content) VALUES (?, ?)",
       [user_id, content]
@@ -68,6 +70,7 @@ router.post("/", verifyToken, async (req, res) => {
         msg: "Journal saved. We noticed you might be going through a difficult time. Help is available. 💙",
         id: result.insertId,
         crisisDetected: true,
+        crisisConfidence: crisisCheck.confidence,
         crisisResources: [
           { name: "Talian Kasih", number: "15999", hours: "24/7" },
           { name: "Befrienders KL", number: "03-7627 2929", hours: "24/7" },

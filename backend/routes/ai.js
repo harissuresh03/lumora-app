@@ -8,7 +8,7 @@ const {
   generateJournalSummary, 
   updateMoodFromAI 
 } = require("../services/aiService");
-const { createCrisisAlert, quickCrisisCheck } = require("../services/ModerationService");
+const { detectCrisisWithAI, createCrisisAlert } = require("../services/ModerationService");
 
 // Helper function to get mood label
 function getMoodLabel(mood) {
@@ -59,14 +59,16 @@ router.post("/chat", verifyToken, async (req, res) => {
       });
     }
     
-    // ✅ CHECK FOR CRISIS CONTENT IN CHAT MESSAGE
-    const crisisCheck = quickCrisisCheck(message);
+    // ✅ Use AI-based crisis detection
+    const crisisCheck = await detectCrisisWithAI(message);
     
     if (crisisCheck.hasCrisis) {
-      console.log("🚨 Crisis detected in chat message for user:", user_id);
-      console.log("🔑 Crisis keywords found:", crisisCheck.crisisKeywords);
+      console.log(`🚨 AI detected crisis in chat message for user: ${user_id}`);
+      console.log(`   Reason: ${crisisCheck.reason}`);
+      console.log(`   Confidence: ${crisisCheck.confidence}%`);
+      console.log(`   Severity: ${crisisCheck.severity}`);
       
-      // ✅ Create crisis alert (this will send email + dashboard notification)
+      // Create crisis alert (this will send email + dashboard notification)
       await createCrisisAlert(
         user_id, 
         message, 
@@ -80,7 +82,7 @@ router.post("/chat", verifyToken, async (req, res) => {
       moodSaved = await updateMoodFromAI(user_id, aiAnalysis.detectedMood);
     }
     
-    // ✅ Return response with crisis flag and resources
+    // Return response with crisis flag and resources
     res.json({
       success: true,
       response: aiAnalysis.response,
@@ -94,6 +96,7 @@ router.post("/chat", verifyToken, async (req, res) => {
       },
       moodAutoSaved: moodSaved,
       crisisDetected: crisisCheck.hasCrisis || false,
+      crisisConfidence: crisisCheck.confidence || 0,
       crisisResources: crisisCheck.hasCrisis ? CRISIS_RESOURCES : undefined
     });
     

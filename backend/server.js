@@ -38,6 +38,7 @@ const publicResourcesRoutes = require("./routes/publicResources");
 const deadlinesRoutes = require("./routes/deadlines");
 const stressForecastRoutes = require("./routes/stressForecast");
 const recommendationsRoutes = require("./routes/recommendations");
+const gamificationRoutes = require("./routes/gamification");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/mood", moodRoutes);
@@ -64,6 +65,7 @@ app.use("/api/public", publicResourcesRoutes);
 app.use("/api/deadlines", deadlinesRoutes);
 app.use("/api/stress-forecast", stressForecastRoutes);
 app.use("/api/recommendations", recommendationsRoutes);
+app.use("/api/gamification", gamificationRoutes);
 
 app.get("/", (req, res) => {
   res.send("API running 🌿");

@@ -73,13 +73,10 @@ function CounsellorLayout() {
   const refreshData = async () => {
     setRefreshing(true);
     try {
-      // Refresh stats
       const statsRes = await api.get(`/counsellor/stats/${counsellorId}`);
       setPendingAlerts(statsRes.data.pendingAlerts || 0);
       setUnreadMessages(statsRes.data.unreadMessages || 0);
       
-      // ✅ Force refresh the current page by reloading the outlet
-      // This will trigger a re-render of the child component
       window.dispatchEvent(new Event('refresh'));
       
       showSuccessToast("Dashboard refreshed! ✅");
@@ -91,13 +88,13 @@ function CounsellorLayout() {
     }
   };
 
+  // ✅ REMOVED: Stress Levels from menu
   const menuItems = [
     { path: "/counsellor", icon: <LayoutDashboard size={20} />, label: "Dashboard", badge: 0 },
     { path: "/counsellor/students", icon: <Users size={20} />, label: "Students", badge: 0 },
     { path: "/counsellor/messages", icon: <MessageCircle size={20} />, label: "Messages", badge: unreadMessages, badgeColor: "#3b82f6" },
     { path: "/counsellor/appointments", icon: <Calendar size={20} />, label: "Appointments", badge: 0 },
     { path: "/counsellor/alerts", icon: <AlertTriangle size={20} />, label: "Alerts", badge: pendingAlerts, badgeColor: "#ef4444" },
-    { path: "/counsellor/stress-levels", icon: <Activity size={20} />, label: "Stress Levels", badge: 0 },
     { path: "/counsellor/settings", icon: <SettingsIcon size={20} />, label: "Settings", badge: 0 },
   ];
 
@@ -203,7 +200,6 @@ function CounsellorLayout() {
             <p style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>Support and monitor student well-being</p>
           </div>
           
-          {/* Pill container - Student Style */}
           <div
             style={{
               display: 'flex',
@@ -215,15 +211,13 @@ function CounsellorLayout() {
               borderRadius: '999px',
               border: '1px solid var(--border-glass)',
               boxShadow: 'var(--shadow-md)',
-              overflow: 'visible',  // ✅ ADD THIS
-              position: 'relative', // ✅ ADD THIS
-              zIndex: 100  // ✅ ADD THIS
+              overflow: 'visible',
+              position: 'relative',
+              zIndex: 100
             }}
           >
-            {/* Notification Bell */}
             <NotificationBell userId={parseInt(counsellorId)} />
 
-            {/* Avatar + Name */}
             <div
               style={{
                 display: 'flex',
@@ -262,7 +256,6 @@ function CounsellorLayout() {
               </span>
             </div>
 
-            {/* Refresh Button */}
             <button
               onClick={refreshData}
               disabled={refreshing}
@@ -298,7 +291,6 @@ function CounsellorLayout() {
               />
             </button>
 
-            {/* Logout */}
             <button
               onClick={logout}
               title="Logout"

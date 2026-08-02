@@ -1,7 +1,6 @@
 // backend/services/ModerationService.js
 const Groq = require("groq-sdk");
 const db = require("../db");
-const { sendCrisisAlertEmail } = require("./emailService");
 
 // Initialize Groq
 let groq;
@@ -17,11 +16,7 @@ try {
   console.error("❌ Failed to initialize Groq AI:", error.message);
 }
 
-// ⚠️ REMOVED: Hardcoded banned words list
-// We're now using AI exclusively for moderation
-
-// Crisis keywords - ONLY used for initial detection, not for blocking
-// These trigger crisis protocol, not blocking
+// Crisis keywords - used for quick initial detection
 const crisisKeywords = [
   'suicide', 'kill myself', 'end my life', 'want to die', 
   'hurt myself', 'self harm', 'cut myself', 'overdose',
@@ -47,6 +42,83 @@ function quickCrisisCheck(content) {
   };
 }
 
+// ============================================
+// AI-BASED CRISIS DETECTION
+// ============================================
+
+/**
+ * AI-based crisis detection (without blocking)
+ * This is similar to moderatePost but only checks for crisis,
+ * without blocking content
+ */
+async function detectCrisisWithAI(content) {
+  try {
+    if (!groq) {
+      console.log("⚠️ Groq not initialized, falling back to keyword matching");
+      return quickCrisisCheck(content);
+    }
+
+    const prompt = `
+      You are a crisis detection system for a mental health support platform.
+      Analyze the following content and determine if it indicates a personal crisis.
+
+      IMPORTANT: 
+      - A personal crisis includes expressions of suicidal thoughts, self-harm, severe hopelessness, or extreme distress.
+      - DO NOT flag general sadness, stress, or anxiety as a crisis.
+      - ONLY flag content that suggests immediate danger to the person's well-being.
+
+      Content to analyze: "${content}"
+
+      Return ONLY JSON with this exact structure:
+      {
+        "isCrisis": true/false,
+        "confidence": 0-100,
+        "reason": "Brief explanation of why this is or isn't a crisis",
+        "severity": "low" | "medium" | "high" | "critical"
+      }
+    `;
+
+    console.log("🤖 Calling Groq API for crisis detection...");
+    const chatCompletion = await groq.chat.completions.create({
+      messages: [{ role: "user", content: prompt }],
+      model: "llama-3.3-70b-versatile",
+      temperature: 0.2,
+      max_tokens: 256,
+    });
+    
+    const response = chatCompletion.choices[0]?.message?.content || "";
+    console.log("📝 Groq crisis detection response:", response);
+    
+    let cleanResponse = response.trim();
+    cleanResponse = cleanResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    
+    let analysis;
+    try {
+      analysis = JSON.parse(cleanResponse);
+    } catch (parseError) {
+      console.error('❌ Failed to parse Groq response:', cleanResponse);
+      return quickCrisisCheck(content);
+    }
+
+    return {
+      hasCrisis: analysis.isCrisis || false,
+      confidence: analysis.confidence || 0,
+      reason: analysis.reason || '',
+      severity: analysis.severity || 'medium',
+      crisisKeywords: analysis.isCrisis ? ['AI-detected crisis'] : []
+    };
+
+  } catch (error) {
+    console.error('❌ AI crisis detection error:', error.message);
+    // Fallback to keyword matching
+    return quickCrisisCheck(content);
+  }
+}
+
+// ============================================
+// CONTENT MODERATION (with AI)
+// ============================================
+
 async function moderatePost(content) {
   console.log("🔍 Starting AI moderation for:", content);
   
@@ -55,11 +127,10 @@ async function moderatePost(content) {
   
   if (crisisCheck.hasCrisis) {
     console.log("🚨 Crisis detected! Keywords:", crisisCheck.crisisKeywords);
-    // ✅ Return crisis action - this will trigger crisis protocol
     return {
       action: 'crisis',
       reason: 'Crisis-related content detected. Help is available.',
-      safeScore: 100, // 100% safe - we want to help, not block
+      safeScore: 100,
       crisisKeywords: crisisCheck.crisisKeywords,
       isCrisis: true
     };
@@ -72,7 +143,7 @@ async function moderatePost(content) {
       return {
         action: 'approved',
         reason: 'AI service unavailable, approved by default',
-        safeScore: 100 // Default to completely safe
+        safeScore: 100
       };
     }
 
@@ -141,17 +212,15 @@ async function moderatePost(content) {
       return {
         action: 'approved',
         reason: 'Unable to analyze, approved by default',
-        safeScore: 100 // Default to completely safe on error
+        safeScore: 100
       };
     }
 
-    // Ensure safeScore is within valid range
     const safeScore = Math.min(Math.max(analysis.safeScore || 100, 0), 100);
     
     console.log(`📊 Content analysis: Safe Score = ${safeScore}%`);
 
     // Decision logic based on safe score and flags
-    // ✅ Personal crisis - ALLOW but flag for support
     if (analysis.isPersonalCrisis) {
       return {
         action: 'crisis',
@@ -162,17 +231,15 @@ async function moderatePost(content) {
       };
     }
 
-    // ❌ Harassment or Bullying - BLOCK
     if (analysis.isHarassment || analysis.isBullying || analysis.isToxic) {
       return {
         action: 'blocked',
         reason: analysis.reason || 'Harassment or bullying detected',
-        safeScore: safeScore, // Should be low (0-20) for harassment
+        safeScore: safeScore,
         aiAnalysis: analysis
       };
     }
 
-    // ❌ Low safe score - BLOCK
     if (safeScore < 30) {
       return {
         action: 'blocked',
@@ -182,7 +249,6 @@ async function moderatePost(content) {
       };
     }
 
-    // ✅ Approved
     return {
       action: 'approved',
       reason: analysis.reason || 'Content approved',
@@ -195,10 +261,14 @@ async function moderatePost(content) {
     return {
       action: 'approved',
       reason: 'Moderation service unavailable, approved by default',
-      safeScore: 100 // Default to completely safe on error
+      safeScore: 100
     };
   }
 }
+
+// ============================================
+// CRISIS ALERT FUNCTIONS
+// ============================================
 
 // Helper function to create crisis alert for counsellor
 async function createCrisisAlert(studentId, content, counsellorId = null, source = 'unknown') {
@@ -245,6 +315,7 @@ async function createCrisisAlert(studentId, content, counsellorId = null, source
     
     // ✅ SEND EMAIL TO COUNSELLOR
     try {
+      const { sendCrisisAlertEmail } = require("./emailService");
       const emailResult = await sendCrisisAlertEmail(
         counsellorInfo.email,
         counsellorInfo.name,
@@ -267,7 +338,6 @@ async function createCrisisAlert(studentId, content, counsellorId = null, source
     }
     
     // ✅ CREATE DASHBOARD NOTIFICATION
-    // Insert into crisis_alerts table
     const [alertResult] = await db.promise().query(
       `INSERT INTO crisis_alerts 
        (student_id, counsellor_id, alert_type, severity, message, is_resolved, created_at) 
@@ -303,6 +373,10 @@ async function createCrisisAlert(studentId, content, counsellorId = null, source
     console.error("❌ Create crisis alert error:", error);
   }
 }
+
+// ============================================
+// WARNING FUNCTIONS
+// ============================================
 
 async function getUserWarningCount(userId) {
   return new Promise((resolve, reject) => {
@@ -343,9 +417,14 @@ async function incrementWarningCount(userId) {
   });
 }
 
+// ============================================
+// EXPORTS
+// ============================================
+
 module.exports = { 
   moderatePost, 
   quickCrisisCheck,
+  detectCrisisWithAI,   // ✅ Added
   createCrisisAlert,
   getUserWarningCount, 
   incrementWarningCount 

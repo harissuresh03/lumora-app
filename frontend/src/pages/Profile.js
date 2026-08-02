@@ -3,13 +3,29 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import Layout from "./components/Layout";
-import { User, Mail, BookOpen, Heart, LogOut, ArrowLeft, Building, Calendar, GraduationCap, Shield } from "lucide-react";
+import { 
+  User, 
+  Mail, 
+  BookOpen, 
+  Heart, 
+  LogOut, 
+  ArrowLeft, 
+  Building, 
+  Calendar, 
+  GraduationCap, 
+  Shield,
+  Award,
+  Star,
+  Sparkles
+} from "lucide-react";
 
 function Profile() {
   const navigate = useNavigate();
   const user_id = localStorage.getItem("user_id");
   const [userNickname, setUserNickname] = useState("");
   const [user, setUser] = useState(null);
+  const [gamificationStats, setGamificationStats] = useState(null);
+  const [loadingGamification, setLoadingGamification] = useState(true);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -26,7 +42,20 @@ function Profile() {
         if (err.response?.status === 401) navigate("/");
       }
     };
+    
+    const fetchGamificationStats = async () => {
+      try {
+        const res = await api.get(`/gamification/stats/${user_id}`);
+        setGamificationStats(res.data);
+      } catch (err) {
+        console.error("Fetch gamification stats error:", err);
+      } finally {
+        setLoadingGamification(false);
+      }
+    };
+
     fetchUserProfile();
+    fetchGamificationStats();
   }, [user_id, navigate]);
 
   const logout = () => {
@@ -46,40 +75,162 @@ function Profile() {
   };
 
   const consentStatus = getConsentStatus();
+  const levelTitle = gamificationStats?.points?.level 
+    ? getLevelTitle(gamificationStats.points.level) 
+    : "Well-being Starter 🌱";
+
+  function getLevelTitle(level) {
+    const titles = {
+      1: "Well-being Starter 🌱",
+      2: "Mindful Beginner",
+      3: "Self-Care Explorer",
+      4: "Wellness Adventurer",
+      5: "Emotional Navigator",
+      6: "Resilience Builder",
+      7: "Balance Seeker",
+      8: "Growth Achiever",
+      9: "Mental Health Advocate",
+      10: "Lumora Champion 🌟"
+    };
+    return titles[level] || `Level ${level}`;
+  }
 
   return (
     <Layout>
       <div className="page-header">
-        <button onClick={() => navigate("/dashboard")} className="back-arrow-btn"><ArrowLeft size={18} /></button>
-        <div><h1 className="page-title">Profile</h1><p className="page-subtitle">Your personal information and account details</p></div>
+        <button onClick={() => navigate("/dashboard")} className="back-arrow-btn">
+          <ArrowLeft size={18} />
+        </button>
+        <div>
+          <h1 className="page-title">Profile</h1>
+          <p className="page-subtitle">Your personal information and account details</p>
+        </div>
       </div>
 
       <div className="profile-card">
         <div className="profile-header">
-          <div className="profile-avatar"><User size={40} /></div>
-          <div><h2 style={{ margin: 0, fontSize: "22px" }}>{user.name}</h2><p className="profile-subtext" style={{ color: "var(--text-secondary)", marginTop: "4px" }}>{user.nickname ? `@${user.nickname}` : ""}</p></div>
+          <div className="profile-avatar">
+            <User size={40} />
+          </div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: "22px" }}>{user.name}</h2>
+            <p className="profile-subtext" style={{ color: "var(--text-secondary)", marginTop: "4px" }}>
+              {user.nickname ? `@${user.nickname}` : ""}
+            </p>
+            
+            {/* ✅ Gamification Stats */}
+            {!loadingGamification && gamificationStats && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginTop: '8px',
+                flexWrap: 'wrap'
+              }}>
+                <span style={{
+                  padding: '4px 14px',
+                  background: 'var(--accent-gradient)',
+                  borderRadius: '20px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <Star size={14} />
+                  Level {gamificationStats.points?.level || 1} • {gamificationStats.points?.total_points || 0} pts
+                </span>
+                <span style={{
+                  padding: '4px 12px',
+                  background: 'var(--accent-soft)',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  color: 'var(--text-secondary)'
+                }}>
+                  {levelTitle}
+                </span>
+                {gamificationStats.equipped_badge && (
+                  <span style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 12px',
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    border: '1px solid rgba(245, 158, 11, 0.3)'
+                  }}>
+                    🏅 {gamificationStats.equipped_badge.icon} {gamificationStats.equipped_badge.name}
+                  </span>
+                )}
+                <span style={{
+                  fontSize: '12px',
+                  color: 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <Award size={14} />
+                  {gamificationStats.total_badges || 0} badges earned
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="profile-info-grid">
           <div className="profile-section">
-            <h4 className="profile-section-title"><User size={16} style={{ display: "inline", marginRight: "8px" }} /> Personal Information</h4>
-            <div className="profile-info-item"><span className="profile-label">Full Name</span><span className="profile-value">{user.name}</span></div>
-            <div className="profile-info-item"><span className="profile-label">Nickname</span><span className="profile-value">{user.nickname || "-"}</span></div>
-            <div className="profile-info-item"><span className="profile-label">Date of Birth</span><span className="profile-value">{user.dob ? new Date(user.dob).toLocaleDateString() : "-"}</span></div>
-            <div className="profile-info-item"><span className="profile-label">Gender</span><span className="profile-value">{user.gender || "-"}</span></div>
+            <h4 className="profile-section-title">
+              <User size={16} style={{ display: "inline", marginRight: "8px" }} />
+              Personal Information
+            </h4>
+            <div className="profile-info-item">
+              <span className="profile-label">Full Name</span>
+              <span className="profile-value">{user.name}</span>
+            </div>
+            <div className="profile-info-item">
+              <span className="profile-label">Nickname</span>
+              <span className="profile-value">{user.nickname || "-"}</span>
+            </div>
+            <div className="profile-info-item">
+              <span className="profile-label">Date of Birth</span>
+              <span className="profile-value">{user.dob ? new Date(user.dob).toLocaleDateString() : "-"}</span>
+            </div>
+            <div className="profile-info-item">
+              <span className="profile-label">Gender</span>
+              <span className="profile-value">{user.gender || "-"}</span>
+            </div>
           </div>
 
           <div className="profile-section">
-            <h4 className="profile-section-title"><BookOpen size={16} style={{ display: "inline", marginRight: "8px" }} /> Academic Information</h4>
-            <div className="profile-info-item"><span className="profile-label">University</span><span className="profile-value">{user.university_name || "-"}</span></div>
-            <div className="profile-info-item"><span className="profile-label">Student ID</span><span className="profile-value">{user.student_id || "-"}</span></div>
-            {/* ✅ NEW: Faculty and Department */}
-            <div className="profile-info-item"><span className="profile-label">Faculty</span><span className="profile-value">{user.faculty || "-"}</span></div>
-            <div className="profile-info-item"><span className="profile-label">Department</span><span className="profile-value">{user.department || "-"}</span></div>
+            <h4 className="profile-section-title">
+              <BookOpen size={16} style={{ display: "inline", marginRight: "8px" }} />
+              Academic Information
+            </h4>
+            <div className="profile-info-item">
+              <span className="profile-label">University</span>
+              <span className="profile-value">{user.university_name || "-"}</span>
+            </div>
+            <div className="profile-info-item">
+              <span className="profile-label">Student ID</span>
+              <span className="profile-value">{user.student_id || "-"}</span>
+            </div>
+            <div className="profile-info-item">
+              <span className="profile-label">Faculty</span>
+              <span className="profile-value">{user.faculty || "-"}</span>
+            </div>
+            <div className="profile-info-item">
+              <span className="profile-label">Department</span>
+              <span className="profile-value">{user.department || "-"}</span>
+            </div>
           </div>
 
           <div className="profile-section">
-            <h4 className="profile-section-title"><Shield size={16} style={{ display: "inline", marginRight: "8px" }} /> Privacy & Consent</h4>
+            <h4 className="profile-section-title">
+              <Shield size={16} style={{ display: "inline", marginRight: "8px" }} />
+              Privacy & Consent
+            </h4>
             <div className="profile-info-item">
               <span className="profile-label">Data Sharing Consent</span>
               <span className="profile-value" style={{ color: consentStatus.color }}>
@@ -101,19 +252,39 @@ function Profile() {
           </div>
 
           <div className="profile-section">
-            <h4 className="profile-section-title"><Heart size={16} style={{ display: "inline", marginRight: "8px" }} /> Emergency Contact</h4>
-            <div className="profile-info-item"><span className="profile-label">Contact Name</span><span className="profile-value">{user.emergency_contact_name || "-"}</span></div>
-            <div className="profile-info-item"><span className="profile-label">Phone Number</span><span className="profile-value">{user.emergency_contact_phone || "-"}</span></div>
-            <div className="profile-info-item"><span className="profile-label">Relationship</span><span className="profile-value">{user.emergency_contact_relationship || "-"}</span></div>
+            <h4 className="profile-section-title">
+              <Heart size={16} style={{ display: "inline", marginRight: "8px" }} />
+              Emergency Contact
+            </h4>
+            <div className="profile-info-item">
+              <span className="profile-label">Contact Name</span>
+              <span className="profile-value">{user.emergency_contact_name || "-"}</span>
+            </div>
+            <div className="profile-info-item">
+              <span className="profile-label">Phone Number</span>
+              <span className="profile-value">{user.emergency_contact_phone || "-"}</span>
+            </div>
+            <div className="profile-info-item">
+              <span className="profile-label">Relationship</span>
+              <span className="profile-value">{user.emergency_contact_relationship || "-"}</span>
+            </div>
           </div>
 
           <div className="profile-section">
-            <h4 className="profile-section-title"><Mail size={16} style={{ display: "inline", marginRight: "8px" }} /> Account Information</h4>
-            <div className="profile-info-item"><span className="profile-label">Email</span><span className="profile-value">{user.email}</span></div>
+            <h4 className="profile-section-title">
+              <Mail size={16} style={{ display: "inline", marginRight: "8px" }} />
+              Account Information
+            </h4>
+            <div className="profile-info-item">
+              <span className="profile-label">Email</span>
+              <span className="profile-value">{user.email}</span>
+            </div>
           </div>
         </div>
 
-        <button className="primary-btn" onClick={() => navigate("/profile/edit")}>Edit Profile</button>
+        <button className="primary-btn" onClick={() => navigate("/profile/edit")}>
+          Edit Profile
+        </button>
       </div>
     </Layout>
   );

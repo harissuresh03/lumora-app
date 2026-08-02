@@ -7,6 +7,7 @@ import AICompanion from "./components/AICompanion";
 import Layout from "./components/Layout";
 import AssessmentModal from "./components/AssessmentModal";
 import Recommendations from "./components/Recommendations";
+import GamificationMini from "./components/GamificationMini";
 import { showSuccessToast, showErrorToast, showInfoToast } from "./components/ToastNotification";
 import AnimatedCard, { AnimatedButton, PageTransition } from "./components/AnimatedWrapper";
 import ExportButton from "./components/ExportButton";
@@ -17,7 +18,6 @@ import {
   StatsCard 
 } from "./components/EnhancedCharts";
 import StressForecast from "./components/StressForecast";
-import AssessmentHistoryGraph from "./components/AssessmentHistoryGraph";
 import { requireStudent } from "../utils/roleAuth";
 import {
   Calendar,
@@ -25,14 +25,11 @@ import {
   Smile,
   BookOpen,
   MessageCircle,
-  LogOut,
-  User,
   ChevronLeft,
   ChevronRight,
   TrendingUp,
   BarChart3,
-  Activity,
-  RefreshCw
+  Activity
 } from "lucide-react";
 
 function Dashboard() {
@@ -63,6 +60,10 @@ function Dashboard() {
   const [selectedDateJournals, setSelectedDateJournals] = useState([]);
   const [showDateModal, setShowDateModal] = useState(false);
   const [chartView, setChartView] = useState("mood");
+
+  // ✅ PSS Reminder State
+  const [pssReminder, setPssReminder] = useState(null);
+  const [showPssReminder, setShowPssReminder] = useState(false);
 
   // Role check - redirect admin to admin panel
   useEffect(() => {
@@ -186,6 +187,17 @@ function Dashboard() {
     }
   };
 
+  // ✅ Check PSS status (monthly reminder)
+  const checkPSSStatus = async () => {
+    try {
+      const res = await api.get(`/assessments/pss/should-retake/${user_id}`);
+      setPssReminder(res.data);
+      setShowPssReminder(res.data.shouldRetake || false);
+    } catch (err) {
+      console.error("Check PSS status error:", err);
+    }
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -209,6 +221,7 @@ function Dashboard() {
   const refreshData = async () => {
     setRefreshing(true);
     await fetchData();
+    await checkPSSStatus();
     setRefreshing(false);
     showSuccessToast("Dashboard refreshed!");
   };
@@ -216,6 +229,7 @@ function Dashboard() {
   useEffect(() => {
     fetchUserProfile();
     fetchData();
+    checkPSSStatus();
   }, []);
 
   const updateMoodManually = async (moodValue) => {
@@ -331,6 +345,33 @@ function Dashboard() {
   const averageSleepDuration = sleepDurations.length > 0
     ? (sleepDurations.reduce((a, b) => a + b, 0) / sleepDurations.length).toFixed(1)
     : 0;
+
+  // ✅ Color-coded values for stats cards
+  const getMoodColor = (mood) => {
+    const val = parseFloat(mood);
+    if (val >= 4) return { color: "#22c55e", label: "Good" };
+    if (val >= 3) return { color: "#eab308", label: "Neutral" };
+    return { color: "#ef4444", label: "Bad" };
+  };
+
+  const getSleepQualityColor = (quality) => {
+    const val = parseFloat(quality);
+    if (val >= 4) return { color: "#22c55e", label: "Good" };
+    if (val >= 3) return { color: "#eab308", label: "Neutral" };
+    return { color: "#ef4444", label: "Bad" };
+  };
+
+  const getSleepDurationColor = (duration) => {
+    const val = parseFloat(duration);
+    if (val >= 7 && val <= 9) return { color: "#22c55e", label: "Good" };
+    if (val >= 5 && val < 7) return { color: "#eab308", label: "Neutral" };
+    if (val > 9 && val <= 10) return { color: "#eab308", label: "Neutral" };
+    return { color: "#ef4444", label: "Bad" };
+  };
+
+  const moodColor = getMoodColor(averageMood);
+  const sleepQualityColor = getSleepQualityColor(averageSleepQuality);
+  const sleepDurationColor = getSleepDurationColor(averageSleepDuration);
 
   const getMoodForDate = (date) => {
     const year = date.getFullYear();
@@ -460,6 +501,9 @@ function Dashboard() {
                 </h1>
                 <p className="quote-text">{getMotivationalQuote()}</p>
               </div>
+
+              <GamificationMini userId={user_id} />
+              
               <div className="today-mood-quick">
                 <span className="today-mood-icon">{todayMoodDetails?.emoji || "❓"}</span>
                 <div>
@@ -471,7 +515,58 @@ function Dashboard() {
           </div>
         </AnimatedCard>
 
-        {/* STATS CARDS */}
+        {/* ✅ PSS REMINDER BANNER */}
+        {showPssReminder && pssReminder && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              padding: "14px 20px",
+              background: "linear-gradient(135deg, #fef3c7, #fffbeb)",
+              borderRadius: "12px",
+              border: "1px solid #f59e0b",
+              marginBottom: "20px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "12px"
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "24px" }}>📋</span>
+              <div>
+                <span style={{ fontWeight: 600, color: "#92400e" }}>
+                  Monthly Stress Assessment
+                </span>
+                <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#92400e" }}>
+                  {pssReminder.reason || "It's time to take your monthly stress assessment."}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowAssessment('pss')}
+              style={{
+                padding: "8px 20px",
+                background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                border: "none",
+                borderRadius: "30px",
+                color: "white",
+                cursor: "pointer",
+                fontSize: "13px",
+                fontWeight: 600,
+                transition: "all 0.2s",
+                whiteSpace: "nowrap"
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.02)"}
+              onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+            >
+              Take PSS Assessment →
+            </button>
+          </motion.div>
+        )}
+
+        {/* STATS CARDS - with color coding */}
         <motion.div 
           className="stats-grid"
           style={{
@@ -488,22 +583,25 @@ function Dashboard() {
             title="Average Mood" 
             value={`${averageMood}/5`} 
             icon="😊" 
-            color="#6366f1"
+            color={moodColor.color}
             subtitle={`Based on ${moodsList.length} entries`}
+            valueColor={moodColor.color}
           />
           <StatsCard 
             title="Sleep Quality" 
             value={`${averageSleepQuality}/5`} 
             icon="💤" 
-            color="#10b981"
+            color={sleepQualityColor.color}
             subtitle={`${averageSleepDuration}h avg`}
+            valueColor={sleepQualityColor.color}
           />
           <StatsCard 
             title="Average Sleep" 
             value={`${averageSleepDuration}h`} 
             icon="🌙" 
-            color="#f59e0b"
+            color={sleepDurationColor.color}
             subtitle={`From ${sleepDurations.length} sleep logs`}
+            valueColor={sleepDurationColor.color}
           />
           <StatsCard 
             title="Journal Entries" 
@@ -511,16 +609,14 @@ function Dashboard() {
             icon="📓" 
             color="#8b5cf6"
             subtitle="Your reflections"
+            valueColor="#8b5cf6"
           />
         </motion.div>
 
         {/* RECOMMENDATIONS SECTION */}
         <Recommendations userId={user_id} />
 
-        {/* Assessment History Graph */}
-        <AssessmentHistoryGraph userId={user_id} />
-
-        {/* ✅ STRESS FORECAST SECTION */}
+        {/* STRESS FORECAST SECTION */}
         <StressForecast userId={user_id} />
 
         {/* LARGE CALENDAR */}
@@ -708,7 +804,6 @@ function Dashboard() {
               </button>
             </div>
             
-            {/* ✅ NEW: Export section below chart selector */}
             <div style={{
               display: 'flex',
               alignItems: 'center',

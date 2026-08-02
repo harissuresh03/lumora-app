@@ -178,67 +178,6 @@ router.get("/health", verifyToken, async (req, res) => {
 });
 
 // ============================================
-// GROUP REPORTING - Firebase Only
-// ============================================
-
-router.post("/report-group", verifyToken, async (req, res) => {
-  const { group_id, reported_by } = req.body;
-  const userId = req.user.id;
-  
-  if (!group_id) {
-    return res.status(400).json({ msg: "Group ID required" });
-  }
-  
-  try {
-    const groupRef = firestore.collection("groups").doc(group_id);
-    const groupDoc = await groupRef.get();
-    
-    if (!groupDoc.exists) {
-      return res.status(404).json({ msg: "Group not found" });
-    }
-    
-    const groupData = groupDoc.data();
-    const reportedBy = groupData.reportedBy || [];
-    
-    if (reportedBy.includes(userId)) {
-      return res.status(400).json({ msg: "You have already reported this group" });
-    }
-    
-    await groupRef.update({
-      reportedBy: admin.firestore.FieldValue.arrayUnion(userId),
-      status: 'reported',
-      reportedAt: new Date()
-    });
-    
-    const reportRef = firestore.collection("groupReports").doc();
-    await reportRef.set({
-      groupId: group_id,
-      reportedBy: userId,
-      groupName: groupData.name || 'Unknown Group',
-      reportedUserId: reported_by || null,
-      status: 'pending',
-      createdAt: new Date()
-    });
-    
-    // Send admin notification
-    await sendAdminNotification(
-      'report_group',
-      'New Group Report',
-      `A group was reported: ${groupData.name || 'Unknown Group'}`,
-      '/admin/reports',
-      group_id
-    );
-    
-    console.log(`✅ Group report submitted for ${group_id} by user ${userId}`);
-    
-    res.json({ msg: "Group reported successfully" });
-  } catch (error) {
-    console.error("Report group error:", error);
-    res.status(500).json({ msg: "Failed to report group" });
-  }
-});
-
-// ============================================
 // COMMENT MODERATION
 // ============================================
 
@@ -385,13 +324,5 @@ router.post("/comment", verifyToken, async (req, res) => {
     res.status(500).json({ msg: "Failed to add comment" });
   }
 });
-
-// ============================================
-// CREATE POST WITH MODERATION
-// ============================================
-
-// Note: Posts are created directly from Firebase in the frontend
-// This route is for moderation only, not for creating posts
-// The actual post creation happens in the frontend with Firebase
 
 module.exports = router;

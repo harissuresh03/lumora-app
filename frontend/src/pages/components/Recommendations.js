@@ -15,7 +15,9 @@ import {
   Brain,
   TrendingUp,
   Award,
-  RefreshCw
+  RefreshCw,
+  CheckCircle,
+  AlertCircle
 } from "lucide-react";
 import api from "../../utils/api";
 import { showErrorToast, showSuccessToast } from "./ToastNotification";
@@ -29,11 +31,43 @@ function Recommendations({ userId }) {
   const [message, setMessage] = useState("");
   const [selectedTip, setSelectedTip] = useState(null);
   const [showTipModal, setShowTipModal] = useState(false);
+  
+  // Assessment history state
+  const [assessmentHistory, setAssessmentHistory] = useState({
+    phq9: null,
+    gad7: null,
+    pss: null
+  });
 
   useEffect(() => {
-    fetchRecommendations();
+    if (userId) {
+      fetchRecommendations();
+      fetchAssessmentHistory();
+    }
   }, [userId]);
 
+  // Fetch assessment history
+  const fetchAssessmentHistory = async () => {
+    try {
+      const res = await api.get(`/assessments/history/graph/${userId}`);
+      
+      // Get latest of each type
+      const phq9Latest = res.data.phq9?.length > 0 ? res.data.phq9[res.data.phq9.length - 1] : null;
+      const gad7Latest = res.data.gad7?.length > 0 ? res.data.gad7[res.data.gad7.length - 1] : null;
+      const pssLatest = res.data.pss?.length > 0 ? res.data.pss[res.data.pss.length - 1] : null;
+      
+      setAssessmentHistory({
+        phq9: phq9Latest,
+        gad7: gad7Latest,
+        pss: pssLatest
+      });
+      
+    } catch (err) {
+      console.error("Fetch assessment history error:", err);
+    }
+  };
+
+  // Fetch recommendations
   const fetchRecommendations = async () => {
     try {
       const res = await api.get(`/recommendations/${userId}`);
@@ -77,6 +111,10 @@ function Recommendations({ userId }) {
     }));
   };
 
+  const handleAssessmentClick = (type) => {
+    window.dispatchEvent(new CustomEvent('openAssessment', { detail: { type } }));
+  };
+
   const getIcon = (type) => {
     switch(type) {
       case 'article': return <BookOpen size={18} />;
@@ -116,8 +154,139 @@ function Recommendations({ userId }) {
     return 'Low priority';
   };
 
-  const handleAssessmentClick = (type) => {
-    window.dispatchEvent(new CustomEvent('openAssessment', { detail: { type } }));
+  // Get severity color for assessment display
+  const getSeverityColor = (severity) => {
+    if (!severity) return '#9ca3af';
+    const colors = {
+      'Minimal': '#22c55e',
+      'Mild': '#eab308',
+      'Moderate': '#f97316',
+      'Moderately': '#ef4444',
+      'Severe': '#dc2626',
+      'Low': '#22c55e',
+      'High': '#ef4444'
+    };
+    const key = Object.keys(colors).find(k => severity.includes(k));
+    return key ? colors[key] : '#9ca3af';
+  };
+
+  // Get days since last assessment
+  const getDaysSince = (takenAt) => {
+    if (!takenAt) return null;
+    const lastTaken = new Date(takenAt);
+    const now = new Date();
+    return Math.floor((now - lastTaken) / (1000 * 60 * 60 * 24));
+  };
+
+  // ✅ Render assessment card
+  const renderAssessmentCard = (type, data, label, icon, maxScore, retakeDays) => {
+    const daysSince = data ? getDaysSince(data.taken_at) : null;
+    const isOverdue = data ? daysSince >= retakeDays : true;
+    const severityColor = data ? getSeverityColor(data.severity) : '#9ca3af';
+    
+    return (
+      <div style={{
+        background: 'var(--card-bg-glass)',
+        backdropFilter: 'var(--glass-blur)',
+        borderRadius: '16px',
+        padding: '20px',
+        border: isOverdue && data ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--border-glass)',
+        boxShadow: 'var(--shadow-sm)',
+        transition: 'all 0.2s',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h4 style={{ fontSize: '15px', fontWeight: 600, margin: 0 }}>{label}</h4>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0' }}>{icon} Questionnaire</p>
+          </div>
+          <div style={{
+            width: '36px',
+            height: '36px',
+            background: 'var(--accent-soft)',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            {icon === '📋' ? <Brain size={18} color="var(--accent-primary)" /> : 
+             icon === '😰' ? <Activity size={18} color="#ef4444" /> : 
+             <Activity size={18} color="#f59e0b" />}
+          </div>
+        </div>
+
+        <div style={{ marginTop: '12px' }}>
+          {data ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {data.score}
+                </span>
+                <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>/ {maxScore}</span>
+              </div>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0' }}>
+                Last taken: {new Date(data.taken_at).toLocaleDateString()}
+              </p>
+              {isOverdue ? (
+                <div style={{
+                  marginTop: '8px',
+                  padding: '6px 12px',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(239, 68, 68, 0.2)'
+                }}>
+                  <p style={{ fontSize: '12px', color: '#ef4444', margin: 0 }}>
+                    ⏰ Retake now ({daysSince} days ago)
+                  </p>
+                </div>
+              ) : (
+                <p style={{ fontSize: '12px', color: '#22c55e', margin: '6px 0 0' }}>
+                  ✓ Up to date - Retake in {retakeDays - daysSince} days
+                </p>
+              )}
+              <div style={{ 
+                marginTop: '8px',
+                padding: '4px 12px',
+                borderRadius: '12px',
+                fontSize: '11px',
+                background: severityColor,
+                color: 'white',
+                display: 'inline-block'
+              }}>
+                {data.severity || 'Unknown'}
+              </div>
+            </>
+          ) : (
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '8px 0' }}>
+              Not taken yet
+            </p>
+          )}
+        </div>
+
+        <button
+          onClick={() => handleAssessmentClick(type)}
+          style={{
+            marginTop: '16px',
+            width: '100%',
+            padding: '10px',
+            background: isOverdue && data ? '#ef4444' : 'var(--accent-gradient)',
+            border: 'none',
+            borderRadius: '10px',
+            color: 'white',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: 500,
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+          onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+        >
+          {data ? (isOverdue ? 'Retake Assessment' : 'View Results') : 'Take Assessment'}
+        </button>
+      </div>
+    );
   };
 
   if (loading) {
@@ -125,7 +294,7 @@ function Recommendations({ userId }) {
       <div style={{ padding: '20px', textAlign: 'center' }}>
         <div className="spinner" style={{ width: '30px', height: '30px' }}></div>
         <p style={{ fontSize: '13px', marginTop: '12px', color: 'var(--text-muted)' }}>
-          Personalizing recommendations...
+          Loading recommendations...
         </p>
       </div>
     );
@@ -215,255 +384,91 @@ function Recommendations({ userId }) {
     );
   }
 
-  // No data message
-  if (!hasEnoughData) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        style={{
-          background: 'var(--card-bg-glass)',
-          backdropFilter: 'var(--glass-blur)',
-          borderRadius: '20px',
-          padding: '28px',
-          border: '1px solid var(--border-glass)',
-          textAlign: 'center',
-          marginBottom: '28px'
-        }}
-      >
-        <Sparkles size={40} style={{ marginBottom: '16px', opacity: 0.5 }} />
-        <h3 style={{ fontSize: '18px', marginBottom: '8px' }}>Start Your Journey</h3>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>
-          {message || 'Start logging your mood, sleep, or journal to get personalized recommendations!'}
-        </p>
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => handleAssessmentClick('phq9')}
-            style={{
-              padding: '8px 20px',
-              background: 'var(--accent-gradient)',
-              border: 'none',
-              borderRadius: '30px',
-              color: 'white',
-              cursor: 'pointer',
-              fontSize: '13px'
-            }}
-          >
-            Take PHQ-9 Assessment
-          </button>
-          <button
-            onClick={() => handleAssessmentClick('gad7')}
-            style={{
-              padding: '8px 20px',
-              background: 'var(--accent-gradient)',
-              border: 'none',
-              borderRadius: '30px',
-              color: 'white',
-              cursor: 'pointer',
-              fontSize: '13px'
-            }}
-          >
-            Take GAD-7 Assessment
-          </button>
-        </div>
-      </motion.div>
-    );
-  }
-
-  // Check if assessmentRec is null before accessing its properties
-  const hasPhq9Recommendation = assessmentRec?.phq9?.recommended || false;
-  const hasGad7Recommendation = assessmentRec?.gad7?.recommended || false;
-  const phq9LastScore = assessmentRec?.phq9?.lastScore;
-  const gad7LastScore = assessmentRec?.gad7?.lastScore;
-  const phq9LastTaken = assessmentRec?.phq9?.lastTaken;
-  const gad7LastTaken = assessmentRec?.gad7?.lastTaken;
-  const phq9Reason = assessmentRec?.phq9?.reason || '';
-  const gad7Reason = assessmentRec?.gad7?.reason || '';
-
   return (
     <div style={{ marginBottom: '28px' }}>
-      {/* Assessment Cards - Two Separate Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '20px' }}>
-        {/* PHQ-9 Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          style={{
-            background: 'var(--card-bg-glass)',
-            backdropFilter: 'var(--glass-blur)',
-            borderRadius: '16px',
-            padding: '20px',
-            border: hasPhq9Recommendation ? '2px solid var(--accent-primary)' : '1px solid var(--border-glass)',
-            transition: 'all 0.2s'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <h4 style={{ fontSize: '15px', fontWeight: 600, margin: 0 }}>Depression Screening</h4>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0' }}>PHQ-9 Questionnaire</p>
-            </div>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              background: 'var(--accent-soft)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Brain size={18} color="var(--accent-primary)" />
-            </div>
-          </div>
-
-          <div style={{ marginTop: '12px' }}>
-            {phq9LastScore !== null && phq9LastScore !== undefined ? (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {phq9LastScore}
-                  </span>
-                  <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>/ 27</span>
-                </div>
-                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0' }}>
-                  Last taken: {phq9LastTaken ? new Date(phq9LastTaken).toLocaleDateString() : 'N/A'}
-                </p>
-                {hasPhq9Recommendation ? (
-                  <div style={{
-                    marginTop: '8px',
-                    padding: '8px 12px',
-                    background: 'rgba(245, 158, 11, 0.1)',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(245, 158, 11, 0.3)'
-                  }}>
-                    <p style={{ fontSize: '12px', color: '#f59e0b', margin: 0 }}>
-                      ⏰ {phq9Reason}
-                    </p>
-                  </div>
-                ) : (
-                  <p style={{ fontSize: '12px', color: '#22c55e', margin: '6px 0 0' }}>
-                    ✓ Up to date - Retake recommended in 14 days
-                  </p>
-                )}
-              </>
-            ) : (
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '8px 0' }}>
-                {phq9Reason || 'Take your first screening to establish a baseline.'}
-              </p>
-            )}
-          </div>
-
-          <button
-            onClick={() => handleAssessmentClick('phq9')}
-            style={{
-              marginTop: '16px',
-              width: '100%',
-              padding: '10px',
-              background: hasPhq9Recommendation ? 'var(--accent-gradient)' : 'var(--bg-secondary)',
-              border: hasPhq9Recommendation ? 'none' : '1px solid var(--border-light)',
-              borderRadius: '10px',
-              color: hasPhq9Recommendation ? 'white' : 'var(--text-secondary)',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: 500,
-              transition: 'all 0.2s'
-            }}
-          >
-            {phq9LastScore !== null && phq9LastScore !== undefined ? 'Retake Assessment' : 'Take Assessment'}
-          </button>
-        </motion.div>
-
-        {/* GAD-7 Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          style={{
-            background: 'var(--card-bg-glass)',
-            backdropFilter: 'var(--glass-blur)',
-            borderRadius: '16px',
-            padding: '20px',
-            border: hasGad7Recommendation ? '2px solid var(--accent-primary)' : '1px solid var(--border-glass)',
-            transition: 'all 0.2s'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <h4 style={{ fontSize: '15px', fontWeight: 600, margin: 0 }}>Anxiety Screening</h4>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0' }}>GAD-7 Questionnaire</p>
-            </div>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              background: 'rgba(239, 68, 68, 0.1)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Activity size={18} color="#ef4444" />
-            </div>
-          </div>
-
-          <div style={{ marginTop: '12px' }}>
-            {gad7LastScore !== null && gad7LastScore !== undefined ? (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {gad7LastScore}
-                  </span>
-                  <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>/ 21</span>
-                </div>
-                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0' }}>
-                  Last taken: {gad7LastTaken ? new Date(gad7LastTaken).toLocaleDateString() : 'N/A'}
-                </p>
-                {hasGad7Recommendation ? (
-                  <div style={{
-                    marginTop: '8px',
-                    padding: '8px 12px',
-                    background: 'rgba(245, 158, 11, 0.1)',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(245, 158, 11, 0.3)'
-                  }}>
-                    <p style={{ fontSize: '12px', color: '#f59e0b', margin: 0 }}>
-                      ⏰ {gad7Reason}
-                    </p>
-                  </div>
-                ) : (
-                  <p style={{ fontSize: '12px', color: '#22c55e', margin: '6px 0 0' }}>
-                    ✓ Up to date - Retake recommended in 30 days
-                  </p>
-                )}
-              </>
-            ) : (
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '8px 0' }}>
-                {gad7Reason || 'Take your first screening to establish a baseline.'}
-              </p>
-            )}
-          </div>
-
-          <button
-            onClick={() => handleAssessmentClick('gad7')}
-            style={{
-              marginTop: '16px',
-              width: '100%',
-              padding: '10px',
-              background: hasGad7Recommendation ? 'var(--accent-gradient)' : 'var(--bg-secondary)',
-              border: hasGad7Recommendation ? 'none' : '1px solid var(--border-light)',
-              borderRadius: '10px',
-              color: hasGad7Recommendation ? 'white' : 'var(--text-secondary)',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: 500,
-              transition: 'all 0.2s'
-            }}
-          >
-            {gad7LastScore !== null && gad7LastScore !== undefined ? 'Retake Assessment' : 'Take Assessment'}
-          </button>
-        </motion.div>
+      {/* ✅ Assessment Cards - Always Visible */}
+      <div style={{ marginBottom: '24px' }}>
+        <h3 style={{ 
+          fontSize: '18px', 
+          fontWeight: 600, 
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Brain size={20} color="var(--accent-primary)" />
+          Mental Health Screenings
+          <span style={{ 
+            fontSize: '12px', 
+            fontWeight: 400, 
+            color: 'var(--text-muted)',
+            marginLeft: '8px'
+          }}>
+            (Retake regularly for accurate tracking)
+          </span>
+        </h3>
+        
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+          gap: '16px' 
+        }}>
+          {/* PHQ-9 Card */}
+          {renderAssessmentCard(
+            'phq9', 
+            assessmentHistory.phq9, 
+            'Depression Screening', 
+            '📋', 
+            27, 
+            14  // Retake every 14 days
+          )}
+          
+          {/* GAD-7 Card */}
+          {renderAssessmentCard(
+            'gad7', 
+            assessmentHistory.gad7, 
+            'Anxiety Screening', 
+            '😰', 
+            21, 
+            30  // Retake every 30 days
+          )}
+          
+          {/* PSS-10 Card */}
+          {renderAssessmentCard(
+            'pss', 
+            assessmentHistory.pss, 
+            'Stress Screening', 
+            '📊', 
+            40, 
+            30  // Retake every 30 days
+          )}
+        </div>
       </div>
 
-      {/* Recommendations Section */}
+      {/* No data message (only if no data AND no assessments) */}
+      {!hasEnoughData && recommendations.length === 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          style={{
+            background: 'var(--card-bg-glass)',
+            backdropFilter: 'var(--glass-blur)',
+            borderRadius: '20px',
+            padding: '28px',
+            border: '1px solid var(--border-glass)',
+            textAlign: 'center',
+            marginBottom: '28px'
+          }}
+        >
+          <Sparkles size={40} style={{ marginBottom: '16px', opacity: 0.5 }} />
+          <h3 style={{ fontSize: '18px', marginBottom: '8px' }}>Start Your Journey</h3>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>
+            {message || 'Start logging your mood, sleep, or journal to get personalized recommendations!'}
+          </p>
+        </motion.div>
+      )}
+
+      {/* ✅ Recommendations Section */}
       {recommendations.length > 0 && (
         <div>
           <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -565,7 +570,6 @@ function Recommendations({ userId }) {
                   )}
                 </div>
 
-                {/* Reason why recommended */}
                 <div style={{
                   marginTop: '12px',
                   padding: '10px 12px',

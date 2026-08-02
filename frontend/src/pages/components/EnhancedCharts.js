@@ -331,7 +331,7 @@ export const CorrelationChart = ({ data, height = 300 }) => {
 };
 
 // Stats Card Component
-export const StatsCard = ({ title, value, change, icon, color, subtitle }) => {
+export const StatsCard = ({ title, value, change, icon, color, subtitle, valueColor }) => {
   return (
     <motion.div
       whileHover={{ y: -5 }}
@@ -348,7 +348,12 @@ export const StatsCard = ({ title, value, change, icon, color, subtitle }) => {
         <span style={{ fontSize: '14px', color: '#64748b' }}>{title}</span>
         <span style={{ fontSize: '24px' }}>{icon}</span>
       </div>
-      <div style={{ fontSize: '32px', fontWeight: '700', color: color || '#6366f1', marginBottom: '8px' }}>
+      <div style={{ 
+        fontSize: '32px', 
+        fontWeight: '700', 
+        color: valueColor || color || '#6366f1', 
+        marginBottom: '8px' 
+      }}>
         {value}
       </div>
       {subtitle && <div style={{ fontSize: '12px', color: '#94a3b8' }}>{subtitle}</div>}

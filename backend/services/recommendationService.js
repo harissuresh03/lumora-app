@@ -1,21 +1,58 @@
 // backend/services/recommendationService.js
 const db = require("../db");
 const admin = require("firebase-admin");
+const fs = require("fs");
+const path = require("path");
 
-// Initialize Firebase Admin if not already
-if (!admin.apps.length) {
+// Initialize Firebase Admin with better error handling
+let firestore = null;
+let firebaseInitialized = false;
+
+function initializeFirebase() {
+  if (admin.apps.length) {
+    console.log("✅ Firebase Admin already initialized");
+    firestore = admin.firestore();
+    firebaseInitialized = true;
+    return true;
+  }
+
   try {
-    const path = require("path");
-    const serviceAccount = require("../firebase-service-account.json");
+    const serviceAccountPath = path.join(__dirname, "../firebase-service-account.json");
+    
+    // Check if file exists
+    if (!fs.existsSync(serviceAccountPath)) {
+      console.error("❌ firebase-service-account.json not found at:", serviceAccountPath);
+      return false;
+    }
+    
+    const serviceAccount = require(serviceAccountPath);
+    
+    // Validate required fields
+    const requiredFields = ['project_id', 'private_key', 'client_email'];
+    const missingFields = requiredFields.filter(field => !serviceAccount[field]);
+    
+    if (missingFields.length > 0) {
+      console.error("❌ firebase-service-account.json is missing fields:", missingFields);
+      return false;
+    }
+    
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount)
     });
-    console.log("Firebase Admin initialized for recommendations");
+    
+    firestore = admin.firestore();
+    firebaseInitialized = true;
+    console.log("✅ Firebase Admin initialized successfully for recommendations");
+    return true;
+    
   } catch (error) {
-    console.error("Firebase Admin initialization error:", error.message);
+    console.error("❌ Firebase Admin initialization error:", error.message);
+    return false;
   }
 }
-const firestore = admin.firestore();
+
+// Attempt initialization
+initializeFirebase();
 
 // Crisis keywords
 const CRISIS_KEYWORDS = [
@@ -95,6 +132,124 @@ const ACTIVITIES = {
 };
 
 // ============================================
+// NEW: PEER CONTENT ANALYSIS FUNCTIONS
+// ============================================
+
+function analyzeContentThemes(texts) {
+  const themes = {};
+  const allText = texts.join(' ').toLowerCase();
+  
+  if (!allText) return themes;
+  
+  for (const [emotion, keywords] of Object.entries(EMOTION_KEYWORDS)) {
+    let count = 0;
+    for (const keyword of keywords) {
+      const regex = new RegExp(keyword, 'g');
+      const matches = allText.match(regex);
+      if (matches) count += matches.length;
+    }
+    if (count > 0) {
+      themes[emotion] = count;
+    }
+  }
+  
+  return themes;
+}
+
+function getPrimaryEmotion(themes) {
+  if (Object.keys(themes).length === 0) return 'neutral';
+  const sorted = Object.entries(themes).sort((a, b) => b[1] - a[1]);
+  return sorted[0][0];
+}
+
+async function analyzePeerContent(userId) {
+  try {
+    // Check if Firebase is initialized
+    if (!firebaseInitialized || !firestore) {
+      console.log("⚠️ Firebase not initialized, skipping peer content analysis");
+      return { 
+        postThemes: [], 
+        commentThemes: [], 
+        postEmotion: 'neutral', 
+        commentEmotion: 'neutral',
+        primaryEmotion: 'neutral',
+        postCount: 0,
+        commentCount: 0
+      };
+    }
+
+    // Get user's posts from last 7 days
+    const postsSnapshot = await firestore.collection("posts")
+      .where("user_id", "==", userId)
+      .where("createdAt", ">=", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
+      .get();
+    
+    // Get user's comments from all posts
+    const allPostsSnapshot = await firestore.collection("posts").get();
+    let userComments = [];
+    
+    for (const doc of allPostsSnapshot.docs) {
+      const post = doc.data();
+      if (post.comments && Array.isArray(post.comments)) {
+        const comments = post.comments.filter(c => c.user_id === userId);
+        userComments = userComments.concat(comments);
+      }
+    }
+    
+    // Extract text content from posts and comments
+    const postTexts = [];
+    postsSnapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.content) {
+        postTexts.push(data.content);
+      }
+    });
+    
+    const commentTexts = userComments.map(c => c.content).filter(Boolean);
+    
+    // Analyze posts
+    const postThemes = analyzeContentThemes(postTexts);
+    const postEmotion = getPrimaryEmotion(postThemes);
+    
+    // Analyze comments
+    const commentThemes = analyzeContentThemes(commentTexts);
+    const commentEmotion = getPrimaryEmotion(commentThemes);
+    
+    // Combined emotion from both posts and comments
+    const combinedThemes = { ...postThemes, ...commentThemes };
+    const primaryEmotion = getPrimaryEmotion(combinedThemes);
+    
+    console.log(`📊 Peer Content Analysis for user ${userId}:`);
+    console.log(`   Posts: ${postTexts.length}, Post Emotion: ${postEmotion}`);
+    console.log(`   Comments: ${commentTexts.length}, Comment Emotion: ${commentEmotion}`);
+    console.log(`   Combined Emotion: ${primaryEmotion}`);
+    
+    return {
+      postCount: postTexts.length,
+      commentCount: commentTexts.length,
+      postThemes,
+      commentThemes,
+      postEmotion,
+      commentEmotion,
+      combinedThemes,
+      primaryEmotion: primaryEmotion !== 'neutral' ? primaryEmotion : null
+    };
+    
+  } catch (error) {
+    console.error("❌ Error analyzing peer content:", error);
+    return { 
+      postThemes: [], 
+      commentThemes: [], 
+      postEmotion: 'neutral', 
+      commentEmotion: 'neutral',
+      primaryEmotion: null,
+      postCount: 0,
+      commentCount: 0
+    };
+  }
+}
+
+// ============================================
 // MAIN FUNCTIONS
 // ============================================
 
@@ -124,6 +279,7 @@ async function getUserProfile(userId) {
     moodCount: 0,
     sleepCount: 0,
     journalCount: 0,
+    assessmentCount: 0,
     averageMood: null,
     moodTrend: null,
     averageSleepQuality: null,
@@ -132,6 +288,8 @@ async function getUserProfile(userId) {
     journalThemes: [],
     primaryEmotion: null,
     peerActivity: { posts: 0, comments: 0 },
+    peerThemes: {},        // ✅ NEW
+    peerEmotion: 'neutral', // ✅ NEW
     lastAssessment: null,
     isSociallyInactive: false,
     assessmentHistory: []
@@ -193,11 +351,11 @@ async function getUserProfile(userId) {
   profile.journalCount = profile.journals.length;
   
   if (profile.journalCount > 0) {
-    profile.journalThemes = analyzeJournalThemes(profile.journals);
+    profile.journalThemes = analyzeContentThemes(profile.journals.map(j => j.content));
     profile.primaryEmotion = getPrimaryEmotion(profile.journalThemes);
   }
   
-  // Get all assessments (last 30 days)
+  // Get all assessments
   const assessmentQuery = await db.promise().query(
     `SELECT type, score, severity, taken_at 
      FROM assessments 
@@ -206,61 +364,39 @@ async function getUserProfile(userId) {
     [userId]
   );
   profile.assessmentHistory = assessmentQuery[0];
+  profile.assessmentCount = assessmentQuery[0].length;
   if (assessmentQuery[0].length > 0) {
     profile.lastAssessment = assessmentQuery[0][0];
   }
   
-  // Get peer support activity from Firebase
-  try {
-    const postsSnapshot = await firestore.collection("posts")
-      .where("user_id", "==", userId)
-      .where("createdAt", ">=", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
-      .get();
-    profile.peerActivity.posts = postsSnapshot.size;
-    
-    const allPostsSnapshot = await firestore.collection("posts").get();
-    let commentCount = 0;
-    for (const doc of allPostsSnapshot.docs) {
-      const post = doc.data();
-      if (post.comments && Array.isArray(post.comments)) {
-        const userComments = post.comments.filter(c => c.user_id === userId);
-        commentCount += userComments.length;
-      }
+  // ✅ Get peer support activity AND analyze content
+  if (firebaseInitialized && firestore) {
+    try {
+      // Get peer content analysis
+      const peerAnalysis = await analyzePeerContent(userId);
+      
+      profile.peerActivity.posts = peerAnalysis.postCount;
+      profile.peerActivity.comments = peerAnalysis.commentCount;
+      profile.peerThemes = peerAnalysis.combinedThemes || {};
+      profile.peerEmotion = peerAnalysis.primaryEmotion || 'neutral';
+      
+      // Check social inactivity
+      profile.isSociallyInactive = profile.peerActivity.posts === 0 && profile.peerActivity.comments === 0;
+      
+      console.log(`📊 Peer content analysis complete for user ${userId}:`);
+      console.log(`   Peer Emotion: ${profile.peerEmotion}`);
+      console.log(`   Peer Themes:`, profile.peerThemes);
+      
+    } catch (firebaseError) {
+      console.error("Firebase peer activity error for user", userId, ":", firebaseError.message);
+      profile.isSociallyInactive = true;
     }
-    profile.peerActivity.comments = commentCount;
-    profile.isSociallyInactive = profile.peerActivity.posts === 0 && commentCount === 0;
-    
-  } catch (firebaseError) {
-    console.error("Firebase peer activity error:", firebaseError);
+  } else {
+    console.log("⚠️ Firebase not initialized, skipping peer activity for user:", userId);
     profile.isSociallyInactive = true;
   }
   
   return profile;
-}
-
-function analyzeJournalThemes(journals) {
-  const themes = {};
-  const allText = journals.map(j => j.content.toLowerCase()).join(' ');
-  
-  for (const [emotion, keywords] of Object.entries(EMOTION_KEYWORDS)) {
-    let count = 0;
-    for (const keyword of keywords) {
-      const regex = new RegExp(keyword, 'g');
-      const matches = allText.match(regex);
-      if (matches) count += matches.length;
-    }
-    if (count > 0) {
-      themes[emotion] = count;
-    }
-  }
-  
-  return themes;
-}
-
-function getPrimaryEmotion(themes) {
-  if (Object.keys(themes).length === 0) return 'neutral';
-  const sorted = Object.entries(themes).sort((a, b) => b[1] - a[1]);
-  return sorted[0][0];
 }
 
 async function detectCrisis(userId) {
@@ -294,6 +430,27 @@ async function generateRecommendations(profile, articles) {
   const recommendations = [];
   const scores = calculateNeedScores(profile);
   
+  // Log peer data for debugging
+  console.log(`📊 Peer Data Summary for user ${profile.userId}:`);
+  console.log(`   Peer Emotion: ${profile.peerEmotion}`);
+  console.log(`   Peer Themes:`, profile.peerThemes);
+  console.log(`   Socially Inactive: ${profile.isSociallyInactive}`);
+  console.log(`   Social Score: ${scores.socialSupport}`);
+  
+  // ✅ Check if user has enough data
+  const hasEnoughData = profile.moodCount > 2 || 
+                        profile.sleepCount > 2 || 
+                        profile.journalCount > 0 ||
+                        profile.assessmentCount > 0;
+  
+  if (!hasEnoughData) {
+    return {
+      hasEnoughData: false,
+      message: "Start logging your mood, sleep, or journal to get personalized recommendations!",
+      recommendations: []
+    };
+  }
+  
   // Article recommendations from database
   const articleRecommendations = getArticleRecommendationsFromDB(profile, scores, articles);
   recommendations.push(...articleRecommendations);
@@ -308,7 +465,10 @@ async function generateRecommendations(profile, articles) {
   
   recommendations.sort((a, b) => b.score - a.score);
   
-  return recommendations.slice(0, 10);
+  return {
+    hasEnoughData: true,
+    recommendations: recommendations.slice(0, 10)
+  };
 }
 
 function calculateNeedScores(profile) {
@@ -346,7 +506,8 @@ function calculateNeedScores(profile) {
     scores.academicSupport += 15;
   }
   
-  for (const [theme, count] of Object.entries(profile.journalThemes)) {
+  // ✅ Journal theme-based scoring
+  for (const [theme, count] of Object.entries(profile.journalThemes || {})) {
     if (theme === 'anxiety') scores.anxietySupport += count * 2;
     if (theme === 'depression') scores.depressionSupport += count * 2;
     if (theme === 'stress') scores.academicSupport += count * 2;
@@ -354,10 +515,34 @@ function calculateNeedScores(profile) {
     if (theme === 'social') scores.socialSupport += count * 2;
   }
   
+  // ✅ NEW: Peer emotion-based scoring
+  if (profile.peerEmotion === 'anxiety') {
+    scores.anxietySupport += 10;
+  } else if (profile.peerEmotion === 'depression') {
+    scores.depressionSupport += 10;
+  } else if (profile.peerEmotion === 'stress') {
+    scores.academicSupport += 10;
+  } else if (profile.peerEmotion === 'social') {
+    scores.socialSupport += 10;
+  } else if (profile.peerEmotion === 'sleep') {
+    scores.sleepSupport += 10;
+  }
+  
+  // ✅ NEW: Peer theme-based scoring (from post/comment content)
+  for (const [theme, count] of Object.entries(profile.peerThemes || {})) {
+    if (theme === 'anxiety') scores.anxietySupport += count * 1.5;
+    if (theme === 'depression') scores.depressionSupport += count * 1.5;
+    if (theme === 'stress') scores.academicSupport += count * 1.5;
+    if (theme === 'sleep') scores.sleepSupport += count * 1.5;
+    if (theme === 'social') scores.socialSupport += count * 1.5;
+  }
+  
+  // ✅ Social inactivity from peer activity
   if (profile.isSociallyInactive && profile.journalCount > 0) {
     scores.socialSupport += 15;
   }
   
+  // Combined mood-sleep correlation
   if (profile.averageMood !== null && profile.averageSleepQuality !== null) {
     if (profile.averageMood < 3 && profile.averageSleepQuality < 3) {
       scores.moodSupport += 10;
@@ -479,7 +664,7 @@ function getTipRecommendations(profile, scores) {
     tipCategories.push('academic');
   }
   
-  if (profile.isSociallyInactive) {
+  if (profile.isSociallyInactive || scores.socialSupport > 30) {
     tipCategories.push('social');
   }
   
@@ -502,6 +687,7 @@ function getTipRecommendations(profile, scores) {
       if (category === 'anxiety' && scores.anxietySupport > 50) score = 85;
       if (category === 'depression' && scores.depressionSupport > 50) score = 85;
       if (category === 'sleep' && profile.averageSleepQuality < 3) score = 80;
+      if (category === 'social' && scores.socialSupport > 40) score = 80;
       tipPool.push({ ...tip, type: category, score });
     }
   }
@@ -566,6 +752,17 @@ function getActivityRecommendations(profile, scores) {
     activities.push(...ACTIVITIES.movement.map(a => ({ ...a, score: 50, category: 'movement' })));
   }
   
+  if (scores.socialSupport > 40) {
+    // Add social activities if social support is high
+    activities.push({ 
+      name: 'Call a Friend', 
+      description: 'Reach out to a friend you haven\'t spoken to in a while. A simple conversation can boost your mood.', 
+      duration: '10 min', 
+      category: 'social',
+      score: 60
+    });
+  }
+  
   // If no specific activities, add general ones
   if (activities.length === 0) {
     activities.push({ ...ACTIVITIES.mindfulness[0], score: 40, category: 'mindfulness' });
@@ -604,7 +801,8 @@ function getActivityReason(category, profile, scores) {
     anxiety: 'Breathing exercises can help calm your nervous system and reduce anxiety in moments of stress.',
     depression: 'Journaling helps process emotions and can improve mood over time.',
     mindfulness: 'Mindfulness practices reduce stress and improve focus and emotional regulation.',
-    movement: 'Physical activity releases endorphins and boosts mood naturally.'
+    movement: 'Physical activity releases endorphins and boosts mood naturally.',
+    social: 'Connecting with others reduces feelings of isolation and builds resilience.'
   };
   return reasons[category] || 'This activity is recommended to support your mental well-being.';
 }

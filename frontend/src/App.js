@@ -14,6 +14,7 @@ import MentalHealthArticle from "./pages/MentalHealthArticle";
 import StudentSupport from "./pages/StudentSupport";          
 import PeerSupport from "./pages/PeerSupport";
 import Settings from "./pages/Settings";
+import Achievements from "./pages/Achievements";
 
 // Admin imports
 import AdminLayout from "./pages/Admin/AdminLayout";
@@ -33,7 +34,6 @@ import CounsellorStudentProfile from "./pages/Counsellor/CounsellorStudentProfil
 import CounsellorMessages from "./pages/Counsellor/CounsellorMessages";
 import CounsellorAppointments from "./pages/Counsellor/CounsellorAppointments";
 import CounsellorAlerts from "./pages/Counsellor/CounsellorAlerts";
-import CounsellorStressLevel from "./pages/Counsellor/CounsellorStressLevel";
 import CounsellorSettings from "./pages/Counsellor/CounsellorSettings";
 
 // Route protection helper
@@ -107,6 +107,11 @@ function App() {
                   <Settings />
                 </ProtectedRoute>
               } />
+              <Route path="/achievements" element={
+                <ProtectedRoute>
+                  <Achievements />
+                </ProtectedRoute>
+              } />
               
               {/* Admin Routes - Protected */}
               <Route path="/admin" element={
@@ -135,7 +140,6 @@ function App() {
                 <Route path="messages" element={<CounsellorMessages />} />
                 <Route path="appointments" element={<CounsellorAppointments />} />
                 <Route path="alerts" element={<CounsellorAlerts />} />
-                <Route path="stress-levels" element={<CounsellorStressLevel />} />
                 <Route path="settings" element={<CounsellorSettings />} />
               </Route>
             </Routes>

@@ -14,7 +14,8 @@ import {
   RefreshCw,
   Users,
   Eye,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Filter
 } from "lucide-react";
 
 function CounsellorStudents() {
@@ -29,6 +30,14 @@ function CounsellorStudents() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
+  // Stress summary stats
+  const [stressStats, setStressStats] = useState({
+    high: 0,
+    moderate: 0,
+    low: 0,
+    noData: 0
+  });
+
   const fetchStudents = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -42,8 +51,29 @@ function CounsellorStudents() {
         setError(res.data.message);
         setStudents([]);
       } else {
-        setStudents(res.data.students || []);
+        const studentsData = res.data.students || [];
+        setStudents(studentsData);
         setTotalPages(res.data.totalPages || 1);
+        
+        // Calculate stress stats
+        const stats = {
+          high: 0,
+          moderate: 0,
+          low: 0,
+          noData: 0
+        };
+        studentsData.forEach(s => {
+          if (s.current_stress_score === null || s.current_stress_score === undefined) {
+            stats.noData++;
+          } else if (s.current_stress_score >= 60) {
+            stats.high++;
+          } else if (s.current_stress_score >= 30) {
+            stats.moderate++;
+          } else {
+            stats.low++;
+          }
+        });
+        setStressStats(stats);
       }
     } catch (err) {
       console.error("Fetch students error:", err);
@@ -65,7 +95,6 @@ function CounsellorStudents() {
     if (!error) showSuccessToast("Students refreshed!");
   };
 
-  // FIXED: Handle decimal values by rounding
   const getMoodEmoji = (mood) => {
     if (mood === null || mood === undefined || mood === 0) return "❓";
     const roundedMood = Math.round(mood);
@@ -73,9 +102,8 @@ function CounsellorStudents() {
     return emojis[roundedMood] || "❓";
   };
 
-  // FIXED: Always show sleep emoji regardless of score
   const getSleepEmoji = () => {
-    return "😴"; // Always show the sleep emoji
+    return "😴";
   };
 
   const getMoodColor = (mood) => {
@@ -92,6 +120,13 @@ function CounsellorStudents() {
     return <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '11px', background: '#ef4444', color: 'white', fontWeight: 500 }}>❌ No Consent</span>;
   };
 
+  const getStressLevel = (score) => {
+    if (score === null || score === undefined) return { label: 'No Data', color: '#9ca3af', emoji: '⚪' };
+    if (score >= 60) return { label: 'High', color: '#ef4444', emoji: '🔴' };
+    if (score >= 30) return { label: 'Moderate', color: '#f59e0b', emoji: '🟡' };
+    return { label: 'Low', color: '#22c55e', emoji: '🟢' };
+  };
+
   if (loading && students.length === 0) {
     return (
       <div className="loading-container">
@@ -103,6 +138,62 @@ function CounsellorStudents() {
 
   return (
     <div>
+      {/* Stress Summary Stats */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
+        gap: '16px', 
+        marginBottom: '24px' 
+      }}>
+        <div style={{ 
+          background: 'var(--card-bg-glass)', 
+          borderRadius: '12px', 
+          padding: '16px', 
+          textAlign: 'center', 
+          border: '1px solid rgba(239, 68, 68, 0.2)' 
+        }}>
+          <div style={{ fontSize: '28px', fontWeight: 700, color: '#ef4444' }}>
+            {stressStats.high}
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>🔴 High Stress</div>
+        </div>
+        <div style={{ 
+          background: 'var(--card-bg-glass)', 
+          borderRadius: '12px', 
+          padding: '16px', 
+          textAlign: 'center', 
+          border: '1px solid rgba(245, 158, 11, 0.2)' 
+        }}>
+          <div style={{ fontSize: '28px', fontWeight: 700, color: '#f59e0b' }}>
+            {stressStats.moderate}
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>🟡 Moderate Stress</div>
+        </div>
+        <div style={{ 
+          background: 'var(--card-bg-glass)', 
+          borderRadius: '12px', 
+          padding: '16px', 
+          textAlign: 'center', 
+          border: '1px solid rgba(34, 197, 94, 0.2)' 
+        }}>
+          <div style={{ fontSize: '28px', fontWeight: 700, color: '#22c55e' }}>
+            {stressStats.low}
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>🟢 Low Stress</div>
+        </div>
+        <div style={{ 
+          background: 'var(--card-bg-glass)', 
+          borderRadius: '12px', 
+          padding: '16px', 
+          textAlign: 'center' 
+        }}>
+          <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--accent-primary)' }}>
+            {stressStats.noData}
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No Stress Data</div>
+        </div>
+      </div>
+
       {/* Search and Filter */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -146,7 +237,6 @@ function CounsellorStudents() {
             Refresh
           </button>
           
-          {/* Export Button */}
           <ExportButton 
             type="counsellor-students"
             userId={parseInt(counsellorId)}
@@ -216,144 +306,144 @@ function CounsellorStudents() {
                 </td>
               </tr>
             ) : (
-              students.map((student) => (
-                <tr key={student.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                  {/* Student Column */}
-                  <td style={{ padding: '16px' }}>
-                    <strong>{student.name}</strong>
-                    {student.nickname && <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>@{student.nickname}</div>}
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{student.email}</div>
-                  </td>
+              students.map((student) => {
+                const stressLevel = getStressLevel(student.current_stress_score);
+                return (
+                  <tr key={student.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                    {/* Student Column */}
+                    <td style={{ padding: '16px' }}>
+                      <strong>{student.name}</strong>
+                      {student.nickname && <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>@{student.nickname}</div>}
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{student.email}</div>
+                    </td>
 
-                  {/* Status Column */}
-                  <td style={{ padding: '16px' }}>
-                    {student.is_active ? (
-                      <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', background: '#22c55e', color: 'white', fontWeight: 500 }}>Active</span>
-                    ) : (
-                      <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', background: '#ef4444', color: 'white', fontWeight: 500 }}>Inactive</span>
-                    )}
-                  </td>
+                    {/* Status Column */}
+                    <td style={{ padding: '16px' }}>
+                      {student.is_active ? (
+                        <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', background: '#22c55e', color: 'white', fontWeight: 500 }}>Active</span>
+                      ) : (
+                        <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', background: '#ef4444', color: 'white', fontWeight: 500 }}>Inactive</span>
+                      )}
+                    </td>
 
-                  {/* Avg Mood Column */}
-                  <td style={{ padding: '16px', textAlign: 'center' }}>
-                    <span style={{ fontSize: '20px' }}>{getMoodEmoji(student.avg_mood)}</span>
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: getMoodColor(student.avg_mood) }}>
-                      {student.avg_mood ? `${parseFloat(student.avg_mood).toFixed(2)}/5` : 'N/A'}
-                    </div>
-                  </td>
+                    {/* Avg Mood Column */}
+                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                      <span style={{ fontSize: '20px' }}>{getMoodEmoji(student.avg_mood)}</span>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: getMoodColor(student.avg_mood) }}>
+                        {student.avg_mood ? `${parseFloat(student.avg_mood).toFixed(2)}/5` : 'N/A'}
+                      </div>
+                    </td>
 
-                  {/* Avg Sleep Column - FIXED: Always shows sleep emoji */}
-                  <td style={{ padding: '16px', textAlign: 'center' }}>
-                    <span style={{ fontSize: '20px' }}>{getSleepEmoji()}</span>
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                      {student.avg_sleep_quality ? `${parseFloat(student.avg_sleep_quality).toFixed(2)}/5` : 'N/A'}
-                    </div>
-                  </td>
+                    {/* Avg Sleep Column */}
+                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                      <span style={{ fontSize: '20px' }}>{getSleepEmoji()}</span>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        {student.avg_sleep_quality ? `${parseFloat(student.avg_sleep_quality).toFixed(2)}/5` : 'N/A'}
+                      </div>
+                    </td>
 
-                  {/* Stress Column - Shows stress level with color coding */}
-                  <td style={{ padding: '16px', textAlign: 'center' }}>
-                    {student.current_stress_score !== null && student.current_stress_score !== undefined ? (
-                      <span style={{
-                        padding: '4px 10px',
-                        borderRadius: '20px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        background: student.current_stress_score >= 60 ? '#ef4444' : 
-                                    student.current_stress_score >= 30 ? '#f59e0b' : '#22c55e',
-                        color: 'white',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}>
-                        {student.current_stress_score >= 60 ? '🔴' : 
-                         student.current_stress_score >= 30 ? '🟡' : '🟢'} 
-                        {student.current_stress_score}/100
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>N/A</span>
-                    )}
-                  </td>
-
-                  {/* Consent Column - Shows consent status */}
-                  <td style={{ padding: '16px', textAlign: 'center' }}>
-                    {getConsentBadge(student.counsellor_consent)}
-                  </td>
-
-                  {/* Alerts Column - Shows alerts count or N/A */}
-                  <td style={{ padding: '16px', textAlign: 'center' }}>
-                    {student.pending_alerts !== null && student.pending_alerts !== undefined && student.pending_alerts > 0 ? (
-                      <span style={{ 
-                        padding: '4px 10px', 
-                        borderRadius: '20px', 
-                        fontSize: '12px', 
-                        background: '#ef4444', 
-                        color: 'white', 
-                        fontWeight: 600,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}>
-                        <AlertTriangle size={12} />
-                        {student.pending_alerts}
-                      </span>
-                    ) : student.pending_alerts === 0 ? (
-                      <span style={{ color: '#22c55e', fontSize: '14px', fontWeight: 500 }}>✅ No Alerts</span>
-                    ) : (
-                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>N/A</span>
-                    )}
-                  </td>
-
-                  {/* Actions Column */}
-                  <td style={{ padding: '16px', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                      <button
-                        onClick={() => navigate(`/counsellor/student/${student.id}`)}
-                        style={{ 
-                          background: 'none', 
-                          border: 'none', 
-                          cursor: 'pointer', 
-                          color: 'var(--accent-primary)',
-                          padding: '6px 12px',
-                          borderRadius: '8px',
-                          transition: 'all 0.2s',
-                          display: 'flex',
+                    {/* Stress Column - shows stress level with color coding */}
+                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                      {student.current_stress_score !== null && student.current_stress_score !== undefined ? (
+                        <span style={{
+                          padding: '4px 10px',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          background: stressLevel.color,
+                          color: 'white',
+                          display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '12px'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-soft)'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                        title="View Profile"
-                      >
-                        <Eye size={16} />
-                        <span>View</span>
-                      </button>
-                      <button
-                        onClick={() => navigate(`/counsellor/messages?student=${student.id}`)}
-                        style={{ 
-                          background: 'none', 
-                          border: 'none', 
-                          cursor: 'pointer', 
-                          color: '#3b82f6',
-                          padding: '6px 12px',
-                          borderRadius: '8px',
-                          transition: 'all 0.2s',
-                          display: 'flex',
+                          gap: '4px'
+                        }}>
+                          {stressLevel.emoji} {student.current_stress_score}/100
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>N/A</span>
+                      )}
+                    </td>
+
+                    {/* Consent Column */}
+                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                      {getConsentBadge(student.counsellor_consent)}
+                    </td>
+
+                    {/* Alerts Column */}
+                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                      {student.pending_alerts !== null && student.pending_alerts !== undefined && student.pending_alerts > 0 ? (
+                        <span style={{ 
+                          padding: '4px 10px', 
+                          borderRadius: '20px', 
+                          fontSize: '12px', 
+                          background: '#ef4444', 
+                          color: 'white', 
+                          fontWeight: 600,
+                          display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '12px'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                        title="Send Message"
-                      >
-                        <Mail size={16} />
-                        <span>Message</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                          gap: '4px'
+                        }}>
+                          <AlertTriangle size={12} />
+                          {student.pending_alerts}
+                        </span>
+                      ) : student.pending_alerts === 0 ? (
+                        <span style={{ color: '#22c55e', fontSize: '14px', fontWeight: 500 }}>✅ No Alerts</span>
+                      ) : (
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>N/A</span>
+                      )}
+                    </td>
+
+                    {/* Actions Column */}
+                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                        <button
+                          onClick={() => navigate(`/counsellor/student/${student.id}`)}
+                          style={{ 
+                            background: 'none', 
+                            border: 'none', 
+                            cursor: 'pointer', 
+                            color: 'var(--accent-primary)',
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '12px'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-soft)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                          title="View Profile"
+                        >
+                          <Eye size={16} />
+                          <span>View</span>
+                        </button>
+                        <button
+                          onClick={() => navigate(`/counsellor/messages?student=${student.id}`)}
+                          style={{ 
+                            background: 'none', 
+                            border: 'none', 
+                            cursor: 'pointer', 
+                            color: '#3b82f6',
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '12px'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                          title="Send Message"
+                        >
+                          <Mail size={16} />
+                          <span>Message</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

@@ -1,9 +1,35 @@
 // backend/services/stressPredictionService.js
 const Groq = require("groq-sdk");
+const db = require("../db");
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-function buildStressPrompt(moodScore, deadlines, todayDate) {
+/**
+ * Get the latest PSS score for a user
+ */
+async function getLatestPSS(userId) {
+  try {
+    const [result] = await db.promise().query(
+      "SELECT score, severity FROM assessments WHERE user_id = ? AND type = 'pss' ORDER BY taken_at DESC LIMIT 1",
+      [userId]
+    );
+    if (result.length === 0) {
+      return null;
+    }
+    return {
+      score: result[0].score,
+      severity: result[0].severity
+    };
+  } catch (error) {
+    console.error("Error fetching PSS:", error);
+    return null;
+  }
+}
+
+/**
+ * Build the stress prediction prompt with PSS
+ */
+function buildStressPrompt(moodScore, deadlines, todayDate, pss) {
   // Format deadlines for the prompt
   const deadlinesFormatted = deadlines.map(d => ({
     title: d.title,
@@ -13,6 +39,36 @@ function buildStressPrompt(moodScore, deadlines, todayDate) {
     difficulty: d.difficulty || 'medium',
     is_overdue: d.due_date < new Date(todayDate)
   }));
+
+  // Build PSS section
+  let pssSection = '';
+  if (pss) {
+    let pssLevel = '';
+    if (pss.score <= 13) pssLevel = 'Low (0-13)';
+    else if (pss.score <= 26) pssLevel = 'Moderate (14-26)';
+    else pssLevel = 'High (27-40)';
+    
+    pssSection = `
+**Perceived Stress Scale (PSS-10) Score:** ${pss.score}/40 (${pss.severity} - ${pssLevel})
+
+**PSS Scoring Guide:**
+- 0-13: Low perceived stress
+- 14-26: Moderate perceived stress  
+- 27-40: High perceived stress
+
+**Note:** The student's PSS score indicates they generally perceive ${pss.severity.toLowerCase()} in their life.
+This should be factored into the stress forecast as a baseline adjustment.
+- Low PSS (0-13): Reduce stress scores by 10%
+- Moderate PSS (14-26): No adjustment (baseline)
+- High PSS (27-40): Increase stress scores by 15%
+`;
+  } else {
+    pssSection = `
+**Perceived Stress Scale (PSS-10) Score:** Not available (student has not completed the assessment)
+
+Note: Use mood score only for stress calculation. Consider suggesting the student complete the PSS assessment.
+`;
+  }
 
   return `
 You are a stress analysis engine for a university student mental health web application. Your role is to analyze a student's academic workload and daily mood data, then generate a personalized 7-day stress forecast with actionable, empathetic advice.
@@ -26,6 +82,8 @@ Analyze the following student data and generate a 7-day stress forecast.
 Today's date: ${todayDate}
 Today's mood log (1=Terrible, 2=Bad, 3=Okay, 4=Good, 5=Great): ${moodScore}
 Note: If today's mood has not been logged yet, use a neutral modifier of 1.0.
+
+${pssSection}
 
 Upcoming and overdue academic deadlines:
 ${JSON.stringify(deadlinesFormatted, null, 2)}
@@ -67,18 +125,26 @@ Each deadline has these fields:
      mood 1 = 1.4, mood 2 = 1.2, mood 3 = 1.0, mood 4 = 0.8, mood 5 = 0.6
    - Days 1 through 7 (future days): use a neutral modifier of 1.0 for all future days since mood has not been logged yet.
 
-5. FINAL DAILY SCORE:
+5. PSS BASELINE ADJUSTMENT:
+   - If PSS score is available:
+     - Low PSS (0-13): Multiply final score by 0.90 (10% reduction)
+     - Moderate PSS (14-26): No adjustment (× 1.0)
+     - High PSS (27-40): Multiply final score by 1.15 (15% increase)
+   - If PSS score is not available: No adjustment (× 1.0)
+
+6. FINAL DAILY SCORE:
    - raw_score = sum of all deadline stress contributions for that day (after clustering penalty applied)
-   - final_score = raw_score × mood_modifier
+   - score_with_mood = raw_score × mood_modifier
+   - final_score = score_with_mood × pss_adjustment
    - Cap final_score at 100.
    - Round to nearest integer.
 
-6. RISK LEVEL CLASSIFICATION:
+7. RISK LEVEL CLASSIFICATION:
    - 0 to 29: "low" (green)
    - 30 to 59: "moderate" (yellow)
    - 60 to 100: "high" (red)
 
-7. CHART DISPLAY FLAG:
+8. CHART DISPLAY FLAG:
    - Day 0 is actual measured data. Set "is_actual": true for Day 0 only.
    - Days 1 through 7 are predicted. Set "is_actual": false.
 
@@ -113,7 +179,7 @@ Return a single JSON object with this exact structure:
   },
   "overdue_warning": "A short sentence listing any overdue incomplete assignments by title and urging the student to complete them. Return null if no overdue items exist.",
   "tip": {
-    "category": "burnout_warning" | "academic_triage" | "high_energy_window" | "clustering_alert" | "general_wellness",
+    "category": "burnout_warning" | "academic_triage" | "high_energy_window" | "clustering_alert" | "general_wellness" | "pss_high" | "pss_moderate" | "pss_low",
     "headline": "A short 6-8 word action-oriented headline.",
     "body": "2-3 sentences of specific, empathetic, actionable advice personalised to this student's exact workload pattern and mood. Reference specific assignment titles or subjects where relevant. Never use generic advice like 'take a break' without context. Tone: warm, supportive, never alarming."
   },
@@ -128,15 +194,21 @@ Use these rules to choose the tip category before writing the tip body:
 - "academic_triage": 3 or more deadlines are due within the next 5 days
 - "clustering_alert": clustering penalty was triggered on any day in the forecast
 - "high_energy_window": today's mood score is 4 or 5 AND at least one high-difficulty deadline is due within 7 days
+- "pss_high": PSS score is high (27-40) - provide stress management tips
+- "pss_moderate": PSS score is moderate (14-26) - provide general wellness tips
+- "pss_low": PSS score is low (0-13) - provide maintenance and prevention tips
 - "general_wellness": none of the above conditions are met
 
-If multiple conditions are met, prioritise in this order: burnout_warning → academic_triage → clustering_alert → high_energy_window → general_wellness.
+If multiple conditions are met, prioritise in this order: burnout_warning → academic_triage → pss_high → clustering_alert → high_energy_window → pss_moderate → pss_low → general_wellness.
 `;
 }
 
-async function generateStressForecast(moodScore, deadlines, todayDate) {
+async function generateStressForecast(moodScore, deadlines, todayDate, userId) {
   try {
-    const prompt = buildStressPrompt(moodScore, deadlines, todayDate);
+    // Get latest PSS score for the user
+    const pss = await getLatestPSS(userId);
+    
+    const prompt = buildStressPrompt(moodScore, deadlines, todayDate, pss);
 
     console.log("📊 Generating stress forecast...");
     const chatCompletion = await groq.chat.completions.create({
@@ -153,7 +225,7 @@ async function generateStressForecast(moodScore, deadlines, todayDate) {
     cleanResponse = cleanResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '');
 
     const forecast = JSON.parse(cleanResponse);
-    console.log("✅ Stress forecast generated successfully");
+    console.log("✅ Stress forecast generated successfully with PSS data");
     return forecast;
   } catch (error) {
     console.error("❌ Stress forecast error:", error);
@@ -161,4 +233,4 @@ async function generateStressForecast(moodScore, deadlines, todayDate) {
   }
 }
 
-module.exports = { generateStressForecast };
+module.exports = { generateStressForecast, getLatestPSS };

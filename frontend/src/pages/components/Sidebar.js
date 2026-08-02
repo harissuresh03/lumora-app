@@ -10,6 +10,7 @@ import {
   Users,
   Menu,
   Settings as SettingsIcon,
+  Trophy,
   Shield
 } from "lucide-react";
 import { isAdmin } from "../../utils/roleAuth";
@@ -30,6 +31,7 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
     { path: "/peer-support", icon: <Users size={18} />, label: "Community Connect" },
     { path: "/student-support", icon: <TrendingUp size={18} />, label: "University Resources" },
     { path: "/profile", icon: <User size={18} />, label: "Profile" },
+    { path: "/achievements", icon: <Trophy size={18} />, label: "Achievements" },
     { path: "/settings", icon: <SettingsIcon size={18} />, label: "Settings" },
   ];
 

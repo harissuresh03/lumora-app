@@ -46,12 +46,15 @@ function AICompanion({ onClose, onJournalSaved }) {
 
       // ✅ SHOW CRISIS RESOURCES IF DETECTED
       if (response.data.crisisDetected && response.data.crisisResources) {
+        const confidenceText = response.data.crisisConfidence ? 
+          ` (${response.data.crisisConfidence}% confidence)` : '';
+        
         const crisisMessage = 
           `💙 I want you to know that you're not alone. What you've shared is important, and there is support available. Here are some resources that can help:\n\n` +
           response.data.crisisResources.map(r => 
             `📞 **${r.name}** — ${r.number} (${r.hours})`
           ).join('\n') +
-          `\n\nYou are not alone. 💙 Please reach out to one of these services if you need immediate support.`;
+          `\n\nYou are not alone. 💙 Please reach out to one of these services if you need immediate support.${confidenceText}`;
         
         setMessages(prev => [...prev, { 
           role: "ai", 

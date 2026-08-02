@@ -1,10 +1,10 @@
 // frontend/src/pages/components/AssessmentModal.js
 import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast, showWarningToast } from "./ToastNotification";
 import ExportButton from "./ExportButton";
-import { Heart, Brain, AlertTriangle, X, ChevronRight, ChevronLeft, FileText } from "lucide-react";
+import { Heart, Brain, AlertTriangle, ChevronRight, ChevronLeft, FileText, Activity } from "lucide-react";
 
 function AssessmentModal({ type, onClose, onComplete }) {
   const [questions, setQuestions] = useState([]);
@@ -15,13 +15,38 @@ function AssessmentModal({ type, onClose, onComplete }) {
   const [result, setResult] = useState(null);
   const [assessmentId, setAssessmentId] = useState(null);
 
+  // Local PSS questions (used as fallback or directly)
+  const PSS_QUESTIONS = [
+    { id: 1, text: "In the last month, how often have you been upset because of something that happened unexpectedly?", scores: [0, 1, 2, 3, 4] },
+    { id: 2, text: "In the last month, how often have you felt that you were unable to control the important things in your life?", scores: [0, 1, 2, 3, 4] },
+    { id: 3, text: "In the last month, how often have you felt nervous and 'stressed'?", scores: [0, 1, 2, 3, 4] },
+    { id: 4, text: "In the last month, how often have you felt confident about your ability to handle your personal problems?", scores: [0, 1, 2, 3, 4] },
+    { id: 5, text: "In the last month, how often have you felt that things were going your way?", scores: [0, 1, 2, 3, 4] },
+    { id: 6, text: "In the last month, how often have you found that you could not cope with all the things that you had to do?", scores: [0, 1, 2, 3, 4] },
+    { id: 7, text: "In the last month, how often have you been able to control irritations in your life?", scores: [0, 1, 2, 3, 4] },
+    { id: 8, text: "In the last month, how often have you felt that you were on top of things?", scores: [0, 1, 2, 3, 4] },
+    { id: 9, text: "In the last month, how often have you been angered because of things that happened that were outside of your control?", scores: [0, 1, 2, 3, 4] },
+    { id: 10, text: "In the last month, how often have you felt difficulties were piling up so high that you could not overcome them?", scores: [0, 1, 2, 3, 4] }
+  ];
+
   useEffect(() => {
     fetchQuestions();
   }, [type]);
 
   const fetchQuestions = async () => {
     try {
-      const endpoint = type === 'phq9' ? '/assessments/phq9/questions' : '/assessments/gad7/questions';
+      let endpoint;
+      if (type === 'phq9') {
+        endpoint = '/assessments/phq9/questions';
+      } else if (type === 'gad7') {
+        endpoint = '/assessments/gad7/questions';
+      } else if (type === 'pss') {
+        // Use local PSS questions
+        setQuestions(PSS_QUESTIONS);
+        setLoading(false);
+        return;
+      }
+      
       const res = await api.get(endpoint);
       setQuestions(res.data.questions);
       setLoading(false);
@@ -52,13 +77,16 @@ function AssessmentModal({ type, onClose, onComplete }) {
 
     setSubmitting(true);
     try {
-      const endpoint = type === 'phq9' ? '/assessments/phq9' : '/assessments/gad7';
+      let endpoint;
+      if (type === 'phq9') endpoint = '/assessments/phq9';
+      else if (type === 'gad7') endpoint = '/assessments/gad7';
+      else if (type === 'pss') endpoint = '/assessments/pss';
+      
       const res = await api.post(endpoint, {
         user_id: parseInt(localStorage.getItem("user_id")),
         answers: answerArray
       });
       
-      // ✅ Store assessment ID for export
       setAssessmentId(res.data.id || null);
       setResult(res.data);
       
@@ -80,14 +108,46 @@ function AssessmentModal({ type, onClose, onComplete }) {
     onClose();
   };
 
+  // Get score label for PSS
   const getScoreLabel = (score) => {
-    const labels = {
-      0: "Not at all",
-      1: "Several days",
-      2: "More than half the days",
-      3: "Nearly every day"
+    if (type === 'phq9' || type === 'gad7') {
+      const labels = {
+        0: "Not at all",
+        1: "Several days",
+        2: "More than half the days",
+        3: "Nearly every day"
+      };
+      return labels[score] || "";
+    } else if (type === 'pss') {
+      const labels = {
+        0: "Never",
+        1: "Almost never",
+        2: "Sometimes",
+        3: "Fairly often",
+        4: "Very often"
+      };
+      return labels[score] || "";
+    }
+    return "";
+  };
+
+  // Get color for severity
+  const getSeverityColor = (severity) => {
+    const colors = {
+      "Minimal depression": "#22c55e",
+      "Mild depression": "#eab308",
+      "Moderate depression": "#f97316",
+      "Moderately severe depression": "#ef4444",
+      "Severe depression": "#dc2626",
+      "Minimal anxiety": "#22c55e",
+      "Mild anxiety": "#eab308",
+      "Moderate anxiety": "#f97316",
+      "Severe anxiety": "#ef4444",
+      "Low stress": "#22c55e",
+      "Moderate stress": "#f97316",
+      "High stress": "#ef4444"
     };
-    return labels[score] || "";
+    return colors[severity] || "#6366f1";
   };
 
   if (loading) {
@@ -104,17 +164,9 @@ function AssessmentModal({ type, onClose, onComplete }) {
   }
 
   if (result) {
-    const severityColors = {
-      "Minimal depression": "#22c55e",
-      "Mild depression": "#eab308",
-      "Moderate depression": "#f97316",
-      "Moderately severe depression": "#ef4444",
-      "Severe depression": "#dc2626",
-      "Minimal anxiety": "#22c55e",
-      "Mild anxiety": "#eab308",
-      "Moderate anxiety": "#f97316",
-      "Severe anxiety": "#ef4444"
-    };
+    const severityColor = getSeverityColor(result.severity);
+    const maxScore = result.maxScore || (type === 'phq9' ? 27 : type === 'gad7' ? 21 : 40);
+    const typeIcon = type === 'phq9' ? <Brain size={24} /> : type === 'gad7' ? <Heart size={24} /> : <Activity size={24} />;
 
     return (
       <div className="modal-overlay" onClick={resetAndClose}>
@@ -126,7 +178,9 @@ function AssessmentModal({ type, onClose, onComplete }) {
           style={{ maxWidth: "500px" }}
         >
           <div className="modal-header">
-            <h3>{type === 'phq9' ? 'PHQ-9 Results' : 'GAD-7 Results'}</h3>
+            <h3>
+              {type === 'phq9' ? 'PHQ-9 Results' : type === 'gad7' ? 'GAD-7 Results' : 'PSS-10 Results'}
+            </h3>
             <button className="modal-close" onClick={resetAndClose}>✕</button>
           </div>
           <div className="modal-content">
@@ -134,15 +188,15 @@ function AssessmentModal({ type, onClose, onComplete }) {
               <div style={{ 
                 fontSize: "48px", 
                 fontWeight: "bold", 
-                color: severityColors[result.severity] || "#6366f1",
+                color: severityColor,
                 marginBottom: "8px"
               }}>
-                {result.score}/{result.maxScore}
+                {result.score}/{maxScore}
               </div>
               <div style={{ 
                 fontSize: "18px", 
                 fontWeight: "600",
-                color: severityColors[result.severity] || "#6366f1"
+                color: severityColor
               }}>
                 {result.severity}
               </div>
@@ -179,7 +233,6 @@ function AssessmentModal({ type, onClose, onComplete }) {
               </div>
             )}
 
-            {/* ✅ ADD: Export Button */}
             <div style={{ 
               display: 'flex', 
               gap: '10px', 
@@ -220,7 +273,11 @@ function AssessmentModal({ type, onClose, onComplete }) {
       >
         <div className="modal-header">
           <div>
-            <h3>{type === 'phq9' ? 'Depression Screening (PHQ-9)' : 'Anxiety Assessment (GAD-7)'}</h3>
+            <h3>
+              {type === 'phq9' ? 'Depression Screening (PHQ-9)' : 
+               type === 'gad7' ? 'Anxiety Assessment (GAD-7)' : 
+               'Perceived Stress Scale (PSS-10)'}
+            </h3>
             <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>
               Question {currentQuestion + 1} of {questions.length}
             </p>
