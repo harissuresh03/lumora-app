@@ -19,6 +19,12 @@ export const isStudent = () => {
   return role === 'student' || !role;
 };
 
+// ✅ Check if current user is parent
+export const isParent = () => {
+  const role = localStorage.getItem("user_role");
+  return role === 'parent';
+};
+
 // Check if current user has staff access (admin or counsellor)
 export const isStaff = () => {
   const role = localStorage.getItem("user_role");
@@ -30,16 +36,19 @@ export const getUserRole = () => {
   return localStorage.getItem("user_role") || 'student';
 };
 
+// Get dashboard path based on role
+export const getDashboardPath = () => {
+  const role = getUserRole();
+  if (role === 'admin') return '/admin';
+  if (role === 'counsellor') return '/counsellor';
+  if (role === 'parent') return '/parent/dashboard';
+  return '/dashboard';
+};
+
 // Redirect to appropriate dashboard based on role
 export const redirectToDashboard = (navigate) => {
-  const role = getUserRole();
-  if (role === 'admin') {
-    navigate("/admin");
-  } else if (role === 'counsellor') {
-    navigate("/counsellor");
-  } else {
-    navigate("/dashboard");
-  }
+  const path = getDashboardPath();
+  navigate(path);
 };
 
 // Require admin access - redirects to their respective dashboard if not admin
@@ -47,6 +56,8 @@ export const requireAdmin = (navigate) => {
   if (!isAdmin()) {
     if (isCounsellor()) {
       navigate("/counsellor");
+    } else if (isParent()) {
+      navigate("/parent/dashboard");
     } else {
       navigate("/dashboard");
     }
@@ -57,9 +68,11 @@ export const requireAdmin = (navigate) => {
 
 // Require counsellor access - redirects to their respective dashboard if not counsellor
 export const requireCounsellor = (navigate) => {
-  if (!isCounsellor()) {
+  if (!isCounsellor() && !isAdmin()) {
     if (isAdmin()) {
       navigate("/admin");
+    } else if (isParent()) {
+      navigate("/parent/dashboard");
     } else {
       navigate("/dashboard");
     }
@@ -68,7 +81,7 @@ export const requireCounsellor = (navigate) => {
   return true;
 };
 
-// Require student access - redirects to admin if admin, counsellor if counsellor
+// Require student access - redirects based on role
 export const requireStudent = (navigate) => {
   if (isAdmin()) {
     navigate("/admin");
@@ -76,6 +89,25 @@ export const requireStudent = (navigate) => {
   }
   if (isCounsellor()) {
     navigate("/counsellor");
+    return false;
+  }
+  if (isParent()) {
+    navigate("/parent/dashboard");
+    return false;
+  }
+  return true;
+};
+
+// ✅ Require parent access - redirects based on role
+export const requireParent = (navigate) => {
+  if (!isParent()) {
+    if (isAdmin()) {
+      navigate("/admin");
+    } else if (isCounsellor()) {
+      navigate("/counsellor");
+    } else {
+      navigate("/dashboard");
+    }
     return false;
   }
   return true;
@@ -91,10 +123,46 @@ export const hasCounsellorAccess = () => {
   return isAdmin() || isCounsellor();
 };
 
-// Get dashboard path based on role
-export const getDashboardPath = () => {
+// ✅ Check if user has permission to view parent panel
+export const hasParentAccess = () => {
+  return isParent();
+};
+
+// ✅ Get user role display name
+export const getRoleDisplayName = () => {
   const role = getUserRole();
-  if (role === 'admin') return '/admin';
-  if (role === 'counsellor') return '/counsellor';
-  return '/dashboard';
+  const roleNames = {
+    'admin': 'Administrator',
+    'counsellor': 'Counsellor',
+    'parent': 'Parent/Guardian',
+    'student': 'Student'
+  };
+  return roleNames[role] || 'Student';
+};
+
+// ✅ Get role icon (emoji)
+export const getRoleIcon = () => {
+  const role = getUserRole();
+  const icons = {
+    'admin': '🛡️',
+    'counsellor': '🧑‍🏫',
+    'parent': '👨‍👩‍👦',
+    'student': '👤'
+  };
+  return icons[role] || '👤';
+};
+
+// ✅ Check if user is logged in
+export const isLoggedIn = () => {
+  return !!localStorage.getItem("token");
+};
+
+// ✅ Get user name
+export const getUserName = () => {
+  return localStorage.getItem("user_name") || localStorage.getItem("user_nickname") || 'User';
+};
+
+// ✅ Get user ID
+export const getUserId = () => {
+  return localStorage.getItem("user_id");
 };

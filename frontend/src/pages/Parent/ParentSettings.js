@@ -1,19 +1,17 @@
-// frontend/src/pages/Settings.js
-import { useEffect, useState } from "react";
+// frontend/src/pages/Parent/ParentSettings.js
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../utils/api";
-import Layout from "./components/Layout";
-import { useTheme } from "./components/ThemeProvider";
-import { showSuccessToast, showErrorToast, showWarningToast } from "./components/ToastNotification";
+import { motion, AnimatePresence } from "framer-motion";
+import api from "../../utils/api";
+import Layout from "../components/Layout";
+import { useTheme } from "../components/ThemeProvider";
+import { showSuccessToast, showErrorToast } from "../components/ToastNotification";
 import {
   User,
-  LogOut,
-  ArrowLeft,
   Moon,
   Sun,
   Contrast,
   Eye,
-  Activity,
   Trash2,
   AlertTriangle,
   Mail,
@@ -21,14 +19,14 @@ import {
   Save,
   EyeOff,
   Lock,
-  Type
+  LayoutDashboard,
+  Settings as SettingsIcon,
+  ArrowLeft
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 
-function Settings() {
+function ParentSettings() {
   const navigate = useNavigate();
   const user_id = localStorage.getItem("user_id");
-  const [userNickname, setUserNickname] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
@@ -55,6 +53,12 @@ function Settings() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Parent menu items with correct paths
+  const parentMenuItems = [
+    { path: "/parent/dashboard", icon: <LayoutDashboard size={18} />, label: "Dashboard" },
+    { path: "/parent/settings", icon: <SettingsIcon size={18} />, label: "Settings" },
+  ];
+
   // Fetch user profile
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -68,8 +72,7 @@ function Settings() {
           newPassword: "",
           confirmPassword: ""
         });
-        if (res.data.nickname) setUserNickname(res.data.nickname);
-        else setUserNickname(res.data.name.split(" ")[0]);
+        localStorage.setItem("user_nickname", res.data.nickname || res.data.name || "Parent");
       } catch (err) {
         console.log("Profile fetch error:", err);
       }
@@ -121,7 +124,7 @@ function Settings() {
     try {
       await api.delete(`/auth/account/${user_id}`);
       localStorage.clear();
-      showSuccessToast("Account deleted successfully. We're sorry to see you go. 💙");
+      showSuccessToast("Account deleted successfully. 💙");
       setTimeout(() => {
         navigate("/");
       }, 2000);
@@ -172,16 +175,42 @@ function Settings() {
   };
 
   return (
-    <Layout>
+    <Layout customMenuItems={parentMenuItems}>
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        {/* Page Header */}
-        <div className="page-header">
-          <button onClick={() => navigate("/dashboard")} className="back-arrow-btn">
-            <ArrowLeft size={18} />
+        {/* ✅ Page Header with Back Button */}
+        <div className="page-header" style={{ marginBottom: '24px' }}>
+          <button 
+            onClick={() => navigate("/parent/dashboard")} 
+            className="back-arrow-btn"
+            style={{
+              background: 'var(--card-bg-glass)',
+              backdropFilter: 'var(--glass-blur)',
+              border: '1px solid var(--border-glass)',
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--accent-soft)';
+              e.currentTarget.style.transform = 'translateX(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--card-bg-glass)';
+              e.currentTarget.style.transform = 'translateX(0)';
+            }}
+          >
+            <ArrowLeft size={18} style={{ color: 'var(--accent-primary)' }} />
           </button>
           <div>
-            <h1 className="page-title">Settings</h1>
-            <p className="page-subtitle">Customize your experience</p>
+            <h1 className="page-title" style={{ fontSize: '28px', fontWeight: 700, margin: 0 }}>Settings</h1>
+            <p className="page-subtitle" style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>
+              Customize your parent experience
+            </p>
           </div>
         </div>
 
@@ -203,13 +232,11 @@ function Settings() {
             <Eye size={20} /> Appearance
           </h2>
 
-          {/* Theme Selection */}
           <div style={{ marginBottom: '24px' }}>
             <label style={{ display: 'block', marginBottom: '12px', fontWeight: 500 }}>Theme</label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
               <button
                 onClick={() => setTheme('light')}
-                className={`theme-option ${theme === 'light' ? 'active' : ''}`}
                 style={{
                   padding: '12px',
                   borderRadius: '12px',
@@ -228,7 +255,6 @@ function Settings() {
               </button>
               <button
                 onClick={() => setTheme('dark')}
-                className={`theme-option ${theme === 'dark' ? 'active' : ''}`}
                 style={{
                   padding: '12px',
                   borderRadius: '12px',
@@ -247,7 +273,6 @@ function Settings() {
               </button>
               <button
                 onClick={() => setTheme('high-contrast')}
-                className={`theme-option ${theme === 'high-contrast' ? 'active' : ''}`}
                 style={{
                   padding: '12px',
                   borderRadius: '12px',
@@ -267,7 +292,6 @@ function Settings() {
             </div>
           </div>
 
-          {/* Font Size Selection */}
           <div style={{ marginBottom: '24px' }}>
             <label style={{ display: 'block', marginBottom: '12px', fontWeight: 500 }}>Text Size</label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
@@ -275,7 +299,6 @@ function Settings() {
                 <button
                   key={size}
                   onClick={() => setFontSize(size)}
-                  className={`font-size-option ${fontSize === size ? 'active' : ''}`}
                   style={{
                     padding: '10px',
                     borderRadius: '12px',
@@ -523,10 +546,8 @@ function Settings() {
                   </p>
                   <ul style={{ marginBottom: '20px', paddingLeft: '20px', color: 'var(--text-secondary)' }}>
                     <li>Your profile information</li>
-                    <li>All journal entries</li>
-                    <li>All mood and sleep tracking data</li>
-                    <li>All posts and comments in peer support</li>
-                    <li>All group memberships and messages</li>
+                    <li>Your linked student data (if any)</li>
+                    <li>All your account data</li>
                   </ul>
                   <p style={{ marginBottom: '16px', fontWeight: 500 }}>
                     Type <strong style={{ color: '#ef4444' }}>DELETE</strong> to confirm:
@@ -665,4 +686,4 @@ function Settings() {
   );
 }
 
-export default Settings;
+export default ParentSettings;

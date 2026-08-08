@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast } from "../components/ToastNotification";
 import ExportButton from "../components/ExportButton";
-import { Calendar, Clock, User, CheckCircle, XCircle, Plus, FileSpreadsheet } from "lucide-react";
+import { Calendar, Clock, User, CheckCircle, XCircle, Plus, FileSpreadsheet, Trash2 } from "lucide-react";
 
 function CounsellorAppointments() {
   const counsellorId = localStorage.getItem("user_id");
@@ -115,6 +115,22 @@ function CounsellorAppointments() {
       setShowCompleteModal(false);
       setSelectedAppointmentId(null);
       setCompletionNotes("");
+    }
+  };
+
+  // ✅ Delete Appointment Handler
+  const handleDeleteAppointment = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this appointment? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      await api.delete(`/counsellor/appointments/${id}`);
+      showSuccessToast("Appointment deleted successfully");
+      fetchAppointments();
+    } catch (err) {
+      console.error("Delete appointment error:", err);
+      showErrorToast(err.response?.data?.msg || "Failed to delete appointment");
     }
   };
 
@@ -303,6 +319,26 @@ function CounsellorAppointments() {
                     Mark Complete
                   </button>
                 )}
+                {/* ✅ Delete Button - Always visible for all statuses */}
+                <button
+                  onClick={() => handleDeleteAppointment(appt.id)}
+                  style={{ 
+                    padding: '8px 14px', 
+                    background: '#ef4444', 
+                    border: 'none', 
+                    borderRadius: '20px', 
+                    color: 'white', 
+                    cursor: 'pointer', 
+                    fontSize: '12px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px' 
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#dc2626'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = '#ef4444'}
+                >
+                  <Trash2 size={14} /> Delete
+                </button>
               </div>
             </motion.div>
           ))
@@ -386,7 +422,7 @@ function CounsellorAppointments() {
         </div>
       )}
 
-      {/* ✅ Complete Appointment with Notes Modal */}
+      {/* Complete Appointment with Notes Modal */}
       {showCompleteModal && (
         <div className="modal-overlay" onClick={() => setShowCompleteModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>

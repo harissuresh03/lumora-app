@@ -4,16 +4,12 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../utils/api";
 import Layout from "./components/Layout";
-import { showSuccessToast, showErrorToast } from "./components/ToastNotification";
+import { showSuccessToast } from "./components/ToastNotification";
 import { formatArticleContent } from "../utils/articleFormatter";
 import { 
   BookOpen, 
-  LogOut, 
-  ArrowLeft, 
-  User, 
-  Shield, 
+  ArrowLeft,  
   Clock,
-  Sparkles,
   ChevronLeft,
   ChevronRight,
   X,
@@ -555,36 +551,16 @@ function MentalHealthArticle() {
 
                 {/* Footer */}
                 <div style={{
-                  marginTop: "32px",
-                  paddingTop: "20px",
-                  borderTop: "1px solid var(--border-light)",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center"
+                  marginTop: '32px',
+                  paddingTop: '20px',
+                  borderTop: '1px solid var(--border-light)',
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  alignItems: 'center'
                 }}>
-                  <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                     📖 {selectedArticle.read_time || 3} min read
                   </span>
-                  <button
-                    onClick={() => {
-                      showSuccessToast("Article saved to your library! 📚");
-                    }}
-                    style={{
-                      padding: "8px 20px",
-                      background: "var(--accent-gradient)",
-                      border: "none",
-                      borderRadius: "30px",
-                      color: "white",
-                      fontSize: "13px",
-                      fontWeight: 500,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px"
-                    }}
-                  >
-                    <BookOpen size={14} /> Save to Library
-                  </button>
                 </div>
               </div>
             </motion.div>

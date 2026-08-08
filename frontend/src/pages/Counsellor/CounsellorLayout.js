@@ -5,14 +5,11 @@ import { motion } from "framer-motion";
 import {
   LayoutDashboard,
   Users,
-  MessageCircle,
   Calendar,
   AlertTriangle,
-  BarChart3,
   LogOut,
   Menu,
   X,
-  Activity,
   Settings as SettingsIcon,
   RefreshCw
 } from "lucide-react";
@@ -26,7 +23,6 @@ function CounsellorLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [counsellorName, setCounsellorName] = useState("");
   const [pendingAlerts, setPendingAlerts] = useState(0);
-  const [unreadMessages, setUnreadMessages] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
   const counsellorId = localStorage.getItem("user_id");
@@ -45,7 +41,6 @@ function CounsellorLayout() {
         
         const statsRes = await api.get(`/counsellor/stats/${counsellorId}`);
         setPendingAlerts(statsRes.data.pendingAlerts || 0);
-        setUnreadMessages(statsRes.data.unreadMessages || 0);
       } catch (err) {
         console.error("Fetch counsellor error:", err);
       }
@@ -56,7 +51,6 @@ function CounsellorLayout() {
       api.get(`/counsellor/stats/${counsellorId}`)
         .then(res => {
           setPendingAlerts(res.data.pendingAlerts || 0);
-          setUnreadMessages(res.data.unreadMessages || 0);
         })
         .catch(err => console.error("Refresh stats error:", err));
     }, 30000);
@@ -75,7 +69,6 @@ function CounsellorLayout() {
     try {
       const statsRes = await api.get(`/counsellor/stats/${counsellorId}`);
       setPendingAlerts(statsRes.data.pendingAlerts || 0);
-      setUnreadMessages(statsRes.data.unreadMessages || 0);
       
       window.dispatchEvent(new Event('refresh'));
       
@@ -88,11 +81,9 @@ function CounsellorLayout() {
     }
   };
 
-  // ✅ REMOVED: Stress Levels from menu
   const menuItems = [
     { path: "/counsellor", icon: <LayoutDashboard size={20} />, label: "Dashboard", badge: 0 },
     { path: "/counsellor/students", icon: <Users size={20} />, label: "Students", badge: 0 },
-    { path: "/counsellor/messages", icon: <MessageCircle size={20} />, label: "Messages", badge: unreadMessages, badgeColor: "#3b82f6" },
     { path: "/counsellor/appointments", icon: <Calendar size={20} />, label: "Appointments", badge: 0 },
     { path: "/counsellor/alerts", icon: <AlertTriangle size={20} />, label: "Alerts", badge: pendingAlerts, badgeColor: "#ef4444" },
     { path: "/counsellor/settings", icon: <SettingsIcon size={20} />, label: "Settings", badge: 0 },

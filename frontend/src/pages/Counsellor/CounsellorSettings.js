@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast } from "../components/ToastNotification";
 import { useTheme } from "../components/ThemeProvider";
-import { useAccessibility } from "../components/AccessibilityProvider";
 import {
   User,
   LogOut,
@@ -23,8 +22,6 @@ import {
   Lock,
   Bell,
   Globe,
-  RefreshCw,
-  Users,
   Building,
   Mail
 } from "lucide-react";
@@ -40,9 +37,8 @@ function CounsellorSettings() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
-  // Theme and Accessibility
+  // Theme
   const { theme, fontSize, setTheme, setFontSize, getFontSizeInPx } = useTheme();
-  const { reducedMotion, focusOutline, setReducedMotion, setFocusOutline } = useAccessibility();
 
   // Profile State
   const [profile, setProfile] = useState({
@@ -167,8 +163,6 @@ function CounsellorSettings() {
   const resetAllSettings = () => {
     setTheme('light');
     setFontSize('medium');
-    setReducedMotion(false);
-    setFocusOutline(true);
     showSuccessToast("All appearance settings reset to default!");
   };
 
@@ -196,7 +190,6 @@ function CounsellorSettings() {
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-      {/* Page Header */}
       <div className="page-header">
         <button onClick={() => navigate("/counsellor")} className="back-arrow-btn">
           <ArrowLeft size={18} />
@@ -207,7 +200,7 @@ function CounsellorSettings() {
         </div>
       </div>
 
-      {/* Appearance Settings */}
+      {/* Appearance Section */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -224,7 +217,6 @@ function CounsellorSettings() {
           <Eye size={22} /> Appearance
         </h2>
 
-        {/* Theme Selection */}
         <div style={{ marginBottom: '24px' }}>
           <label style={{ display: 'block', marginBottom: '12px', fontWeight: 500 }}>Theme</label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
@@ -285,7 +277,6 @@ function CounsellorSettings() {
           </div>
         </div>
 
-        {/* Font Size Selection */}
         <div style={{ marginBottom: '24px' }}>
           <label style={{ display: 'block', marginBottom: '12px', fontWeight: 500 }}>Text Size</label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
@@ -312,68 +303,6 @@ function CounsellorSettings() {
             <p style={{ fontSize: getFontSizeInPx(), color: 'var(--text-primary)' }}>
               Preview text: This is how text will look at this size.
             </p>
-          </div>
-        </div>
-
-        {/* Accessibility Toggles */}
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'block', marginBottom: '16px', fontWeight: 500 }}>Accessibility</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-              <span>Reduced Motion</span>
-              <button
-                onClick={() => setReducedMotion(!reducedMotion)}
-                style={{
-                  width: '50px',
-                  height: '26px',
-                  borderRadius: '13px',
-                  background: reducedMotion ? 'var(--accent-primary)' : 'var(--border-light)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  position: 'relative',
-                  transition: 'all 0.2s'
-                }}
-              >
-                <span style={{
-                  position: 'absolute',
-                  width: '22px',
-                  height: '22px',
-                  borderRadius: '11px',
-                  background: 'white',
-                  top: '2px',
-                  left: reducedMotion ? '26px' : '2px',
-                  transition: 'left 0.2s'
-                }} />
-              </button>
-            </label>
-
-            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-              <span>Focus Outline (Keyboard Navigation)</span>
-              <button
-                onClick={() => setFocusOutline(!focusOutline)}
-                style={{
-                  width: '50px',
-                  height: '26px',
-                  borderRadius: '13px',
-                  background: focusOutline ? 'var(--accent-primary)' : 'var(--border-light)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  position: 'relative',
-                  transition: 'all 0.2s'
-                }}
-              >
-                <span style={{
-                  position: 'absolute',
-                  width: '22px',
-                  height: '22px',
-                  borderRadius: '11px',
-                  background: 'white',
-                  top: '2px',
-                  left: focusOutline ? '26px' : '2px',
-                  transition: 'left 0.2s'
-                }} />
-              </button>
-            </label>
           </div>
         </div>
 

@@ -8,17 +8,19 @@ const verifyToken = require("../middleware/authmiddleware");
 
 const JWT_SECRET = "lumora_secret_key";
 
-/* REGISTER - Check if registrations are allowed */
+/* REGISTER - with optional parent email */
 router.post("/register", async (req, res) => {
   const { 
     name, nickname, email, password, dob, gender, 
-    university_id, student_id, faculty, department,  // ✅ Added faculty, department
+    university_id, student_id, faculty, department,
     emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
-    counsellor_consent  // ✅ Added consent
+    counsellor_consent,
+    parent_email // ✅ NEW: optional parent email
   } = req.body;
 
   console.log("Registration data received:", { 
-    name, nickname, email, university_id, student_id, faculty, department, counsellor_consent
+    name, nickname, email, university_id, student_id, faculty, department, counsellor_consent,
+    parent_email // ✅ Log parent email
   });
 
   if (!name || !email || !password) {
@@ -36,7 +38,6 @@ router.post("/register", async (req, res) => {
       return res.status(403).json({ msg: "Registrations are currently disabled. Please try again later." });
     }
     
-    // Get default user role
     const [roleSetting] = await db.promise().query(
       "SELECT setting_value FROM system_settings WHERE setting_key = 'defaultUserRole'"
     );
@@ -44,52 +45,129 @@ router.post("/register", async (req, res) => {
     
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    db.query(
-      `INSERT INTO users (name, nickname, email, password, dob, gender, 
-        university_id, student_id, faculty, department,  -- ✅ Added faculty, department
-        emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, 
-        counsellor_consent, role)  -- ✅ Added counsellor_consent
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        name, 
-        nickname || null, 
-        email, 
-        hashedPassword, 
-        dob || null, 
-        gender || null,
-        university_id || null,
-        student_id || null,
-        faculty || null,  // ✅ New field
-        department || null,  // ✅ New field
-        emergency_contact_name || null, 
-        emergency_contact_phone || null, 
-        emergency_contact_relationship || null,
-        counsellor_consent ? 1 : 0,  // ✅ Consent value (1 or 0)
-        defaultRole
-      ],
-      (err, result) => {
-        if (err) {
-          console.error("Register error:", err);
-          if (err.code === 'ER_DUP_ENTRY') {
-            return res.status(400).json({ msg: "Email already registered" });
+    // Start transaction
+    const connection = await db.promise().getConnection();
+    await connection.beginTransaction();
+
+    try {
+      // Insert user
+      const [result] = await connection.query(
+        `INSERT INTO users (name, nickname, email, password, dob, gender, 
+          university_id, student_id, faculty, department,
+          emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, 
+          counsellor_consent, role)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          name, 
+          nickname || null, 
+          email, 
+          hashedPassword, 
+          dob || null, 
+          gender || null,
+          university_id || null,
+          student_id || null,
+          faculty || null,
+          department || null,
+          emergency_contact_name || null, 
+          emergency_contact_phone || null, 
+          emergency_contact_relationship || null,
+          counsellor_consent ? 1 : 0,
+          defaultRole
+        ]
+      );
+
+      const userId = result.insertId;
+
+      // ✅ Handle parent email if provided
+      let parentInvited = false;
+      if (parent_email && parent_email.trim() !== "") {
+        try {
+          // Check if parent already exists
+          const [existingParent] = await connection.query(
+            "SELECT id, email, parent_invitation_token FROM users WHERE email = ? AND role = 'parent'",
+            [parent_email]
+          );
+
+          let parentId;
+
+          if (existingParent.length > 0) {
+            parentId = existingParent[0].id;
+            
+            // Check if already linked to this student
+            const [existingLink] = await connection.query(
+              "SELECT id FROM parent_student_links WHERE parent_id = ? AND student_id = ?",
+              [parentId, userId]
+            );
+
+            if (existingLink.length === 0) {
+              // Create link with consent granted if parent already confirmed (no token)
+              const isConsented = !existingParent[0].parent_invitation_token;
+              await connection.query(
+                `INSERT INTO parent_student_links 
+                 (parent_id, student_id, consent_granted, consent_granted_at) 
+                 VALUES (?, ?, ?, ?)`,
+                [parentId, userId, isConsented ? 1 : 0, isConsented ? new Date() : null]
+              );
+            }
+            parentInvited = true;
+          } else {
+            // Create new parent account
+            const defaultPassword = "password123";
+            const hashedParentPassword = await bcrypt.hash(defaultPassword, 10);
+            const token = crypto.randomBytes(32).toString('hex');
+            const tokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+            const [parentResult] = await connection.query(
+              `INSERT INTO users 
+               (email, password, role, parent_invitation_token, parent_invitation_expires, is_active, created_at) 
+               VALUES (?, ?, 'parent', ?, ?, 1, NOW())`,
+              [parent_email, hashedParentPassword, token, tokenExpiry]
+            );
+
+            parentId = parentResult.insertId;
+
+            // Create link (consent not yet granted)
+            await connection.query(
+              `INSERT INTO parent_student_links 
+               (parent_id, student_id, consent_granted, consent_granted_at) 
+               VALUES (?, ?, FALSE, NULL)`,
+              [parentId, userId]
+            );
+
+            // Send invitation email
+            const { sendParentInvitationEmail } = require("../services/emailService");
+            await sendParentInvitationEmail(parent_email, name, true);
+            
+            parentInvited = true;
+            console.log(`✅ Parent invitation sent to ${parent_email} during registration`);
           }
-          return res.status(500).json({ 
-            msg: "Register failed", 
-            error: err.message,
-            code: err.code 
-          });
+        } catch (parentError) {
+          console.error("Parent invitation error during registration:", parentError);
+          // Don't fail registration if parent invitation fails
         }
-
-        console.log("User registered successfully. ID:", result.insertId);
-
-        res.json({
-          msg: "User created",
-          user_id: result.insertId,
-        });
       }
-    );
+
+      await connection.commit();
+      connection.release();
+
+      console.log("User registered successfully. ID:", userId);
+      res.json({
+        msg: "User created",
+        user_id: userId,
+        parent_invited: parentInvited
+      });
+
+    } catch (error) {
+      await connection.rollback();
+      connection.release();
+      throw error;
+    }
+
   } catch (error) {
     console.error("Server error:", error);
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ msg: "Email already registered" });
+    }
     res.status(500).json({ msg: "Server error", error: error.message });
   }
 });

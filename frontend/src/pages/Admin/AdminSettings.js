@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast } from "../components/ToastNotification";
+import { useTheme } from "../components/ThemeProvider";
 import {
   User,
   Lock,
@@ -16,15 +17,14 @@ import {
   Sun,
   Moon,
   Monitor,
-  Eye as EyeIcon
+  Eye as EyeIcon,
+  Shield
 } from "lucide-react";
-import { useTheme } from "../components/ThemeProvider";
-import { useAccessibility } from "../components/AccessibilityProvider";
+import { AnimatePresence } from "framer-motion";
 
 function AdminSettings() {
   const navigate = useNavigate();
   const { theme, setTheme, fontSize, setFontSize, getFontSizeInPx } = useTheme();
-  const { reducedMotion, focusOutline, setReducedMotion, setFocusOutline } = useAccessibility();
   
   const [loading, setLoading] = useState(false);
   const [savingSystem, setSavingSystem] = useState(false);
@@ -68,7 +68,6 @@ function AdminSettings() {
     const fetchSystemSettings = async () => {
       try {
         const res = await api.get("/admin/settings");
-        console.log("Fetched system settings:", res.data);
         if (res.data) {
           setSystemSettings(prev => ({
             ...prev,
@@ -131,11 +130,7 @@ function AdminSettings() {
         sessionTimeout: systemSettings.sessionTimeout
       };
       
-      console.log("Saving system settings:", payload);
-      
-      const res = await api.put("/admin/settings", payload);
-      console.log("Save response:", res.data);
-      
+      await api.put("/admin/settings", payload);
       showSuccessToast("System settings updated successfully");
       const refreshRes = await api.get("/admin/settings");
       if (refreshRes.data) {
@@ -158,8 +153,6 @@ function AdminSettings() {
   const resetAllSettings = () => {
     setTheme('light');
     setFontSize('medium');
-    setReducedMotion(false);
-    setFocusOutline(true);
     showSuccessToast("All appearance settings reset to default!");
   };
 
@@ -306,83 +299,6 @@ function AdminSettings() {
           >
             Reset All Appearance Settings to Default
           </button>
-        </motion.div>
-
-        {/* Accessibility Settings */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          style={{
-            background: 'var(--card-bg-glass)',
-            backdropFilter: 'var(--glass-blur)',
-            borderRadius: '20px',
-            padding: '28px',
-            marginBottom: '24px',
-            border: '1px solid var(--border-glass)'
-          }}
-        >
-          <h2 style={{ fontSize: '20px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <EyeIcon size={22} /> Accessibility
-          </h2>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-              <span>Reduced Motion</span>
-              <button
-                onClick={() => setReducedMotion(!reducedMotion)}
-                style={{
-                  width: '50px',
-                  height: '26px',
-                  borderRadius: '13px',
-                  background: reducedMotion ? 'var(--accent-primary)' : 'var(--border-light)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  position: 'relative',
-                  transition: 'all 0.2s'
-                }}
-              >
-                <span style={{
-                  position: 'absolute',
-                  width: '22px',
-                  height: '22px',
-                  borderRadius: '11px',
-                  background: 'white',
-                  top: '2px',
-                  left: reducedMotion ? '26px' : '2px',
-                  transition: 'left 0.2s'
-                }} />
-              </button>
-            </label>
-
-            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-              <span>Focus Outline (Keyboard Navigation)</span>
-              <button
-                onClick={() => setFocusOutline(!focusOutline)}
-                style={{
-                  width: '50px',
-                  height: '26px',
-                  borderRadius: '13px',
-                  background: focusOutline ? 'var(--accent-primary)' : 'var(--border-light)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  position: 'relative',
-                  transition: 'all 0.2s'
-                }}
-              >
-                <span style={{
-                  position: 'absolute',
-                  width: '22px',
-                  height: '22px',
-                  borderRadius: '11px',
-                  background: 'white',
-                  top: '2px',
-                  left: focusOutline ? '26px' : '2px',
-                  transition: 'left 0.2s'
-                }} />
-              </button>
-            </label>
-          </div>
         </motion.div>
 
         {/* Profile Settings */}
@@ -642,36 +558,51 @@ function AdminSettings() {
       </div>
 
       {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
-            <div className="modal-header">
-              <h3 style={{ color: '#ef4444' }}>Delete Admin Account</h3>
-              <button className="modal-close" onClick={() => setShowDeleteModal(false)}>✕</button>
-            </div>
-            <div className="modal-content">
-              <p style={{ marginBottom: '16px' }}>
-                This action <strong>cannot be undone</strong>. This will permanently delete your admin account.
-              </p>
-              <p style={{ marginBottom: '16px', fontWeight: 500 }}>
-                Type <strong style={{ color: '#ef4444' }}>DELETE ADMIN</strong> to confirm:
-              </p>
-              <input
-                type="text"
-                value={deleteConfirmation}
-                onChange={(e) => setDeleteConfirmation(e.target.value)}
-                placeholder="Type DELETE ADMIN here"
-                className="input-field"
-                style={{ marginBottom: '20px' }}
-              />
-              <div className="modal-actions">
-                <button onClick={() => setShowDeleteModal(false)} className="peer-btn-secondary">Cancel</button>
-                <button onClick={handleDeleteAccount} className="peer-btn-primary" style={{ background: '#ef4444' }}>Delete Account</button>
+      <AnimatePresence>
+        {showDeleteModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="modal-overlay"
+            onClick={() => setShowDeleteModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="modal"
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: '450px' }}
+            >
+              <div className="modal-header">
+                <h3 style={{ color: '#ef4444' }}>Delete Admin Account</h3>
+                <button className="modal-close" onClick={() => setShowDeleteModal(false)}>✕</button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+              <div className="modal-content">
+                <p style={{ marginBottom: '16px' }}>
+                  This action <strong>cannot be undone</strong>. This will permanently delete your admin account.
+                </p>
+                <p style={{ marginBottom: '16px', fontWeight: 500 }}>
+                  Type <strong style={{ color: '#ef4444' }}>DELETE ADMIN</strong> to confirm:
+                </p>
+                <input
+                  type="text"
+                  value={deleteConfirmation}
+                  onChange={(e) => setDeleteConfirmation(e.target.value)}
+                  placeholder="Type DELETE ADMIN here"
+                  className="input-field"
+                  style={{ marginBottom: '20px' }}
+                />
+                <div className="modal-actions">
+                  <button onClick={() => setShowDeleteModal(false)} className="peer-btn-secondary">Cancel</button>
+                  <button onClick={handleDeleteAccount} className="peer-btn-primary" style={{ background: '#ef4444' }}>Delete Account</button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

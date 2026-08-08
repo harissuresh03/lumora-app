@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../utils/api";
 import AICompanion from "./components/AICompanion";
+import PatternInsights from "./components/PatternInsights";
 import Layout from "./components/Layout";
 import AssessmentModal from "./components/AssessmentModal";
 import Recommendations from "./components/Recommendations";
@@ -29,6 +30,7 @@ import {
   ChevronRight,
   TrendingUp,
   BarChart3,
+  Brain,
   Activity
 } from "lucide-react";
 
@@ -739,9 +741,57 @@ function Dashboard() {
         {/* CHARTS SECTION */}
         <AnimatedCard delay={0.6}>
           <div className="graph-card">
-            <div className="graph-header">
-              <BarChart3 size={20} color="var(--accent-primary)" />
-              <h3 className="graph-title">Mood Analytics</h3>
+            <div className="graph-header" style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              flexWrap: 'wrap', 
+              gap: '12px' 
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <BarChart3 size={20} color="var(--accent-primary)" />
+                <h3 className="graph-title" style={{ margin: 0 }}>Mood Analytics</h3>
+              </div>
+              
+              {/* ✅ Pattern Insights Button */}
+              <button
+                onClick={() => {
+                  const patternSection = document.getElementById('pattern-insights-section');
+                  if (patternSection) {
+                    const isVisible = patternSection.style.display !== 'none' && patternSection.style.display !== '';
+                    patternSection.style.display = isVisible ? 'none' : 'block';
+                    if (!isVisible) {
+                      patternSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }
+                }}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: '30px',
+                  border: '1px solid var(--accent-primary)',
+                  background: 'var(--card-bg-glass)',
+                  color: 'var(--accent-primary)',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s',
+                  boxShadow: 'var(--shadow-sm)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--accent-soft)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'var(--card-bg-glass)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                <Brain size={16} />
+                View Pattern Insights
+              </button>
             </div>
             
             <div className="chart-selector" style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
@@ -859,6 +909,20 @@ function Dashboard() {
             )}
           </div>
         </AnimatedCard>
+
+        {/* ✅ Pattern Insights Section (Hidden by default, toggled by button) */}
+        <div 
+          id="pattern-insights-section"
+          style={{ 
+            display: 'none',
+            marginTop: '20px',
+            marginBottom: '20px'
+          }}
+        >
+          <AnimatedCard delay={0.65}>
+            <PatternInsights />
+          </AnimatedCard>
+        </div>
 
         {/* JOURNAL CARD */}
         <AnimatedCard delay={0.7}>

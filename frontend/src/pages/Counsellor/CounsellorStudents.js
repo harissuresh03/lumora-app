@@ -30,6 +30,13 @@ function CounsellorStudents() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
+  // Note modal state
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [selectedStudentForNote, setSelectedStudentForNote] = useState(null);
+  const [noteSubject, setNoteSubject] = useState("");
+  const [noteMessage, setNoteMessage] = useState("");
+  const [sendingNote, setSendingNote] = useState(false);
+
   // Stress summary stats
   const [stressStats, setStressStats] = useState({
     high: 0,
@@ -45,7 +52,7 @@ function CounsellorStudents() {
       const res = await api.get(`/counsellor/students/${counsellorId}`, {
         params: { search, filter, page, limit: 20 }
       });
-      console.log("Students response:", res.data);
+      console.log("📊 Students response:", res.data);
       
       if (res.data.message) {
         setError(res.data.message);
@@ -55,7 +62,6 @@ function CounsellorStudents() {
         setStudents(studentsData);
         setTotalPages(res.data.totalPages || 1);
         
-        // Calculate stress stats
         const stats = {
           high: 0,
           moderate: 0,
@@ -93,6 +99,32 @@ function CounsellorStudents() {
     await fetchStudents();
     setRefreshing(false);
     if (!error) showSuccessToast("Students refreshed!");
+  };
+
+  // Send note to student
+  const sendNoteToStudent = async () => {
+    if (!noteMessage.trim()) {
+      showErrorToast("Please enter a message");
+      return;
+    }
+
+    setSendingNote(true);
+    try {
+      await api.post("/counsellor/send-note", {
+        student_id: selectedStudentForNote.id,
+        subject: noteSubject || "Note from Counsellor",
+        message: noteMessage
+      });
+      showSuccessToast(`Note sent to ${selectedStudentForNote.name}! 📬`);
+      setShowNoteModal(false);
+      setNoteSubject("");
+      setNoteMessage("");
+      setSelectedStudentForNote(null);
+    } catch (err) {
+      showErrorToast(err.response?.data?.msg || "Failed to send note");
+    } finally {
+      setSendingNote(false);
+    }
   };
 
   const getMoodEmoji = (mood) => {
@@ -342,7 +374,7 @@ function CounsellorStudents() {
                       </div>
                     </td>
 
-                    {/* Stress Column - shows stress level with color coding */}
+                    {/* Stress Column */}
                     <td style={{ padding: '16px', textAlign: 'center' }}>
                       {student.current_stress_score !== null && student.current_stress_score !== undefined ? (
                         <span style={{
@@ -418,7 +450,10 @@ function CounsellorStudents() {
                           <span>View</span>
                         </button>
                         <button
-                          onClick={() => navigate(`/counsellor/messages?student=${student.id}`)}
+                          onClick={() => {
+                            setSelectedStudentForNote(student);
+                            setShowNoteModal(true);
+                          }}
                           style={{ 
                             background: 'none', 
                             border: 'none', 
@@ -434,10 +469,10 @@ function CounsellorStudents() {
                           }}
                           onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'}
                           onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                          title="Send Message"
+                          title="Send Note"
                         >
                           <Mail size={16} />
-                          <span>Message</span>
+                          <span>Send Note</span>
                         </button>
                       </div>
                     </td>
@@ -483,6 +518,57 @@ function CounsellorStudents() {
           >
             Next
           </button>
+        </div>
+      )}
+
+      {/* Send Note Modal */}
+      {showNoteModal && selectedStudentForNote && (
+        <div className="modal-overlay" onClick={() => setShowNoteModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+            <div className="modal-header">
+              <h3>Send Note to {selectedStudentForNote.name}</h3>
+              <button className="modal-close" onClick={() => setShowNoteModal(false)}>✕</button>
+            </div>
+            <div className="modal-content">
+              <div className="input-group">
+                <label className="input-label">Subject (optional)</label>
+                <input
+                  type="text"
+                  value={noteSubject}
+                  onChange={(e) => setNoteSubject(e.target.value)}
+                  className="input-field"
+                  placeholder="Brief subject"
+                />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Message *</label>
+                <textarea
+                  value={noteMessage}
+                  onChange={(e) => setNoteMessage(e.target.value)}
+                  className="peer-textarea"
+                  rows="4"
+                  placeholder="Write your note to the student..."
+                />
+              </div>
+              <div style={{
+                padding: '10px 14px',
+                background: 'rgba(59, 130, 246, 0.05)',
+                borderRadius: '8px',
+                border: '1px solid rgba(59, 130, 246, 0.2)',
+                fontSize: '12px',
+                color: 'var(--text-secondary)',
+                marginBottom: '16px'
+              }}>
+                📬 This note will be sent as a notification to the student.
+              </div>
+              <div className="modal-actions">
+                <button onClick={() => setShowNoteModal(false)} className="peer-btn-secondary">Cancel</button>
+                <button onClick={sendNoteToStudent} disabled={sendingNote} className="peer-btn-primary">
+                  {sendingNote ? "Sending..." : "Send Note"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

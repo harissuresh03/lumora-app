@@ -28,7 +28,8 @@ import {
   TrendingUp,
   CheckCircle,
   XCircle,
-  Settings
+  Settings,
+  User
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -90,13 +91,13 @@ function AdminDashboard() {
     { title: "Total Users", value: stats?.totalUsers || 0, icon: <Users size={24} />, color: "#6366f1", change: "+12%" },
     { title: "Students", value: stats?.students || 0, icon: <UserCheck size={24} />, color: "#22c55e", change: "+8%" },
     { title: "Counsellors", value: stats?.counsellors || 0, icon: <UserCog size={24} />, color: "#f59e0b", change: "+2%" },
+    { title: "Parents", value: stats?.parents || 0, icon: <User size={24} />, color: "#8b5cf6", change: "+5%" }, // ✅ Added Parents
     { title: "Admins", value: stats?.admins || 0, icon: <UserCog size={24} />, color: "#ef4444", change: "0%" },
     { title: "New Users (Week)", value: stats?.newUsersWeek || 0, icon: <UserPlus size={24} />, color: "#10b981", change: "+15%" },
     { title: "Active Users", value: stats?.activeUsers || 0, icon: <Activity size={24} />, color: "#8b5cf6", change: "+5%" },
-    { title: "Total Posts", value: stats?.totalPosts || 0, icon: <Flag size={24} />, color: "#3b82f6", change: "+23%" },
-    { title: "Pending Reports", value: stats?.pendingReports || 0, icon: <AlertCircle size={24} />, color: "#ef4444", change: stats?.pendingReports > 0 ? "urgent" : "0" },
+    // Removed Total Posts and Total Groups
+    { title: "Pending Reports", value: stats?.pendingReports || 0, icon: <Flag size={24} />, color: "#ef4444", change: stats?.pendingReports > 0 ? "urgent" : "0" },
     { title: "Pending Issues", value: stats?.pendingIssues || 0, icon: <AlertCircle size={24} />, color: "#f59e0b", change: "needs attention" },
-    { title: "Total Groups", value: stats?.totalGroups || 0, icon: <Users size={24} />, color: "#06b6d4", change: "+7%" },
   ];
 
   if (loading) {
@@ -111,7 +112,7 @@ function AdminDashboard() {
   return (
     <div>
       {/* Stats Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
         {statCards.map((card, index) => (
           <motion.div
             key={card.title}
@@ -142,7 +143,7 @@ function AdminDashboard() {
         ))}
       </div>
 
-      {/* Analytics Charts Section */}
+      {/* Analytics Charts Section - unchanged */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', gap: '24px', marginBottom: '32px' }}>
         {/* User Registration Trend */}
         <motion.div
@@ -253,7 +254,7 @@ function AdminDashboard() {
         </motion.div>
       </div>
 
-      {/* System Health */}
+      {/* System Health - unchanged */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

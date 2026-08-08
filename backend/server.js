@@ -30,7 +30,6 @@ const educationalRoutes = require("./routes/educational");
 const counsellorRoutes = require("./routes/counsellor");
 const counsellorRequestsRoutes = require("./routes/counsellorRequests");
 const adminNotificationRoutes = require("./routes/adminNotifications");
-const studentMessageRoutes = require("./routes/studentMessage");
 const aiModerationRoutes = require("./routes/aiModeration");
 const studentExportRoutes = require("./routes/studentExport");
 const counsellorExportRoutes = require("./routes/counsellorExport");
@@ -39,6 +38,7 @@ const deadlinesRoutes = require("./routes/deadlines");
 const stressForecastRoutes = require("./routes/stressForecast");
 const recommendationsRoutes = require("./routes/recommendations");
 const gamificationRoutes = require("./routes/gamification");
+const parentRoutes = require("./routes/parent");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/mood", moodRoutes);
@@ -57,7 +57,6 @@ app.use("/api/educational", educationalRoutes);
 app.use("/api/counsellor", counsellorRoutes);
 app.use("/api/counsellor-requests", counsellorRequestsRoutes);
 app.use("/api/admin-notifications", adminNotificationRoutes);
-app.use("/api/student-message", studentMessageRoutes);
 app.use("/api/ai", aiModerationRoutes);
 app.use("/api/student-export", studentExportRoutes);
 app.use("/api/counsellor-export", counsellorExportRoutes);
@@ -66,6 +65,7 @@ app.use("/api/deadlines", deadlinesRoutes);
 app.use("/api/stress-forecast", stressForecastRoutes);
 app.use("/api/recommendations", recommendationsRoutes);
 app.use("/api/gamification", gamificationRoutes);
+app.use("/api/parent", parentRoutes);
 
 app.get("/", (req, res) => {
   res.send("API running 🌿");

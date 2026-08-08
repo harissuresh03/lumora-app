@@ -18,7 +18,7 @@ import api from "../../utils/api";
 import { Brain, TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react";
 
 function AssessmentHistoryGraph({ userId }) {
-  const [data, setData] = useState({ phq9: [], gad7: [] });
+  const [data, setData] = useState({ phq9: [], gad7: [], pss: [] });
   const [loading, setLoading] = useState(true);
   const [selectedType, setSelectedType] = useState('phq9');
   const [error, setError] = useState(null);
@@ -33,17 +33,18 @@ function AssessmentHistoryGraph({ userId }) {
     try {
       const res = await api.get(`/assessments/history/graph/${userId}`);
       
-      // ✅ Ensure phq9 and gad7 are always arrays
+      // ✅ Ensure phq9, gad7, and pss are always arrays
       setData({
         phq9: Array.isArray(res.data.phq9) ? res.data.phq9 : [],
-        gad7: Array.isArray(res.data.gad7) ? res.data.gad7 : []
+        gad7: Array.isArray(res.data.gad7) ? res.data.gad7 : [],
+        pss: Array.isArray(res.data.pss) ? res.data.pss : []
       });
       setError(null);
     } catch (err) {
       console.error("Fetch assessment history error:", err);
       setError("Failed to load assessment history");
       // ✅ Set empty arrays on error so component doesn't crash
-      setData({ phq9: [], gad7: [] });
+      setData({ phq9: [], gad7: [], pss: [] });
     } finally {
       setLoading(false);
     }
@@ -56,10 +57,14 @@ function AssessmentHistoryGraph({ userId }) {
       if (score <= 14) return '#f97316';
       if (score <= 19) return '#ef4444';
       return '#dc2626';
-    } else {
+    } else if (type === 'gad7') {
       if (score <= 4) return '#22c55e';
       if (score <= 9) return '#eab308';
       if (score <= 14) return '#f97316';
+      return '#ef4444';
+    } else { // pss
+      if (score <= 13) return '#22c55e';
+      if (score <= 26) return '#f97316';
       return '#ef4444';
     }
   };
@@ -71,17 +76,23 @@ function AssessmentHistoryGraph({ userId }) {
       if (score <= 14) return 'Moderate';
       if (score <= 19) return 'Moderately Severe';
       return 'Severe';
-    } else {
+    } else if (type === 'gad7') {
       if (score <= 4) return 'Minimal';
       if (score <= 9) return 'Mild';
       if (score <= 14) return 'Moderate';
       return 'Severe';
+    } else { // pss
+      if (score <= 13) return 'Low';
+      if (score <= 26) return 'Moderate';
+      return 'High';
     }
   };
 
   // ✅ Get the current data array (always returns an array)
   const getCurrentData = () => {
-    return selectedType === 'phq9' ? data.phq9 : data.gad7;
+    if (selectedType === 'phq9') return data.phq9;
+    if (selectedType === 'gad7') return data.gad7;
+    return data.pss;
   };
 
   // ✅ Get comparison - safely handles undefined
@@ -109,8 +120,10 @@ function AssessmentHistoryGraph({ userId }) {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const dataPoint = payload[0].payload;
-      const typeLabel = selectedType === 'phq9' ? 'PHQ-9' : 'GAD-7';
-      const maxScore = selectedType === 'phq9' ? 27 : 21;
+      const typeLabels = { phq9: 'PHQ-9', gad7: 'GAD-7', pss: 'PSS-10' };
+      const maxScores = { phq9: 27, gad7: 21, pss: 40 };
+      const typeLabel = typeLabels[selectedType] || 'PHQ-9';
+      const maxScore = maxScores[selectedType] || 27;
       
       return (
         <div style={{
@@ -150,14 +163,44 @@ function AssessmentHistoryGraph({ userId }) {
   }
 
   const currentData = getCurrentData();
-  const maxScore = selectedType === 'phq9' ? 27 : 21;
-  const typeLabel = selectedType === 'phq9' ? 'PHQ-9' : 'GAD-7';
-  const typeIcon = selectedType === 'phq9' ? '📋' : '😰';
+  const maxScores = { phq9: 27, gad7: 21, pss: 40 };
+  const maxScore = maxScores[selectedType] || 27;
+  const typeLabels = { phq9: 'PHQ-9', gad7: 'GAD-7', pss: 'PSS-10' };
+  const typeLabel = typeLabels[selectedType] || 'PHQ-9';
+  const typeIcons = { phq9: '📋', gad7: '😰', pss: '📊' };
+  const typeIcon = typeIcons[selectedType] || '📋';
 
   // Severity threshold lines
-  const thresholds = selectedType === 'phq9' 
-    ? [{ value: 4, label: 'Minimal' }, { value: 9, label: 'Mild' }, { value: 14, label: 'Moderate' }, { value: 19, label: 'Severe' }]
-    : [{ value: 4, label: 'Minimal' }, { value: 9, label: 'Mild' }, { value: 14, label: 'Moderate' }];
+  const getThresholds = () => {
+    if (selectedType === 'phq9') {
+      return [
+        { value: 4, label: 'Minimal', color: '#22c55e' },
+        { value: 9, label: 'Mild', color: '#eab308' },
+        { value: 14, label: 'Moderate', color: '#f97316' },
+        { value: 19, label: 'Severe', color: '#ef4444' }
+      ];
+    } else if (selectedType === 'gad7') {
+      return [
+        { value: 4, label: 'Minimal', color: '#22c55e' },
+        { value: 9, label: 'Mild', color: '#eab308' },
+        { value: 14, label: 'Moderate', color: '#f97316' }
+      ];
+    } else { // pss
+      return [
+        { value: 13, label: 'Low', color: '#22c55e' },
+        { value: 26, label: 'Moderate', color: '#f97316' }
+      ];
+    }
+  };
+
+  const thresholds = getThresholds();
+
+  // Y-axis ticks based on type
+  const getYAxisTicks = () => {
+    if (selectedType === 'phq9') return [0, 5, 10, 15, 20, 25, 27];
+    if (selectedType === 'gad7') return [0, 5, 10, 15, 20, 21];
+    return [0, 5, 10, 15, 20, 25, 30, 35, 40];
+  };
 
   return (
     <motion.div
@@ -178,34 +221,54 @@ function AssessmentHistoryGraph({ userId }) {
           Assessment History
         </h3>
         
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button
             onClick={() => setSelectedType('phq9')}
             style={{
               padding: '6px 16px',
               borderRadius: '20px',
-              border: selectedType === 'phq9' ? '2px solid var(--accent-primary)' : '1px solid var(--border-light)',
-              background: selectedType === 'phq9' ? 'var(--accent-soft)' : 'var(--bg-secondary)',
+              border: selectedType === 'phq9' ? '2px solid #6366f1' : '1px solid var(--border-light)',
+              background: selectedType === 'phq9' ? 'rgba(99, 102, 241, 0.1)' : 'var(--bg-secondary)',
               cursor: 'pointer',
               fontSize: '12px',
-              fontWeight: selectedType === 'phq9' ? 600 : 400
+              fontWeight: selectedType === 'phq9' ? 600 : 400,
+              color: selectedType === 'phq9' ? '#6366f1' : 'var(--text-secondary)'
             }}
           >
-            📋 PHQ-9
+            <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: '#6366f1', marginRight: '6px' }} />
+            PHQ-9
           </button>
           <button
             onClick={() => setSelectedType('gad7')}
             style={{
               padding: '6px 16px',
               borderRadius: '20px',
-              border: selectedType === 'gad7' ? '2px solid var(--accent-primary)' : '1px solid var(--border-light)',
-              background: selectedType === 'gad7' ? 'var(--accent-soft)' : 'var(--bg-secondary)',
+              border: selectedType === 'gad7' ? '2px solid #ef4444' : '1px solid var(--border-light)',
+              background: selectedType === 'gad7' ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-secondary)',
               cursor: 'pointer',
               fontSize: '12px',
-              fontWeight: selectedType === 'gad7' ? 600 : 400
+              fontWeight: selectedType === 'gad7' ? 600 : 400,
+              color: selectedType === 'gad7' ? '#ef4444' : 'var(--text-secondary)'
             }}
           >
-            😰 GAD-7
+            <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444', marginRight: '6px' }} />
+            GAD-7
+          </button>
+          <button
+            onClick={() => setSelectedType('pss')}
+            style={{
+              padding: '6px 16px',
+              borderRadius: '20px',
+              border: selectedType === 'pss' ? '2px solid #f59e0b' : '1px solid var(--border-light)',
+              background: selectedType === 'pss' ? 'rgba(245, 158, 11, 0.1)' : 'var(--bg-secondary)',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: selectedType === 'pss' ? 600 : 400,
+              color: selectedType === 'pss' ? '#f59e0b' : 'var(--text-secondary)'
+            }}
+          >
+            <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b', marginRight: '6px' }} />
+            PSS-10
           </button>
         </div>
       </div>
@@ -289,7 +352,7 @@ function AssessmentHistoryGraph({ userId }) {
                 domain={[0, maxScore]} 
                 stroke="var(--text-muted)" 
                 fontSize={11}
-                ticks={selectedType === 'phq9' ? [0, 5, 10, 15, 20, 25, 27] : [0, 5, 10, 15, 20, 21]}
+                ticks={getYAxisTicks()}
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend />
@@ -366,9 +429,7 @@ function AssessmentHistoryGraph({ userId }) {
               width: '12px',
               height: '12px',
               borderRadius: '2px',
-              background: i === 0 ? '#22c55e' : 
-                         i === 1 ? '#eab308' : 
-                         i === 2 ? '#f97316' : '#ef4444'
+              background: t.color
             }} />
             {t.label} ({t.value})
           </span>

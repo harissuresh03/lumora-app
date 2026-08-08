@@ -152,6 +152,7 @@ function AdminUsers() {
             <option value="all">All Roles</option>
             <option value="student">Students</option>
             <option value="counsellor">Counsellors</option>
+            <option value="parent">Parents</option>
             <option value="admin">Admins</option>
           </select>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '10px 16px', borderRadius: '40px', border: '1px solid var(--border-light)', background: 'var(--card-bg-glass)' }}>
@@ -224,6 +225,7 @@ function AdminUsers() {
                     >
                       <option value="student">Student</option>
                       <option value="counsellor">Counsellor</option>
+                      <option value="parent">Parent</option>
                       <option value="admin">Admin</option>
                     </select>
                   </td>

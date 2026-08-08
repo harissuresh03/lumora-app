@@ -35,9 +35,6 @@ function getCrisisResourcesFromDB(callback) {
   );
 }
 
-// ❌ REMOVED: Public crisis-resources route (moved to publicResources.js)
-// ❌ REMOVED: Public online-resources route (moved to publicResources.js)
-
 /**
  * GET /api/support/:user_id
  * Get support resources for the user's university (AUTHENTICATED)
@@ -70,6 +67,7 @@ router.get("/:user_id", verifyToken, (req, res) => {
             return res.json({
               hasUniversity: false,
               universityName: null,
+              counsellors: [],
               resources: {
                 general: {
                   onlineResources: onlineResources,
@@ -83,64 +81,79 @@ router.get("/:user_id", verifyToken, (req, res) => {
         return;
       }
       
+      // ✅ GET ALL COUNSELLORS FOR THIS UNIVERSITY
       db.query(
-        `SELECT id, name, short_name, 
-                counselling_contact, counselling_email, counselling_website,
-                hotline, emergency_contact, support_notes
-         FROM universities 
-         WHERE id = ?`,
+        "SELECT id, name, nickname FROM users WHERE role = 'counsellor' AND university_id = ?",
         [userUniversityId],
-        (err, uniResults) => {
+        (err, counsellorResults) => {
           if (err) {
-            console.error("University fetch error:", err);
-            return res.status(500).json({ msg: "Failed to fetch support resources" });
+            console.error("Counsellor fetch error:", err);
           }
           
-          getOnlineResourcesFromDB((onlineResources) => {
-            getCrisisResourcesFromDB((crisisResources) => {
-              if (!uniResults.length) {
-                return res.json({
-                  hasUniversity: true,
-                  universityId: userUniversityId,
-                  hasCustomResources: false,
-                  resources: {
-                    general: {
-                      onlineResources: onlineResources,
-                      crisisResources: crisisResources
-                    }
-                  },
-                  message: "University found but no specific resources available yet."
-                });
+          const counsellors = counsellorResults || [];
+          
+          db.query(
+            `SELECT id, name, short_name, 
+                    counselling_contact, counselling_email, counselling_website,
+                    hotline, emergency_contact, support_notes
+             FROM universities 
+             WHERE id = ?`,
+            [userUniversityId],
+            (err, uniResults) => {
+              if (err) {
+                console.error("University fetch error:", err);
+                return res.status(500).json({ msg: "Failed to fetch support resources" });
               }
               
-              const university = uniResults[0];
-              const hasCustomResources = !!(university.counselling_contact || 
-                                             university.counselling_email || 
-                                             university.counselling_website);
-              
-              res.json({
-                hasUniversity: true,
-                universityId: university.id,
-                universityName: university.name,
-                universityShortName: university.short_name,
-                hasCustomResources: hasCustomResources,
-                resources: {
-                  university: {
-                    counselling_contact: university.counselling_contact,
-                    counselling_email: university.counselling_email,
-                    counselling_website: university.counselling_website,
-                    hotline: university.hotline,
-                    emergency_contact: university.emergency_contact,
-                    support_notes: university.support_notes
-                  },
-                  general: {
-                    onlineResources: onlineResources,
-                    crisisResources: crisisResources
+              getOnlineResourcesFromDB((onlineResources) => {
+                getCrisisResourcesFromDB((crisisResources) => {
+                  if (!uniResults.length) {
+                    return res.json({
+                      hasUniversity: true,
+                      universityId: userUniversityId,
+                      hasCustomResources: false,
+                      counsellors: counsellors,
+                      resources: {
+                        general: {
+                          onlineResources: onlineResources,
+                          crisisResources: crisisResources
+                        }
+                      },
+                      message: "University found but no specific resources available yet."
+                    });
                   }
-                }
+                  
+                  const university = uniResults[0];
+                  const hasCustomResources = !!(university.counselling_contact || 
+                                                 university.counselling_email || 
+                                                 university.counselling_website);
+                  
+                  res.json({
+                    hasUniversity: true,
+                    universityId: university.id,
+                    universityName: university.name,
+                    universityShortName: university.short_name,
+                    hasCustomResources: hasCustomResources,
+                    counsellors: counsellors,
+                    resources: {
+                      university: {
+                        counselling_contact: university.counselling_contact,
+                        counselling_email: university.counselling_email,
+                        counselling_website: university.counselling_website,
+                        hotline: university.hotline,
+                        emergency_contact: university.emergency_contact,
+                        support_notes: university.support_notes
+                      },
+                      general: {
+                        onlineResources: onlineResources,
+                        crisisResources: crisisResources
+                      }
+                    }
+                  });
+                });
               });
-            });
-          });
+            }
+          );
         }
       );
     }
@@ -190,7 +203,6 @@ router.post("/report-issue", verifyToken, (req, res) => {
           return res.status(500).json({ msg: "Failed to submit report" });
         }
         
-        // Send admin notification using imported helper
         await sendAdminNotification(
           'report_issue',
           'New Issue Report',

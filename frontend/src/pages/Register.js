@@ -21,14 +21,15 @@ function Register() {
     university_id: "",
     university_other: "",
     student_id: "",
-    faculty: "",  // ✅ New field
-    department: "",  // ✅ New field
-    counsellor_consent: false,  // ✅ New field - consent
+    faculty: "",
+    department: "",
+    counsellor_consent: false,
     emergency_contact_name: "",
     emergency_contact_phone: "",
     emergency_contact_relationship: "",
     qualification: "",
-    experience: ""
+    experience: "",
+    parent_email: "" // ✅ NEW
   });
 
   const [error, setError] = useState("");
@@ -75,7 +76,7 @@ function Register() {
     const { name, nickname, dob, gender, email, password, confirmPassword, 
             university_id, university_other, student_id, faculty, department,
             emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
-            counsellor_consent, qualification, experience } = form;
+            counsellor_consent, qualification, experience, parent_email } = form;
 
     if (!name || !dob || !gender || !email || !password) {
       setError("Please fill in all required fields 🌙");
@@ -106,16 +107,20 @@ function Register() {
           gender: form.gender,
           university_id: form.university_id || null,
           student_id: form.student_id,
-          faculty: form.faculty || null,  // ✅ New field
-          department: form.department || null,  // ✅ New field
-          counsellor_consent: form.counsellor_consent,  // ✅ Consent
+          faculty: form.faculty || null,
+          department: form.department || null,
+          counsellor_consent: form.counsellor_consent,
           emergency_contact_name: form.emergency_contact_name,
           emergency_contact_phone: form.emergency_contact_phone,
           emergency_contact_relationship: form.emergency_contact_relationship,
+          parent_email: form.parent_email // ✅ NEW
         });
 
         if (response.data.user_id) {
-          showSuccessToast("Registration successful! Welcome to Lumora 🌿");
+          const msg = response.data.parent_invited 
+            ? "Registration successful! A parent invitation email has been sent. 🌿" 
+            : "Registration successful! Welcome to Lumora 🌿";
+          showSuccessToast(msg);
           navigate("/");
         }
         setLoading(false);
@@ -133,8 +138,8 @@ function Register() {
           gender: form.gender,
           university_id: form.university_id || null,
           student_id: form.student_id || "",
-          faculty: form.faculty || null,  // ✅ New field
-          department: form.department || null,  // ✅ New field
+          faculty: form.faculty || null,
+          department: form.department || null,
           emergency_contact_name: form.emergency_contact_name || "",
           emergency_contact_phone: form.emergency_contact_phone || "",
           emergency_contact_relationship: form.emergency_contact_relationship || "",
@@ -380,7 +385,6 @@ function Register() {
               </div>
             </div>
 
-            {/* ✅ NEW: Faculty and Department Fields */}
             <div style={styles.row}>
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Faculty (optional)</label>
@@ -407,7 +411,28 @@ function Register() {
               </div>
             </div>
 
-            {/* ✅ NEW: Consent Section - Only for Students */}
+            {/* ✅ Parent/Guardian Email Field */}
+            <div style={styles.sectionTitle}>
+              <span>👨‍👩‍👦 Parent/Guardian (Optional)</span>
+              <p style={styles.sectionHint}>Add a parent or guardian to view your well-being summary</p>
+            </div>
+
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Parent/Guardian Email</label>
+              <input
+                name="parent_email"
+                placeholder="parent@example.com"
+                value={form.parent_email}
+                onChange={handleChange}
+                style={styles.input}
+                disabled={loading}
+              />
+              <p style={{ fontSize: "11px", color: "#9ca3af", marginTop: "4px" }}>
+                They will receive login credentials and can view your well-being summary.
+              </p>
+            </div>
+
+            {/* Consent Section - Only for Students */}
             {registerAs === "student" && (
               <div style={styles.consentSection}>
                 <div style={styles.consentHeader}>
@@ -527,7 +552,6 @@ function Register() {
               />
             </div>
 
-            {/* ✅ Only show password fields for students */}
             {registerAs === "student" && (
               <div style={styles.row}>
                 <div style={styles.inputGroup}>
@@ -560,7 +584,6 @@ function Register() {
               </div>
             )}
 
-            {/* ✅ For counsellors, show a note instead */}
             {registerAs === "counsellor" && (
               <div style={{
                 padding: "12px 16px",
@@ -804,7 +827,6 @@ const styles = {
     backgroundColor: "white",
     cursor: "pointer",
   },
-  // ✅ New Consent Styles
   consentSection: {
     marginTop: "8px",
   },

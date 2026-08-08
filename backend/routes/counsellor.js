@@ -31,7 +31,6 @@ router.get("/stats/:counsellor_id", verifyCounsellor, async (req, res) => {
         consentedStudents: 0,
         pendingAppointments: 0,
         pendingAlerts: 0,
-        unreadMessages: 0,
         avgMood: null,
         avgSleep: null,
         message: "Please update your profile with your university."
@@ -81,18 +80,12 @@ router.get("/stats/:counsellor_id", verifyCounsellor, async (req, res) => {
       [counsellorId]
     );
     
-    const [unreadMessages] = await db.promise().query(
-      "SELECT COUNT(*) as count FROM counsellor_messages WHERE counsellor_id = ? AND is_from_counsellor = 0 AND is_read = 0",
-      [counsellorId]
-    );
-    
     res.json({
       totalStudents: totalStudents[0].count || 0,
       activeStudents: activeStudents[0].count || 0,
       consentedStudents: consentedStudents[0].count || 0,
       pendingAppointments: pendingAppointments[0].count || 0,
       pendingAlerts: pendingAlerts[0].count || 0,
-      unreadMessages: unreadMessages[0].count || 0,
       avgMood: avgMoodResult[0]?.avg_mood ? parseFloat(avgMoodResult[0].avg_mood).toFixed(1) : null,
       avgSleep: avgSleepResult[0]?.avg_sleep ? parseFloat(avgSleepResult[0].avg_sleep).toFixed(1) : null
     });
@@ -112,6 +105,8 @@ router.get("/students/:counsellor_id", verifyCounsellor, async (req, res) => {
   const { search, filter, page = 1, limit = 20 } = req.query;
   const offset = (page - 1) * limit;
   
+  console.log("🔍 Counsellor ID:", counsellorId); // ✅ DEBUG
+
   if (req.user.id !== counsellorId) {
     return res.status(403).json({ msg: "Unauthorized" });
   }
@@ -122,9 +117,14 @@ router.get("/students/:counsellor_id", verifyCounsellor, async (req, res) => {
       [counsellorId]
     );
     
+    console.log("🔍 Counsellor data:", counsellor); // ✅ DEBUG
+    
     const universityId = counsellor[0]?.university_id;
     
+    console.log("🔍 University ID:", universityId); // ✅ DEBUG
+    
     if (!universityId) {
+      console.log("⚠️ No university found for counsellor:", counsellorId);
       return res.json({
         students: [],
         total: 0,
@@ -140,7 +140,6 @@ router.get("/students/:counsellor_id", verifyCounsellor, async (req, res) => {
              (SELECT AVG(mood) FROM moods WHERE user_id = u.id AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as avg_mood,
              (SELECT AVG(quality) FROM sleep WHERE user_id = u.id AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as avg_sleep_quality,
              (SELECT COUNT(*) FROM crisis_alerts WHERE student_id = u.id AND is_resolved = 0) as pending_alerts,
-             (SELECT COUNT(*) FROM counsellor_messages WHERE student_id = u.id AND counsellor_id = ? AND is_from_counsellor = 0 AND is_read = 0) as unread_messages,
              (SELECT 
                 JSON_EXTRACT(forecast_data, '$[0].score') 
               FROM stress_forecast 
@@ -153,7 +152,7 @@ router.get("/students/:counsellor_id", verifyCounsellor, async (req, res) => {
       AND u.counsellor_consent = 1
     `;
     
-    let params = [counsellorId, universityId];
+    let params = [universityId]; // ✅ FIX: Use universityId, not counsellorId
     
     if (search) {
       query += " AND (u.name LIKE ? OR u.nickname LIKE ? OR u.email LIKE ?)";
@@ -185,7 +184,12 @@ router.get("/students/:counsellor_id", verifyCounsellor, async (req, res) => {
     query += " ORDER BY u.last_login DESC LIMIT ? OFFSET ?";
     params.push(parseInt(limit), offset);
     
+    console.log("🔍 SQL Query:", query); // ✅ DEBUG
+    console.log("🔍 Params:", params); // ✅ DEBUG
+    
     const [students] = await db.promise().query(query, params);
+    
+    console.log("🔍 Students found:", students.length); // ✅ DEBUG
     
     res.json({
       students: students || [],
@@ -348,7 +352,6 @@ router.get("/stress-forecast/:student_id/:counsellor_id", verifyCounsellor, asyn
   }
 
   try {
-    // Check if student has given consent
     const [student] = await db.promise().query(
       "SELECT counsellor_consent, university_id FROM users WHERE id = ? AND role = 'student'",
       [student_id]
@@ -362,7 +365,6 @@ router.get("/stress-forecast/:student_id/:counsellor_id", verifyCounsellor, asyn
       return res.status(403).json({ msg: "Student has not given consent" });
     }
     
-    // Check if counsellor is from the same university
     const [counsellor] = await db.promise().query(
       "SELECT university_id FROM users WHERE id = ?",
       [counsellor_id]
@@ -372,7 +374,6 @@ router.get("/stress-forecast/:student_id/:counsellor_id", verifyCounsellor, asyn
       return res.status(403).json({ msg: "Student is not from your university" });
     }
     
-    // Get the latest forecast for this student
     const [forecast] = await db.promise().query(
       `SELECT 
         id,
@@ -389,7 +390,6 @@ router.get("/stress-forecast/:student_id/:counsellor_id", verifyCounsellor, asyn
       [student_id]
     );
     
-    // Get upcoming deadlines for this student
     const [deadlines] = await db.promise().query(
       `SELECT id, title, subject, type, due_date, difficulty, is_complete
        FROM deadlines 
@@ -424,62 +424,15 @@ router.get("/stress-forecast/:student_id/:counsellor_id", verifyCounsellor, asyn
 });
 
 // ============================================
-// MESSAGES - COUNSELLOR
+// SEND NOTE TO STUDENT (Replaces Messaging)
 // ============================================
 
-router.get("/messages/:counsellor_id", verifyCounsellor, async (req, res) => {
-  const counsellorId = parseInt(req.params.counsellor_id);
-  const { student_id } = req.query;
-  
-  if (req.user.id !== counsellorId) {
-    return res.status(403).json({ msg: "Unauthorized" });
-  }
-
-  try {
-    let query = `
-      SELECT m.*, 
-             u.name as student_name, 
-             u.nickname as student_nickname,
-             u.email as student_email
-      FROM counsellor_messages m
-      JOIN users u ON m.student_id = u.id
-      WHERE m.counsellor_id = ?
-    `;
-    let params = [counsellorId];
-    
-    if (student_id) {
-      const [student] = await db.promise().query(
-        "SELECT counsellor_consent FROM users WHERE id = ? AND role = 'student'",
-        [student_id]
-      );
-      if (student.length && student[0].counsellor_consent === 0) {
-        return res.status(403).json({ msg: "Student has not given consent" });
-      }
-      query += " AND m.student_id = ?";
-      params.push(student_id);
-    }
-    
-    query += " ORDER BY m.created_at DESC";
-    
-    const [messages] = await db.promise().query(query, params);
-    res.json(messages);
-    
-  } catch (error) {
-    console.error("Messages error:", error);
-    res.status(500).json({ msg: "Failed to fetch messages" });
-  }
-});
-
-// ✅ UPDATED: Send message with notification
-router.post("/messages", verifyCounsellor, async (req, res) => {
-  const { counsellor_id, student_id, subject, message } = req.body;
-  
-  if (req.user.id !== counsellor_id) {
-    return res.status(403).json({ msg: "Unauthorized" });
-  }
+router.post("/send-note", verifyCounsellor, async (req, res) => {
+  const { student_id, subject, message } = req.body;
+  const counsellorId = req.user.id;
 
   if (!student_id || !message) {
-    return res.status(400).json({ msg: "Student and message are required" });
+    return res.status(400).json({ msg: "Student ID and message are required" });
   }
 
   try {
@@ -487,83 +440,31 @@ router.post("/messages", verifyCounsellor, async (req, res) => {
       "SELECT counsellor_consent, name FROM users WHERE id = ? AND role = 'student'",
       [student_id]
     );
-    
+
     if (!student.length) {
       return res.status(404).json({ msg: "Student not found" });
     }
-    
+
     if (student[0].counsellor_consent === 0) {
-      return res.status(403).json({ msg: "Student has not given consent to receive messages" });
+      return res.status(403).json({ msg: "Student has not given consent to receive notes" });
     }
-    
-    const [result] = await db.promise().query(
-      `INSERT INTO counsellor_messages 
-       (counsellor_id, student_id, subject, message, is_from_counsellor, is_read, created_at) 
-       VALUES (?, ?, ?, ?, 1, 0, NOW())`,
-      [counsellor_id, student_id, subject || 'Message from Counsellor', message]
-    );
-    
-    // ✅ CORRECT: user_id = student (who needs to know), related_id = counsellor (who sent)
+
     await db.promise().query(
       `INSERT INTO user_notifications 
        (user_id, title, message, type, related_id, created_at) 
-       VALUES (?, ?, ?, 'university', ?, NOW())`,
+       VALUES (?, ?, ?, 'counsellor_note', ?, NOW())`,
       [
-        student_id,  // user_id = student (recipient)
-        'New Message from Counsellor',
-        `You have a new message from your counsellor: ${subject || 'Message'}`,
-        counsellor_id  // related_id = counsellor (who sent)
+        student_id,
+        subject || 'Note from Counsellor',
+        message,
+        counsellorId
       ]
     );
-    
-    res.json({ 
-      msg: "Message sent successfully", 
-      id: result.insertId 
-    });
+
+    res.json({ msg: "Note sent successfully to student" });
   } catch (error) {
-    console.error("Send message error:", error);
-    res.status(500).json({ msg: "Failed to send message" });
-  }
-});
-
-router.get("/messages/unread-count/:counsellor_id", verifyCounsellor, async (req, res) => {
-  const counsellorId = parseInt(req.params.counsellor_id);
-  
-  if (req.user.id !== counsellorId) {
-    return res.status(403).json({ msg: "Unauthorized" });
-  }
-
-  try {
-    const [result] = await db.promise().query(
-      "SELECT COUNT(*) as count FROM counsellor_messages WHERE counsellor_id = ? AND is_from_counsellor = 0 AND is_read = 0",
-      [counsellorId]
-    );
-    
-    res.json({ count: result[0].count });
-  } catch (error) {
-    console.error("Unread count error:", error);
-    res.status(500).json({ msg: "Failed to get unread count" });
-  }
-});
-
-router.put("/messages/:id/read", verifyCounsellor, async (req, res) => {
-  const { id } = req.params;
-  const counsellorId = req.user.id;
-
-  try {
-    const [result] = await db.promise().query(
-      "UPDATE counsellor_messages SET is_read = 1 WHERE id = ? AND counsellor_id = ?",
-      [id, counsellorId]
-    );
-    
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ msg: "Message not found" });
-    }
-    
-    res.json({ msg: "Message marked as read" });
-  } catch (error) {
-    console.error("Mark read error:", error);
-    res.status(500).json({ msg: "Failed to mark message as read" });
+    console.error("Send note error:", error);
+    res.status(500).json({ msg: "Failed to send note" });
   }
 });
 
@@ -620,16 +521,15 @@ router.post("/appointments/student", verifyToken, async (req, res) => {
       [student_id, counsellor_id, session_date, duration || 60, notes || null]
     );
     
-    // ✅ CORRECT: user_id = counsellor (who needs to be notified), related_id = student (who requested)
     await db.promise().query(
       `INSERT INTO user_notifications 
        (user_id, title, message, type, related_id, created_at) 
        VALUES (?, ?, ?, 'university', ?, NOW())`,
       [
-        counsellor_id,  // user_id = counsellor (recipient)
+        counsellor_id,
         'New Appointment Request',
         `A student has requested an appointment on ${new Date(session_date).toLocaleString()}`,
-        student_id  // related_id = student (who requested)
+        student_id
       ]
     );
     
@@ -708,11 +608,10 @@ router.get("/appointments/:counsellor_id", verifyCounsellor, async (req, res) =>
   }
 });
 
-// ✅ UPDATED: Counsellor updates appointment status with notification
-// COUNSELLOR: Update appointment status (accept/decline/complete)
+// COUNSELLOR: Update appointment status
 router.put("/appointments/:id/status", verifyCounsellor, async (req, res) => {
   const { id } = req.params;
-  const { status, notes } = req.body; // ✅ ADD notes to destructuring
+  const { status, notes } = req.body;
   const counsellorId = req.user.id;
 
   if (!['pending', 'confirmed', 'completed', 'cancelled'].includes(status)) {
@@ -720,7 +619,6 @@ router.put("/appointments/:id/status", verifyCounsellor, async (req, res) => {
   }
 
   try {
-    // Get the appointment to check if it belongs to this counsellor
     const [appointment] = await db.promise().query(
       "SELECT student_id, counsellor_id, session_date FROM counselling_sessions WHERE id = ?",
       [id]
@@ -734,7 +632,6 @@ router.put("/appointments/:id/status", verifyCounsellor, async (req, res) => {
       return res.status(403).json({ msg: "Unauthorized" });
     }
     
-    // ✅ UPDATE: Include notes if provided
     let updateQuery = "UPDATE counselling_sessions SET status = ?";
     let params = [status];
     
@@ -748,7 +645,6 @@ router.put("/appointments/:id/status", verifyCounsellor, async (req, res) => {
     
     await db.promise().query(updateQuery, params);
     
-    // Create notification for student
     const statusMessages = {
       confirmed: 'Your appointment has been confirmed! ✅',
       cancelled: 'Your appointment has been cancelled. ❌',
@@ -800,16 +696,15 @@ router.post("/appointments", verifyCounsellor, async (req, res) => {
       [student_id, counsellor_id, session_date, duration || 60, notes || null]
     );
     
-    // ✅ CORRECT: user_id = student (who needs to know), related_id = counsellor (who scheduled)
     await db.promise().query(
       `INSERT INTO user_notifications 
        (user_id, title, message, type, related_id, created_at) 
        VALUES (?, ?, ?, 'university', ?, NOW())`,
       [
-        student_id,  // user_id = student (recipient)
+        student_id,
         'Appointment Scheduled',
         `Your counsellor has scheduled an appointment for you on ${new Date(session_date).toLocaleString()}`,
-        counsellor_id  // related_id = counsellor (who scheduled)
+        counsellor_id
       ]
     );
     
@@ -1020,6 +915,42 @@ router.get("/analytics/:counsellor_id", verifyCounsellor, async (req, res) => {
 });
 
 // ============================================
+// COUNSELLOR: Delete Appointment
+// ============================================
+
+router.delete("/appointments/:id", verifyCounsellor, async (req, res) => {
+  const { id } = req.params;
+  const counsellorId = req.user.id;
+
+  try {
+    // Check if appointment exists and belongs to this counsellor
+    const [appointment] = await db.promise().query(
+      "SELECT counsellor_id FROM counselling_sessions WHERE id = ?",
+      [id]
+    );
+
+    if (!appointment.length) {
+      return res.status(404).json({ msg: "Appointment not found" });
+    }
+
+    if (appointment[0].counsellor_id !== counsellorId) {
+      return res.status(403).json({ msg: "Unauthorized" });
+    }
+
+    // Delete the appointment
+    await db.promise().query(
+      "DELETE FROM counselling_sessions WHERE id = ?",
+      [id]
+    );
+
+    res.json({ msg: "Appointment deleted successfully" });
+  } catch (error) {
+    console.error("Delete appointment error:", error);
+    res.status(500).json({ msg: "Failed to delete appointment" });
+  }
+});
+
+// ============================================
 // WELLNESS REPORT - PDF
 // ============================================
 
@@ -1031,7 +962,6 @@ router.get("/wellness-report/:student_id/:counsellor_id", verifyCounsellor, asyn
   }
 
   try {
-    // Check if student has given consent
     const [student] = await db.promise().query(
       "SELECT counsellor_consent, university_id FROM users WHERE id = ? AND role = 'student'",
       [student_id]
@@ -1045,7 +975,6 @@ router.get("/wellness-report/:student_id/:counsellor_id", verifyCounsellor, asyn
       return res.status(403).json({ msg: "Student has not given consent" });
     }
     
-    // Check if counsellor is from the same university
     const [counsellor] = await db.promise().query(
       "SELECT university_id FROM users WHERE id = ?",
       [counsellor_id]
@@ -1055,17 +984,12 @@ router.get("/wellness-report/:student_id/:counsellor_id", verifyCounsellor, asyn
       return res.status(403).json({ msg: "Student is not from your university" });
     }
 
-    // Generate the report
     const { generateWellnessReport, buildPDF } = require("../services/wellnessReportService");
     const { doc, filename, reportData } = await generateWellnessReport(student_id, counsellor_id);
     
-    // Build the PDF
     buildPDF(doc, reportData);
-    
-    // End the PDF
     doc.end();
 
-    // Send the PDF
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     doc.pipe(res);

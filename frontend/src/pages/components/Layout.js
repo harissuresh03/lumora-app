@@ -8,7 +8,7 @@ import { Shield, Heart, RefreshCw } from "lucide-react";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast } from "./ToastNotification";
 
-function Layout({ children }) {
+function Layout({ children, customMenuItems }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showCrisisModal, setShowCrisisModal] = useState(false);
   const [crisisHotlines, setCrisisHotlines] = useState([]);
@@ -43,7 +43,6 @@ function Layout({ children }) {
   const refreshData = async () => {
     setRefreshing(true);
     try {
-      // Refresh the current page by reloading
       window.location.reload();
     } catch (err) {
       console.error("Refresh error:", err);
@@ -57,7 +56,6 @@ function Layout({ children }) {
     return number.replace(/[^0-9+]/g, '');
   };
 
-  // Get first letter for avatar
   const getInitial = (name) => {
     return name?.charAt(0)?.toUpperCase() || 'U';
   };
@@ -71,10 +69,10 @@ function Layout({ children }) {
         <div className="blob3"></div>
       </div>
 
-      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} customMenuItems={customMenuItems} />
 
       <div className="content-wrapper">
-        {/* ✅ TOP BAR - Same as dashboard but without welcome section */}
+        {/* TOP BAR */}
         <motion.div 
           className="top-bar"
           initial={{ opacity: 0, y: -20 }}
@@ -82,7 +80,6 @@ function Layout({ children }) {
           transition={{ duration: 0.3 }}
           style={{ marginBottom: '24px' }}
         >
-          {/* ✅ Pill container - Same as dashboard */}
           <div style={{ 
             display: 'flex', 
             alignItems: 'center', 
@@ -101,10 +98,8 @@ function Layout({ children }) {
             {/* Notification Bell */}
             <NotificationBell userId={parseInt(userId)} />
 
-            {/* Divider */}
             <div style={{ width: '1px', height: '24px', background: 'var(--border-light)' }} />
 
-            {/* Refresh Button */}
             <button
               onClick={refreshData}
               disabled={refreshing}
@@ -138,10 +133,8 @@ function Layout({ children }) {
               <RefreshCw size={16} className={refreshing ? 'spinning' : ''} />
             </button>
 
-            {/* Divider */}
             <div style={{ width: '1px', height: '24px', background: 'var(--border-light)' }} />
 
-            {/* User Info */}
             <div style={{ 
               display: 'flex', 
               alignItems: 'center', 
@@ -172,10 +165,8 @@ function Layout({ children }) {
               </span>
             </div>
 
-            {/* Divider */}
             <div style={{ width: '1px', height: '24px', background: 'var(--border-light)' }} />
 
-            {/* Logout Button */}
             <button
               onClick={() => {
                 localStorage.clear();

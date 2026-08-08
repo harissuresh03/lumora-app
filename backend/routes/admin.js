@@ -31,24 +31,17 @@ router.get("/stats", verifyAdmin, async (req, res) => {
     const [students] = await db.promise().query("SELECT COUNT(*) as count FROM users WHERE role = 'student'");
     const [counsellors] = await db.promise().query("SELECT COUNT(*) as count FROM users WHERE role = 'counsellor'");
     const [admins] = await db.promise().query("SELECT COUNT(*) as count FROM users WHERE role = 'admin'");
+    const [parents] = await db.promise().query("SELECT COUNT(*) as count FROM users WHERE role = 'parent'");
     const [newUsersWeek] = await db.promise().query("SELECT COUNT(*) as count FROM users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
     const [activeUsers] = await db.promise().query("SELECT COUNT(*) as count FROM users WHERE last_login >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
     
-    let totalPosts = 0;
+    // Removed totalPosts and totalGroups queries (no longer needed)
     let pendingReports = 0;
-    let totalGroups = 0;
-    
     try {
-      const postsSnapshot = await firestore.collection("posts").get();
-      totalPosts = postsSnapshot.size;
-      
-      const reportsSnapshot = await firestore.collection("posts").where("status", "==", "reported").get();
+      const reportsSnapshot = await firestore.collection("reports").where("status", "==", "pending").get();
       pendingReports = reportsSnapshot.size;
-      
-      const groupsSnapshot = await firestore.collection("groups").get();
-      totalGroups = groupsSnapshot.size;
     } catch (firebaseError) {
-      console.error("Firebase stats error:", firebaseError);
+      console.error("Firebase reports error:", firebaseError);
     }
     
     const [pendingIssues] = await db.promise().query("SELECT COUNT(*) as count FROM issue_reports WHERE status = 'pending'");
@@ -58,10 +51,10 @@ router.get("/stats", verifyAdmin, async (req, res) => {
       students: students[0].count,
       counsellors: counsellors[0].count,
       admins: admins[0].count,
+      parents: parents[0].count, // ✅ Added parent count
       newUsersWeek: newUsersWeek[0].count,
       activeUsers: activeUsers[0].count,
-      totalPosts,
-      totalGroups,
+      // totalPosts and totalGroups removed
       pendingReports,
       pendingIssues: pendingIssues[0].count || 0
     });

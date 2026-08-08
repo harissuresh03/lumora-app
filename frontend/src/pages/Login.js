@@ -11,41 +11,60 @@ function Login() {
   const [error, setError] = useState("");
 
   const handleLogin = async (e) => {
-    e.preventDefault();
-    setError("");
+  e.preventDefault();
+  setError("");
 
-    if (!email || !password) {
-      setError("Please enter your details gently 💙");
-      return;
+  if (!email || !password) {
+    setError("Please enter your details gently 💙");
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    // Try regular login first
+    const res = await api.post("/auth/login", {
+      email,
+      password,
+    });
+
+    localStorage.setItem("token", res.data.token);
+    localStorage.setItem("user_id", res.data.user_id);
+    localStorage.setItem("user_role", res.data.role);
+    localStorage.setItem("user_name", res.data.name || "");
+    localStorage.setItem("user_nickname", res.data.nickname || "");
+
+    // Redirect based on role
+    if (res.data.role === 'admin') {
+      navigate("/admin");
+    } else if (res.data.role === 'counsellor') {
+      navigate("/counsellor");
+    } else if (res.data.role === 'parent') {
+      navigate("/parent/dashboard");
+    } else {
+      navigate("/dashboard");
     }
-
+  } catch (err) {
+    // If student login fails, try parent login
     try {
-      setLoading(true);
-
-      const res = await api.post("/auth/login", {
+      const parentRes = await api.post("/parent/login", {
         email,
         password,
       });
-
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("user_id", res.data.user_id);
-      localStorage.setItem("user_role", res.data.role);
-      localStorage.setItem("user_name", res.data.name);
-      localStorage.setItem("user_nickname", res.data.nickname || "");
-
-      // Redirect based on role
-      if (res.data.role === 'admin') {
-        navigate("/admin");
-      } else {
-        navigate("/dashboard");
-      }
-    } catch (err) {
-      console.error("Login error:", err);
+      
+      localStorage.setItem("token", parentRes.data.token);
+      localStorage.setItem("user_id", parentRes.data.user_id);
+      localStorage.setItem("user_role", parentRes.data.role);
+      localStorage.setItem("user_name", parentRes.data.name || "Parent");
+      
+      navigate("/parent/dashboard");
+    } catch (parentErr) {
       setError(err.response?.data?.msg || "We couldn't log you in 🌙");
-    } finally {
-      setLoading(false);
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div style={styles.container}>

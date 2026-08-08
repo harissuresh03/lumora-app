@@ -382,6 +382,103 @@ const sendAccountApprovalEmail = async (email, name, accountType = 'student') =>
 };
 
 /**
+ * Send parent invitation email
+ * @param {string} parentEmail - Parent's email address
+ * @param {string} studentName - Student's name
+ * @returns {Promise<Object>} - Email send result
+ */
+const sendParentInvitationEmail = async (parentEmail, studentName) => {
+  const subject = `📋 ${studentName} has invited you to view their well-being on Lumora`;
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+  const loginLink = `${frontendUrl}`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Parent Invitation</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8fafc; }
+        .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 32px 30px; text-align: center; border-radius: 12px 12px 0 0; }
+        .header h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+        .header p { margin: 8px 0 0; opacity: 0.9; font-size: 14px; }
+        .content { background: #ffffff; padding: 32px 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .content h2 { font-size: 20px; margin-top: 0; color: #1e293b; }
+        .content p { color: #475569; margin: 12px 0; }
+        .credentials { background: #eef2ff; padding: 20px 24px; border-radius: 12px; margin: 16px 0; border-left: 4px solid #6366f1; }
+        .credentials strong { color: #1e293b; }
+        .credentials code { background: #e2e8f0; padding: 4px 12px; border-radius: 6px; font-size: 16px; font-family: monospace; color: #1e293b; font-weight: 600; }
+        .warning { background: #fef3c7; padding: 12px 16px; border-radius: 8px; margin: 12px 0; border-left: 4px solid #f59e0b; font-size: 13px; color: #92400e; }
+        .button { display: inline-block; padding: 12px 32px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; text-decoration: none; border-radius: 30px; font-weight: 600; margin: 16px 0; transition: transform 0.2s; }
+        .button:hover { transform: scale(1.02); }
+        .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
+        .footer a { color: #6366f1; text-decoration: none; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>✨ Lumora</h1>
+        <p>Mental Health Support Platform</p>
+      </div>
+      <div class="content">
+        <h2>You've Been Invited! 👋</h2>
+        <p>Dear Parent,</p>
+        <p><strong>${studentName}</strong> has invited you to view their mental health and well-being summary on Lumora.</p>
+        <p>This is a secure, read-only view that helps you stay informed and support your child's mental health journey.</p>
+        
+        <div class="credentials">
+          <strong>🔑 Your Login Credentials:</strong><br>
+          <strong>Email:</strong> <code>${parentEmail}</code><br>
+          <strong>Password:</strong> <code>password123</code>
+        </div>
+        
+        <div class="warning">
+          ⚠️ <strong>Important:</strong> Please change your password after your first login for security purposes.
+        </div>
+
+        <div style="text-align: center;">
+          <a href="${loginLink}" class="button">🚀 Go to Lumora</a>
+        </div>
+
+        <p style="color: #475569; font-size: 14px; margin-top: 20px;">
+          If you did not expect this invitation, you can safely ignore this email.
+        </p>
+        <p style="color: #475569; font-size: 14px; margin-bottom: 0;">
+          Warm regards,<br>
+          <strong style="color: #1e293b;">The Lumora Team 💙</strong>
+        </p>
+      </div>
+      <div class="footer">
+        <p>This email was sent to <a href="mailto:${parentEmail}">${parentEmail}</a>.</p>
+        <p>© ${new Date().getFullYear()} Lumora Mental Health Platform. All rights reserved.</p>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const text = `
+    ${studentName} has invited you to view their well-being on Lumora.
+
+    Your Login Credentials:
+    Email: ${parentEmail}
+    Password: password123
+
+    IMPORTANT: Please change your password after your first login.
+
+    Go to Lumora: ${frontendUrl}
+
+    If you did not expect this invitation, you can safely ignore this email.
+
+    Warm regards,
+    The Lumora Team 💙
+  `;
+
+  return await sendEmail({ to: parentEmail, subject, html, text });
+};
+
+/**
  * Send crisis alert email to counsellor
  * @param {string} counsellorEmail - Counsellor's email address
  * @param {string} counsellorName - Counsellor's name
@@ -500,5 +597,6 @@ module.exports = {
   sendCounsellorApprovalEmail,
   sendCounsellorRejectionEmail,
   sendAccountApprovalEmail,
+  sendParentInvitationEmail,
   sendCrisisAlertEmail,
 };

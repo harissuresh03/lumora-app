@@ -17,10 +17,12 @@ import {
   Award,
   RefreshCw,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  BarChart3
 } from "lucide-react";
 import api from "../../utils/api";
 import { showErrorToast, showSuccessToast } from "./ToastNotification";
+import AssessmentHistoryGraph from "./AssessmentHistoryGraph";
 
 function Recommendations({ userId }) {
   const [recommendations, setRecommendations] = useState([]);
@@ -32,12 +34,15 @@ function Recommendations({ userId }) {
   const [selectedTip, setSelectedTip] = useState(null);
   const [showTipModal, setShowTipModal] = useState(false);
   
-  // Assessment history state
+  // ✅ Assessment history state
   const [assessmentHistory, setAssessmentHistory] = useState({
     phq9: null,
     gad7: null,
     pss: null
   });
+  
+  // ✅ Single graph visibility
+  const [showGraph, setShowGraph] = useState(false);
 
   useEffect(() => {
     if (userId) {
@@ -111,6 +116,11 @@ function Recommendations({ userId }) {
     }));
   };
 
+  // ✅ Toggle graph visibility
+  const toggleGraph = () => {
+    setShowGraph(!showGraph);
+  };
+
   const handleAssessmentClick = (type) => {
     window.dispatchEvent(new CustomEvent('openAssessment', { detail: { type } }));
   };
@@ -178,11 +188,12 @@ function Recommendations({ userId }) {
     return Math.floor((now - lastTaken) / (1000 * 60 * 60 * 24));
   };
 
-  // ✅ Render assessment card
+  // ✅ RENDER ASSESSMENT CARD
   const renderAssessmentCard = (type, data, label, icon, maxScore, retakeDays) => {
     const daysSince = data ? getDaysSince(data.taken_at) : null;
     const isOverdue = data ? daysSince >= retakeDays : true;
     const severityColor = data ? getSeverityColor(data.severity) : '#9ca3af';
+    const hasData = data !== null;
     
     return (
       <div style={{
@@ -218,7 +229,7 @@ function Recommendations({ userId }) {
         </div>
 
         <div style={{ marginTop: '12px' }}>
-          {data ? (
+          {hasData ? (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -238,7 +249,7 @@ function Recommendations({ userId }) {
                   border: '1px solid rgba(239, 68, 68, 0.2)'
                 }}>
                   <p style={{ fontSize: '12px', color: '#ef4444', margin: 0 }}>
-                    ⏰ Retake now ({daysSince} days ago)
+                    ⏰ {daysSince} days ago - Time to retake
                   </p>
                 </div>
               ) : (
@@ -265,25 +276,37 @@ function Recommendations({ userId }) {
           )}
         </div>
 
+        {/* ✅ Only "Retake Assessment" button */}
         <button
           onClick={() => handleAssessmentClick(type)}
           style={{
             marginTop: '16px',
             width: '100%',
             padding: '10px',
-            background: isOverdue && data ? '#ef4444' : 'var(--accent-gradient)',
+            background: isOverdue && hasData ? '#ef4444' : 'var(--accent-gradient)',
             border: 'none',
             borderRadius: '10px',
             color: 'white',
             cursor: 'pointer',
             fontSize: '13px',
             fontWeight: 500,
-            transition: 'all 0.2s'
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px'
           }}
           onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
           onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
         >
-          {data ? (isOverdue ? 'Retake Assessment' : 'View Results') : 'Take Assessment'}
+          {hasData ? (
+            <>
+              <RefreshCw size={14} />
+              Retake Assessment
+            </>
+          ) : (
+            'Take Assessment'
+          )}
         </button>
       </div>
     );
@@ -386,27 +409,67 @@ function Recommendations({ userId }) {
 
   return (
     <div style={{ marginBottom: '28px' }}>
-      {/* ✅ Assessment Cards - Always Visible */}
+      {/* ✅ Assessment Cards with "View Assessment History" button at top */}
       <div style={{ marginBottom: '24px' }}>
-        <h3 style={{ 
-          fontSize: '18px', 
-          fontWeight: 600, 
-          marginBottom: '16px',
-          display: 'flex',
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
           alignItems: 'center',
-          gap: '8px'
+          flexWrap: 'wrap',
+          gap: '12px',
+          marginBottom: '16px'
         }}>
-          <Brain size={20} color="var(--accent-primary)" />
-          Mental Health Screenings
-          <span style={{ 
-            fontSize: '12px', 
-            fontWeight: 400, 
-            color: 'var(--text-muted)',
-            marginLeft: '8px'
+          <h3 style={{ 
+            fontSize: '18px', 
+            fontWeight: 600, 
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
           }}>
-            (Retake regularly for accurate tracking)
-          </span>
-        </h3>
+            <Brain size={20} color="var(--accent-primary)" />
+            Mental Health Screenings
+            <span style={{ 
+              fontSize: '12px', 
+              fontWeight: 400, 
+              color: 'var(--text-muted)',
+              marginLeft: '8px'
+            }}>
+              (Retake regularly for accurate tracking)
+            </span>
+          </h3>
+          
+          {/* ✅ Single "View Assessment History" Button at top */}
+          <button
+            onClick={toggleGraph}
+            style={{
+              padding: '8px 20px',
+              borderRadius: '30px',
+              border: '1px solid var(--accent-primary)',
+              background: showGraph ? 'var(--accent-soft)' : 'var(--card-bg-glass)',
+              color: 'var(--accent-primary)',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s',
+              boxShadow: 'var(--shadow-sm)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--accent-soft)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = showGraph ? 'var(--accent-soft)' : 'var(--card-bg-glass)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <BarChart3 size={16} />
+            {showGraph ? 'Hide History' : 'View Assessment History'}
+          </button>
+        </div>
         
         <div style={{ 
           display: 'grid', 
@@ -420,7 +483,7 @@ function Recommendations({ userId }) {
             'Depression Screening', 
             '📋', 
             27, 
-            14  // Retake every 14 days
+            14
           )}
           
           {/* GAD-7 Card */}
@@ -430,22 +493,36 @@ function Recommendations({ userId }) {
             'Anxiety Screening', 
             '😰', 
             21, 
-            30  // Retake every 30 days
+            30
           )}
           
-          {/* PSS-10 Card */}
+          {/* ✅ PSS-10 Card (Stress Screening) */}
           {renderAssessmentCard(
             'pss', 
             assessmentHistory.pss, 
             'Stress Screening', 
             '📊', 
             40, 
-            30  // Retake every 30 days
+            30
           )}
         </div>
+
+        {/* ✅ Assessment History Graph (using the existing component) */}
+        <AnimatePresence>
+          {showGraph && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, overflow: 'hidden' }}
+              animate={{ opacity: 1, height: 'auto', overflow: 'visible' }}
+              exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
+              transition={{ duration: 0.3 }}
+            >
+              <AssessmentHistoryGraph userId={userId} />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* No data message (only if no data AND no assessments) */}
+      {/* No data message */}
       {!hasEnoughData && recommendations.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -468,7 +545,7 @@ function Recommendations({ userId }) {
         </motion.div>
       )}
 
-      {/* ✅ Recommendations Section */}
+      {/* Recommendations Section */}
       {recommendations.length > 0 && (
         <div>
           <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>

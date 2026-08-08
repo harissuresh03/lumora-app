@@ -11,7 +11,6 @@ import {
   Mail, 
   Globe, 
   Heart, 
-  LogOut, 
   ArrowLeft, 
   User, 
   MessageCircle, 
@@ -19,15 +18,9 @@ import {
   Building, 
   ExternalLink, 
   Clock,
-  Inbox,
-  ChevronDown,
-  ChevronUp,
-  CheckCircle,
   Calendar,
   BookOpen,
-  MessageSquare,
   Plus,
-  X,
   FileSpreadsheet,
   AlertCircle
 } from "lucide-react";
@@ -38,14 +31,6 @@ function StudentSupport() {
   const [userNickname, setUserNickname] = useState("");
   const [supportData, setSupportData] = useState(null);
   const [loading, setLoading] = useState(true);
-  
-  // Message state
-  const [messages, setMessages] = useState([]);
-  const [counsellor, setCounsellor] = useState(null);
-  const [messageLoading, setMessageLoading] = useState(true);
-  const [expandedMessage, setExpandedMessage] = useState(null);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [activeTab, setActiveTab] = useState("resources");
   
   // Appointment state
   const [appointments, setAppointments] = useState([]);
@@ -58,6 +43,8 @@ function StudentSupport() {
     duration: 60,
     notes: ""
   });
+  const [counsellors, setCounsellors] = useState([]);
+  const [activeTab, setActiveTab] = useState("resources");
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -72,38 +59,18 @@ function StudentSupport() {
       try {
         const res = await api.get(`/support/${user_id}`);
         setSupportData(res.data);
-      } catch (err) { console.error("Support resources error:", err); }
-      finally { setLoading(false); }
-    };
-
-    const fetchMessages = async () => {
-      try {
-        setMessageLoading(true);
-        const res = await api.get(`/student-message/messages/${user_id}`);
-        setMessages(res.data.messages || []);
-        setCounsellor(res.data.counsellor || null);
         
-        // Auto-fill counsellor ID for appointment form
-        if (res.data.counsellor) {
+        // ✅ Get counsellors from response
+        if (res.data.counsellors && res.data.counsellors.length > 0) {
+          setCounsellors(res.data.counsellors);
+          // Auto-select first counsellor
           setAppointmentForm(prev => ({
             ...prev,
-            counsellor_id: res.data.counsellor.id
+            counsellor_id: res.data.counsellors[0].id
           }));
         }
-      } catch (err) {
-        console.error("Fetch messages error:", err);
-      } finally {
-        setMessageLoading(false);
-      }
-    };
-
-    const fetchUnreadCount = async () => {
-      try {
-        const res = await api.get(`/student-message/messages/unread-count/${user_id}`);
-        setUnreadCount(res.data.count || 0);
-      } catch (err) {
-        console.error("Fetch unread count error:", err);
-      }
+      } catch (err) { console.error("Support resources error:", err); }
+      finally { setLoading(false); }
     };
 
     const fetchAppointments = async () => {
@@ -120,25 +87,14 @@ function StudentSupport() {
 
     fetchUserProfile();
     fetchSupportResources();
-    fetchMessages();
-    fetchUnreadCount();
     fetchAppointments();
 
-    // Refresh every 30 seconds
     const interval = setInterval(() => {
-      fetchMessages();
-      fetchUnreadCount();
       fetchAppointments();
     }, 30000);
 
     return () => clearInterval(interval);
   }, [user_id]);
-
-  const logout = () => {
-    localStorage.clear();
-    navigate("/");
-    showInfoToast("Logged out successfully. Take care! 💙");
-  };
 
   const openExternalLink = (url) => { 
     if (url) window.open(url, "_blank", "noopener noreferrer"); 
@@ -147,16 +103,6 @@ function StudentSupport() {
   const handleCall = (number) => {
     const phoneNumber = number.replace(/[^0-9+]/g, '');
     window.location.href = `tel:${phoneNumber}`;
-  };
-
-  const formatDate = (date) => {
-    if (!date) return "";
-    const d = new Date(date);
-    const now = new Date();
-    if (d.toDateString() === now.toDateString()) {
-      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    }
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const formatDateTime = (date) => {
@@ -170,14 +116,7 @@ function StudentSupport() {
     });
   };
 
-  const toggleMessageExpand = (id) => {
-    setExpandedMessage(expandedMessage === id ? null : id);
-  };
-
-  // ============================================
-  // APPOINTMENT FUNCTIONS
-  // ============================================
-
+  // Appointment functions
   const handleScheduleAppointment = async (e) => {
     e.preventDefault();
     
@@ -187,13 +126,13 @@ function StudentSupport() {
     }
 
     if (!appointmentForm.counsellor_id) {
-      showErrorToast("No counsellor available for your university");
+      showErrorToast("Please select a counsellor");
       return;
     }
 
     setSubmitting(true);
     try {
-      const res = await api.post("/counsellor/appointments/student", {
+      await api.post("/counsellor/appointments/student", {
         student_id: parseInt(user_id),
         counsellor_id: parseInt(appointmentForm.counsellor_id),
         session_date: appointmentForm.session_date,
@@ -204,13 +143,12 @@ function StudentSupport() {
       showSuccessToast("Appointment request sent! Waiting for counsellor confirmation.");
       setShowAppointmentModal(false);
       setAppointmentForm({
-        counsellor_id: appointmentForm.counsellor_id,
+        counsellor_id: counsellors.length > 0 ? counsellors[0].id : "",
         session_date: "",
         duration: 60,
         notes: ""
       });
       
-      // Refresh appointments
       const refreshRes = await api.get(`/counsellor/appointments/student/${user_id}`);
       setAppointments(refreshRes.data || []);
     } catch (err) {
@@ -269,8 +207,6 @@ function StudentSupport() {
 
   return (
     <Layout>
-
-      {/* Page Header */}
       <motion.div 
         className="page-header"
         initial={{ opacity: 0, x: -20 }}
@@ -320,46 +256,6 @@ function StudentSupport() {
           <BookOpen size={16} /> Resources
         </button>
         <button 
-          className={`support-tab ${activeTab === "messages" ? "support-tab-active" : ""}`} 
-          onClick={() => setActiveTab("messages")}
-          style={{
-            padding: '12px 24px',
-            borderRadius: '12px 12px 0 0',
-            border: 'none',
-            background: activeTab === "messages" ? 'var(--accent-gradient)' : 'transparent',
-            color: activeTab === "messages" ? 'white' : 'var(--text-secondary)',
-            fontWeight: activeTab === "messages" ? 600 : 500,
-            cursor: 'pointer',
-            fontSize: '14px',
-            transition: 'all 0.3s',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            position: 'relative'
-          }}
-        >
-          <MessageSquare size={16} /> Messages
-          {unreadCount > 0 && (
-            <span style={{
-              position: 'absolute',
-              top: '-6px',
-              right: '-6px',
-              background: '#ef4444',
-              color: 'white',
-              fontSize: '10px',
-              borderRadius: '50%',
-              width: '20px',
-              height: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 'bold'
-            }}>
-              {unreadCount}
-            </span>
-          )}
-        </button>
-        <button 
           className={`support-tab ${activeTab === "appointments" ? "support-tab-active" : ""}`} 
           onClick={() => setActiveTab("appointments")}
           style={{
@@ -386,7 +282,6 @@ function StudentSupport() {
       {/* ============================================ */}
       {activeTab === "resources" && (
         <>
-          {/* University Banner */}
           {supportData?.hasUniversity && supportData.universityName && (
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
@@ -428,7 +323,6 @@ function StudentSupport() {
             </motion.div>
           )}
 
-          {/* University Resources */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -659,83 +553,71 @@ function StudentSupport() {
       )}
 
       {/* ============================================ */}
-      {/* MESSAGES TAB */}
+      {/* APPOINTMENTS TAB */}
       {/* ============================================ */}
-      {activeTab === "messages" && (
+      {activeTab === "appointments" && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          {/* Counsellor Info */}
-          {counsellor ? (
-            <div style={{
-              background: 'var(--card-bg-glass)',
-              backdropFilter: 'var(--glass-blur)',
-              borderRadius: '16px',
-              padding: '20px 24px',
-              border: '1px solid var(--border-glass)',
-              marginBottom: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '16px'
-            }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                background: 'var(--accent-gradient)',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: '20px',
-                fontWeight: 600
-              }}>
-                {counsellor.nickname?.charAt(0) || counsellor.name?.charAt(0) || 'C'}
-              </div>
-              <div>
-                <h4 style={{ margin: 0, fontSize: '16px' }}>
-                  Your Counsellor: {counsellor.nickname || counsellor.name}
-                </h4>
-                <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
-                  {unreadCount > 0 ? `📬 ${unreadCount} unread message${unreadCount > 1 ? 's' : ''}` : 'No unread messages'}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div style={{
-              textAlign: 'center',
-              padding: '40px',
-              background: 'var(--card-bg-glass)',
-              borderRadius: '16px',
-              border: '1px solid var(--border-glass)',
-              marginBottom: '24px'
-            }}>
-              <Shield size={40} color="var(--text-muted)" />
-              <p style={{ marginTop: '12px', color: 'var(--text-secondary)' }}>
-                No counsellor assigned to your university yet.
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '24px',
+            flexWrap: 'wrap',
+            gap: '16px'
+          }}>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '16px' }}>
+                Your Appointments
+              </h4>
+              <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                {appointments.filter(a => a.status === 'pending').length} pending appointment{appointments.filter(a => a.status === 'pending').length !== 1 ? 's' : ''}
               </p>
             </div>
-          )}
+            
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              {appointments.length > 0 && (
+                <ExportButton 
+                  type="appointments" 
+                  userId={parseInt(user_id)} 
+                  label="Export CSV"
+                  icon={<FileSpreadsheet size={16} />}
+                  variant="primary"
+                />
+              )}
+              
+              <button
+                onClick={() => setShowAppointmentModal(true)}
+                disabled={counsellors.length === 0}
+                style={{
+                  padding: '10px 24px',
+                  background: counsellors.length > 0 ? 'var(--accent-gradient)' : 'var(--bg-secondary)',
+                  border: 'none',
+                  borderRadius: '30px',
+                  color: counsellors.length > 0 ? 'white' : 'var(--text-muted)',
+                  cursor: counsellors.length > 0 ? 'pointer' : 'not-allowed',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  opacity: counsellors.length > 0 ? 1 : 0.6
+                }}
+              >
+                <Plus size={16} /> Request Appointment
+              </button>
+            </div>
+          </div>
 
-          {/* Messages List */}
-          <h3 style={{ 
-            fontSize: '16px', 
-            marginBottom: '16px', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px' 
-          }}>
-            <Inbox size={18} /> Messages {messages.length > 0 && `(${messages.length})`}
-          </h3>
-
-          {messageLoading ? (
+          {appointmentLoading ? (
             <div style={{ textAlign: 'center', padding: '40px' }}>
               <div className="spinner" style={{ width: '30px', height: '30px' }}></div>
-              <p style={{ marginTop: '12px', color: 'var(--text-muted)' }}>Loading messages...</p>
+              <p style={{ marginTop: '12px', color: 'var(--text-muted)' }}>Loading appointments...</p>
             </div>
-          ) : messages.length === 0 ? (
+          ) : appointments.length === 0 ? (
             <div style={{
               textAlign: 'center',
               padding: '60px 40px',
@@ -743,107 +625,104 @@ function StudentSupport() {
               borderRadius: '16px',
               border: '1px solid var(--border-glass)'
             }}>
-              <MessageCircle size={48} style={{ marginBottom: '16px', opacity: 0.3 }} />
-              <h4>No messages yet</h4>
+              <Calendar size={48} style={{ marginBottom: '16px', opacity: 0.3 }} />
+              <h4>No appointments yet</h4>
               <p style={{ color: 'var(--text-secondary)' }}>
-                Your counsellor will send you messages here.
+                Request an appointment with your counsellor using the button above.
               </p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {messages.map((msg) => (
-                <motion.div                  key={msg.id}
+              {appointments.map((appt) => (
+                <motion.div
+                  key={appt.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   style={{
-                    background: msg.is_read ? 'var(--card-bg-glass)' : 'var(--accent-soft)',
+                    background: 'var(--card-bg-glass)',
+                    backdropFilter: 'var(--glass-blur)',
                     borderRadius: '14px',
                     padding: '16px 20px',
-                    border: msg.is_read ? '1px solid var(--border-glass)' : '1px solid var(--accent-primary)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
+                    border: appt.status === 'pending' ? '1px solid rgba(245, 158, 11, 0.3)' : 
+                            appt.status === 'confirmed' ? '1px solid rgba(59, 130, 246, 0.3)' :
+                            appt.status === 'completed' ? '1px solid rgba(34, 197, 94, 0.3)' :
+                            '1px solid rgba(239, 68, 68, 0.3)'
                   }}
-                  onClick={() => toggleMessageExpand(msg.id)}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{
-                        width: '32px',
-                        height: '32px',
-                        background: 'var(--accent-gradient)',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white',
-                        fontSize: '14px',
-                        fontWeight: 600
-                      }}>
-                        {counsellor?.nickname?.charAt(0) || counsellor?.name?.charAt(0) || 'C'}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                        <strong style={{ fontSize: '15px' }}>
+                          {appt.counsellor_nickname || appt.counsellor_name || 'Counsellor'}
+                        </strong>
+                        {getStatusBadge(appt.status)}
                       </div>
-                      <div>
-                        <div style={{ fontWeight: 500, fontSize: '14px' }}>
-                          {counsellor?.nickname || counsellor?.name || 'Counsellor'}
+                      <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                        <Calendar size={14} style={{ display: 'inline', marginRight: '6px' }} />
+                        {formatDateTime(appt.session_date)}
+                      </div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                        <Clock size={14} style={{ display: 'inline', marginRight: '6px' }} />
+                        Duration: {appt.duration || 60} minutes
+                      </div>
+                      {appt.notes && (
+                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                          📝 {appt.notes}
                         </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                          {formatDate(msg.created_at)}
+                      )}
+                      {appt.status === 'pending' && (
+                        <div style={{
+                          marginTop: '8px',
+                          padding: '6px 12px',
+                          background: 'rgba(245, 158, 11, 0.1)',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(245, 158, 11, 0.2)',
+                          fontSize: '12px',
+                          color: '#f59e0b'
+                        }}>
+                          ⏳ Waiting for counsellor confirmation
                         </div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {msg.is_read ? (
-                        <CheckCircle size={14} color="#22c55e" />
-                      ) : (
-                        <span style={{
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          background: '#ef4444',
-                          color: 'white',
-                          fontSize: '9px',
-                          fontWeight: 'bold'
-                        }}>
-                          NEW
-                        </span>
                       )}
-                      {expandedMessage === msg.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: '8px' }}>
-                    {msg.subject && (
-                      <div style={{ 
-                        fontSize: '13px', 
-                        fontWeight: 600, 
-                        color: 'var(--text-primary)',
-                        marginBottom: '4px'
-                      }}>
-                        📌 {msg.subject}
-                      </div>
-                    )}
-                    <p style={{
-                      margin: 0,
-                      fontSize: '14px',
-                      color: 'var(--text-secondary)',
-                      lineHeight: 1.5,
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                      maxHeight: expandedMessage === msg.id ? 'none' : '60px',
-                      overflow: 'hidden',
-                      position: 'relative'
-                    }}>
-                      {msg.message}
-                      {expandedMessage !== msg.id && msg.message.length > 100 && (
-                        <span style={{ 
-                          position: 'absolute', 
-                          bottom: 0, 
-                          right: 0,
-                          background: 'linear-gradient(to right, transparent, var(--card-bg-glass))',
-                          paddingLeft: '20px'
+                      {appt.status === 'confirmed' && (
+                        <div style={{
+                          marginTop: '8px',
+                          padding: '6px 12px',
+                          background: 'rgba(59, 130, 246, 0.1)',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(59, 130, 246, 0.2)',
+                          fontSize: '12px',
+                          color: '#3b82f6'
                         }}>
-                          ...
-                        </span>
+                          ✅ Appointment confirmed! Check your calendar.
+                        </div>
                       )}
-                    </p>
+                      {appt.status === 'completed' && (
+                        <div style={{
+                          marginTop: '8px',
+                          padding: '6px 12px',
+                          background: 'rgba(34, 197, 94, 0.1)',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(34, 197, 94, 0.2)',
+                          fontSize: '12px',
+                          color: '#22c55e'
+                        }}>
+                          ✔️ Appointment completed
+                        </div>
+                      )}
+                      {appt.status === 'cancelled' && (
+                        <div style={{
+                          marginTop: '8px',
+                          padding: '6px 12px',
+                          background: 'rgba(239, 68, 68, 0.1)',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(239, 68, 68, 0.2)',
+                          fontSize: '12px',
+                          color: '#ef4444'
+                        }}>
+                          ❌ Appointment cancelled
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
               ))}
@@ -852,227 +731,7 @@ function StudentSupport() {
         </motion.div>
       )}
 
-{/* ============================================ */}
-{/* APPOINTMENTS TAB */}
-{/* ============================================ */}
-{activeTab === "appointments" && (
-  <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: 0.2 }}
-  >
-    {/* Counsellor Info / Schedule Button */}
-    <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '24px',
-      flexWrap: 'wrap',
-      gap: '16px'
-    }}>
-      <div>
-        {counsellor ? (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px'
-          }}>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              background: 'var(--accent-gradient)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontSize: '16px',
-              fontWeight: 600
-            }}>
-              {counsellor.nickname?.charAt(0) || counsellor.name?.charAt(0) || 'C'}
-            </div>
-            <div>
-              <h4 style={{ margin: 0, fontSize: '15px' }}>
-                Counsellor: {counsellor.nickname || counsellor.name}
-              </h4>
-              <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-                {appointments.filter(a => a.status === 'pending').length} pending appointment{appointments.filter(a => a.status === 'pending').length !== 1 ? 's' : ''}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div style={{
-            padding: '12px 20px',
-            background: 'rgba(245, 158, 11, 0.1)',
-            borderRadius: '12px',
-            border: '1px solid rgba(245, 158, 11, 0.3)'
-          }}>
-            <AlertCircle size={16} style={{ display: 'inline', marginRight: '8px', color: '#f59e0b' }} />
-            <span style={{ fontSize: '13px', color: '#f59e0b' }}>
-              No counsellor assigned to your university yet.
-            </span>
-          </div>
-        )}
-      </div>
-      
-      {/* ✅ Export + Request Appointment buttons together */}
-      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-        {appointments.length > 0 && (
-          <ExportButton 
-            type="appointments" 
-            userId={parseInt(user_id)} 
-            label="Export CSV"
-            icon={<FileSpreadsheet size={16} />}
-            variant="primary"
-          />
-        )}
-        
-        <button
-          onClick={() => setShowAppointmentModal(true)}
-          disabled={!counsellor}
-          style={{
-            padding: '10px 24px',
-            background: counsellor ? 'var(--accent-gradient)' : 'var(--bg-secondary)',
-            border: 'none',
-            borderRadius: '30px',
-            color: counsellor ? 'white' : 'var(--text-muted)',
-            cursor: counsellor ? 'pointer' : 'not-allowed',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: '14px',
-            fontWeight: 500,
-            opacity: counsellor ? 1 : 0.6
-          }}
-        >
-          <Plus size={16} /> Request Appointment
-        </button>
-      </div>
-    </div>
-
-    {/* Appointments List */}
-    {appointmentLoading ? (
-      <div style={{ textAlign: 'center', padding: '40px' }}>
-        <div className="spinner" style={{ width: '30px', height: '30px' }}></div>
-        <p style={{ marginTop: '12px', color: 'var(--text-muted)' }}>Loading appointments...</p>
-      </div>
-    ) : appointments.length === 0 ? (
-      <div style={{
-        textAlign: 'center',
-        padding: '60px 40px',
-        background: 'var(--card-bg-glass)',
-        borderRadius: '16px',
-        border: '1px solid var(--border-glass)'
-      }}>
-        <Calendar size={48} style={{ marginBottom: '16px', opacity: 0.3 }} />
-        <h4>No appointments yet</h4>
-        <p style={{ color: 'var(--text-secondary)' }}>
-          Request an appointment with your counsellor using the button above.
-        </p>
-      </div>
-    ) : (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {appointments.map((appt) => (
-          <motion.div
-            key={appt.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            style={{
-              background: 'var(--card-bg-glass)',
-              backdropFilter: 'var(--glass-blur)',
-              borderRadius: '14px',
-              padding: '16px 20px',
-              border: appt.status === 'pending' ? '1px solid rgba(245, 158, 11, 0.3)' : 
-                      appt.status === 'confirmed' ? '1px solid rgba(59, 130, 246, 0.3)' :
-                      appt.status === 'completed' ? '1px solid rgba(34, 197, 94, 0.3)' :
-                      '1px solid rgba(239, 68, 68, 0.3)'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                  <strong style={{ fontSize: '15px' }}>
-                    {appt.counsellor_nickname || appt.counsellor_name || 'Counsellor'}
-                  </strong>
-                  {getStatusBadge(appt.status)}
-                </div>
-                <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                  <Calendar size={14} style={{ display: 'inline', marginRight: '6px' }} />
-                  {formatDateTime(appt.session_date)}
-                </div>
-                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                  <Clock size={14} style={{ display: 'inline', marginRight: '6px' }} />
-                  Duration: {appt.duration || 60} minutes
-                </div>
-                {appt.notes && (
-                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                    📝 {appt.notes}
-                  </div>
-                )}
-                {appt.status === 'pending' && (
-                  <div style={{
-                    marginTop: '8px',
-                    padding: '6px 12px',
-                    background: 'rgba(245, 158, 11, 0.1)',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(245, 158, 11, 0.2)',
-                    fontSize: '12px',
-                    color: '#f59e0b'
-                  }}>
-                    ⏳ Waiting for counsellor confirmation
-                  </div>
-                )}
-                {appt.status === 'confirmed' && (
-                  <div style={{
-                    marginTop: '8px',
-                    padding: '6px 12px',
-                    background: 'rgba(59, 130, 246, 0.1)',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(59, 130, 246, 0.2)',
-                    fontSize: '12px',
-                    color: '#3b82f6'
-                  }}>
-                    ✅ Appointment confirmed! Check your calendar.
-                  </div>
-                )}
-                {appt.status === 'completed' && (
-                  <div style={{
-                    marginTop: '8px',
-                    padding: '6px 12px',
-                    background: 'rgba(34, 197, 94, 0.1)',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(34, 197, 94, 0.2)',
-                    fontSize: '12px',
-                    color: '#22c55e'
-                  }}>
-                    ✔️ Appointment completed
-                  </div>
-                )}
-                {appt.status === 'cancelled' && (
-                  <div style={{
-                    marginTop: '8px',
-                    padding: '6px 12px',
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                    fontSize: '12px',
-                    color: '#ef4444'
-                  }}>
-                    ❌ Appointment cancelled
-                  </div>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-    )}
-  </motion.div>
-)}
-
-      {/* ============================================ */}
-      {/* APPOINTMENT MODAL */}
-      {/* ============================================ */}
+      {/* Appointment Modal with Counsellor Dropdown */}
       <AnimatePresence>
         {showAppointmentModal && (
           <motion.div
@@ -1095,23 +754,37 @@ function StudentSupport() {
                 <button className="modal-close" onClick={() => setShowAppointmentModal(false)}>✕</button>
               </div>
               <div className="modal-content">
-                {counsellor && (
-                  <div style={{
-                    padding: '12px 16px',
-                    background: 'var(--accent-soft)',
-                    borderRadius: '12px',
-                    marginBottom: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px'
-                  }}>
-                    <User size={16} color="var(--accent-primary)" />
-                    <span style={{ fontSize: '14px' }}>
-                      Counsellor: <strong>{counsellor.nickname || counsellor.name}</strong>
-                    </span>
-                  </div>
-                )}
                 <form onSubmit={handleScheduleAppointment}>
+                  <div className="input-group">
+                    <label className="input-label">Select Counsellor *</label>
+                    <select
+                      value={appointmentForm.counsellor_id}
+                      onChange={(e) => setAppointmentForm({ ...appointmentForm, counsellor_id: e.target.value })}
+                      className="input-field"
+                      required
+                      disabled={counsellors.length === 0}
+                    >
+                      <option value="">Select a counsellor...</option>
+                      {counsellors.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nickname || c.name}
+                        </option>
+                      ))}
+                    </select>
+                    {counsellors.length === 0 && (
+                      <div style={{
+                        marginTop: '8px',
+                        padding: '8px 12px',
+                        background: 'rgba(239, 68, 68, 0.05)',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(239, 68, 68, 0.2)',
+                        fontSize: '12px',
+                        color: '#ef4444'
+                      }}>
+                        No counsellor available for your university
+                      </div>
+                    )}
+                  </div>
                   <div className="input-group">
                     <label className="input-label">Date & Time *</label>
                     <input
@@ -1160,7 +833,7 @@ function StudentSupport() {
                   </div>
                   <div className="modal-actions">
                     <button type="button" onClick={() => setShowAppointmentModal(false)} className="peer-btn-secondary">Cancel</button>
-                    <button type="submit" disabled={submitting} className="peer-btn-primary">
+                    <button type="submit" disabled={submitting || counsellors.length === 0} className="peer-btn-primary">
                       {submitting ? 'Sending...' : 'Send Request'}
                     </button>
                   </div>
@@ -1170,7 +843,6 @@ function StudentSupport() {
           </motion.div>
         )}
       </AnimatePresence>
-
     </Layout>
   );
 }

@@ -11,20 +11,23 @@ import {
   Menu,
   Settings as SettingsIcon,
   Trophy,
-  Shield
+  Shield,
+  LayoutDashboard
 } from "lucide-react";
-import { isAdmin } from "../../utils/roleAuth";
+import { isAdmin, getUserRole } from "../../utils/roleAuth";
 
-function Sidebar({ sidebarOpen, setSidebarOpen }) {
+function Sidebar({ sidebarOpen, setSidebarOpen, customMenuItems }) {
   const navigate = useNavigate();
   const adminUser = isAdmin();
+  const userRole = getUserRole();
 
   const logout = () => {
     localStorage.clear();
     navigate("/");
   };
 
-  const menuItems = [
+  // Default student menu items
+  const defaultMenuItems = [
     { path: "/dashboard", icon: <Activity size={18} />, label: "Dashboard" },
     { path: "/journal", icon: <BookOpen size={18} />, label: "Journal" },
     { path: "/mental-health", icon: <Heart size={18} />, label: "Wellness Library" },
@@ -35,10 +38,13 @@ function Sidebar({ sidebarOpen, setSidebarOpen }) {
     { path: "/settings", icon: <SettingsIcon size={18} />, label: "Settings" },
   ];
 
-  // Add admin menu item only for admin users
+  // Add admin panel for admins
   if (adminUser) {
-    menuItems.push({ path: "/admin", icon: <Shield size={18} />, label: "Admin Panel" });
+    defaultMenuItems.push({ path: "/admin", icon: <Shield size={18} />, label: "Admin Panel" });
   }
+
+  // Use custom menu items if provided (for parent)
+  const menuItems = customMenuItems || defaultMenuItems;
 
   return (
     <>
