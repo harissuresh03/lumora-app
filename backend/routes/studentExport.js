@@ -9,6 +9,7 @@ const { Parser } = require('json2csv');
 // ============================================
 // 1. EXPORT JOURNAL ENTRIES AS PDF
 // ============================================
+
 router.get("/journal/:user_id/pdf", verifyToken, async (req, res) => {
   const userId = parseInt(req.params.user_id);
   const { month, year } = req.query;
@@ -82,6 +83,7 @@ router.get("/journal/:user_id/pdf", verifyToken, async (req, res) => {
 // ============================================
 // 2. EXPORT MOOD HISTORY AS CSV (LAST 7 DAYS)
 // ============================================
+
 router.get("/mood/:user_id/csv", verifyToken, async (req, res) => {
   const userId = parseInt(req.params.user_id);
   
@@ -90,7 +92,6 @@ router.get("/mood/:user_id/csv", verifyToken, async (req, res) => {
   }
 
   try {
-    // ✅ Get only last 7 days of mood data
     const [moods] = await db.promise().query(
       `SELECT mood, created_at FROM moods 
        WHERE user_id = ? 
@@ -134,6 +135,7 @@ router.get("/mood/:user_id/csv", verifyToken, async (req, res) => {
 // ============================================
 // 3. EXPORT SLEEP LOGS AS CSV (LAST 7 DAYS)
 // ============================================
+
 router.get("/sleep/:user_id/csv", verifyToken, async (req, res) => {
   const userId = parseInt(req.params.user_id);
   
@@ -142,7 +144,6 @@ router.get("/sleep/:user_id/csv", verifyToken, async (req, res) => {
   }
 
   try {
-    // ✅ Get only last 7 days of sleep data
     const [sleep] = await db.promise().query(
       `SELECT bedtime, wake_time, duration, quality, created_at FROM sleep 
        WHERE user_id = ? 
@@ -189,6 +190,7 @@ router.get("/sleep/:user_id/csv", verifyToken, async (req, res) => {
 // ============================================
 // 4. EXPORT ASSESSMENT RESULT AS PDF
 // ============================================
+
 router.get("/assessment/:assessment_id/pdf", verifyToken, async (req, res) => {
   const assessmentId = parseInt(req.params.assessment_id);
   const userId = req.user.id;
@@ -234,14 +236,24 @@ router.get("/assessment/:assessment_id/pdf", verifyToken, async (req, res) => {
         "Becoming easily annoyed or irritable",
         "Feeling afraid as if something awful might happen"
       ];
+    } else if (assessment.type === 'pss') {
+      questions = [
+        "In the last month, how often have you been upset because of something that happened unexpectedly?",
+        "In the last month, how often have you felt that you were unable to control the important things in your life?",
+        "In the last month, how often have you felt nervous and 'stressed'?",
+        "In the last month, how often have you felt confident about your ability to handle your personal problems?",
+        "In the last month, how often have you felt that things were going your way?",
+        "In the last month, how often have you found that you could not cope with all the things that you had to do?",
+        "In the last month, how often have you been able to control irritations in your life?",
+        "In the last month, how often have you felt that you were on top of things?",
+        "In the last month, how often have you been angered because of things that happened that were outside of your control?",
+        "In the last month, how often have you felt difficulties were piling up so high that you could not overcome them?"
+      ];
     }
 
-    const scoreOptions = [
-      'Not at all',
-      'Several days',
-      'More than half the days',
-      'Nearly every day'
-    ];
+    const scoreOptions = assessment.type === 'pss'
+      ? ['Never', 'Almost never', 'Sometimes', 'Fairly often', 'Very often']
+      : ['Not at all', 'Several days', 'More than half the days', 'Nearly every day'];
 
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
     const filename = `assessment_${assessment.type}_${assessment.id}.pdf`;
@@ -287,6 +299,7 @@ router.get("/assessment/:assessment_id/pdf", verifyToken, async (req, res) => {
 // ============================================
 // 5. EXPORT APPOINTMENTS AS CSV
 // ============================================
+
 router.get("/appointments/:user_id/csv", verifyToken, async (req, res) => {
   const userId = parseInt(req.params.user_id);
   

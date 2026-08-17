@@ -65,7 +65,6 @@ function Profile() {
       }
     };
 
-    // ✅ UPDATED: Fetch parent data using the new endpoint
     const fetchParentData = async () => {
       try {
         const res = await api.get(`/parent/my-parent`);
@@ -101,7 +100,6 @@ function Profile() {
     navigate("/");
   };
 
-  // Invite parent
   const inviteParent = async () => {
     if (!parentEmail.trim()) {
       showErrorToast("Please enter a valid email address");
@@ -113,7 +111,6 @@ function Profile() {
       const res = await api.post("/parent/invite", { parent_email: parentEmail });
       showSuccessToast(res.data.msg || "Invitation sent successfully!");
       setParentEmail("");
-      // Refresh parent data
       const parentRes = await api.get(`/parent/my-parent`);
       if (parentRes.data.hasParent) {
         setParentData({
@@ -137,52 +134,49 @@ function Profile() {
     }
   };
 
-  // Toggle sharing settings
   const toggleShare = async (type) => {
-  let updatedValue;
-  let payload = {};
+    let updatedValue;
+    let payload = {};
 
-  switch(type) {
-    case 'mood':
-      updatedValue = !shareMood;
-      setShareMood(updatedValue);
-      payload.share_mood = updatedValue ? 1 : 0;
-      break;
-    case 'sleep':
-      updatedValue = !shareSleep;
-      setShareSleep(updatedValue);
-      payload.share_sleep = updatedValue ? 1 : 0;
-      break;
-    case 'stress':
-      updatedValue = !shareStress;
-      setShareStress(updatedValue);
-      payload.share_stress = updatedValue ? 1 : 0;
-      break;
-    case 'assessments':
-      updatedValue = !shareAssessments;
-      setShareAssessments(updatedValue);
-      payload.share_assessments = updatedValue ? 1 : 0;
-      break;
-    default:
-      return;
-  }
-
-  try {
-    await api.put("/parent/settings", payload);
-    showSuccessToast("Sharing settings updated!");
-  } catch (err) {
-    showErrorToast("Failed to update sharing settings");
-    // Revert on error
     switch(type) {
-      case 'mood': setShareMood(!updatedValue); break;
-      case 'sleep': setShareSleep(!updatedValue); break;
-      case 'stress': setShareStress(!updatedValue); break;
-      case 'assessments': setShareAssessments(!updatedValue); break;
+      case 'mood':
+        updatedValue = !shareMood;
+        setShareMood(updatedValue);
+        payload.share_mood = updatedValue ? 1 : 0;
+        break;
+      case 'sleep':
+        updatedValue = !shareSleep;
+        setShareSleep(updatedValue);
+        payload.share_sleep = updatedValue ? 1 : 0;
+        break;
+      case 'stress':
+        updatedValue = !shareStress;
+        setShareStress(updatedValue);
+        payload.share_stress = updatedValue ? 1 : 0;
+        break;
+      case 'assessments':
+        updatedValue = !shareAssessments;
+        setShareAssessments(updatedValue);
+        payload.share_assessments = updatedValue ? 1 : 0;
+        break;
+      default:
+        return;
     }
-  }
-};
 
-  // Revoke parent access
+    try {
+      await api.put("/parent/settings", payload);
+      showSuccessToast("Sharing settings updated!");
+    } catch (err) {
+      showErrorToast("Failed to update sharing settings");
+      switch(type) {
+        case 'mood': setShareMood(!updatedValue); break;
+        case 'sleep': setShareSleep(!updatedValue); break;
+        case 'stress': setShareStress(!updatedValue); break;
+        case 'assessments': setShareAssessments(!updatedValue); break;
+      }
+    }
+  };
+
   const revokeParentAccess = async () => {
     if (!parentData || !parentData.parent_id) {
       showErrorToast("No parent linked to revoke");
@@ -207,7 +201,6 @@ function Profile() {
 
   if (!user) return <div className="loading-container"><div className="spinner"></div><p className="loading-text">Loading profile...</p></div>;
 
-  // Get consent status display
   const getConsentStatus = () => {
     if (user.counsellor_consent === 1) {
       return { text: "Consented ✅", color: "#22c55e" };
@@ -260,7 +253,6 @@ function Profile() {
               {user.nickname ? `@${user.nickname}` : ""}
             </p>
             
-            {/* Gamification Stats */}
             {!loadingGamification && gamificationStats && (
               <div style={{
                 display: 'flex',
@@ -355,8 +347,8 @@ function Profile() {
               <span className="profile-value">{user.university_name || "-"}</span>
             </div>
             <div className="profile-info-item">
-              <span className="profile-label">Student ID</span>
-              <span className="profile-value">{user.student_id || "-"}</span>
+              <span className="profile-label">Matric Number</span>
+              <span className="profile-value">{user.matric_number || "-"}</span>
             </div>
             <div className="profile-info-item">
               <span className="profile-label">Faculty</span>
@@ -392,7 +384,6 @@ function Profile() {
                 : "You have not given consent to share your data with your university counsellor."}
             </div>
 
-            {/* Parent/Guardian Section - Updated */}
             <div style={{ marginTop: "16px" }}>
               <h5 style={{ fontSize: "14px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
                 <Heart size={16} color="#6366f1" />
@@ -402,7 +393,6 @@ function Profile() {
               {parentLoading ? (
                 <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>Loading...</div>
               ) : parentData ? (
-                // ✅ Parent already linked - Show details
                 <div>
                   <div className="profile-info-item">
                     <span className="profile-label">Linked Parent</span>
@@ -455,7 +445,6 @@ function Profile() {
                   )}
                 </div>
               ) : (
-                // ✅ No parent linked - Show invite form (only if no parent)
                 <div>
                   <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "12px" }}>
                     Invite a parent or guardian to view your mental health summary. They will receive an email with instructions.

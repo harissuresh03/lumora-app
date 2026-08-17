@@ -35,7 +35,6 @@ router.get("/stats", verifyAdmin, async (req, res) => {
     const [newUsersWeek] = await db.promise().query("SELECT COUNT(*) as count FROM users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
     const [activeUsers] = await db.promise().query("SELECT COUNT(*) as count FROM users WHERE last_login >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
     
-    // Removed totalPosts and totalGroups queries (no longer needed)
     let pendingReports = 0;
     try {
       const reportsSnapshot = await firestore.collection("reports").where("status", "==", "pending").get();
@@ -51,10 +50,9 @@ router.get("/stats", verifyAdmin, async (req, res) => {
       students: students[0].count,
       counsellors: counsellors[0].count,
       admins: admins[0].count,
-      parents: parents[0].count, // ✅ Added parent count
+      parents: parents[0].count,
       newUsersWeek: newUsersWeek[0].count,
       activeUsers: activeUsers[0].count,
-      // totalPosts and totalGroups removed
       pendingReports,
       pendingIssues: pendingIssues[0].count || 0
     });
@@ -72,7 +70,8 @@ router.get("/users", verifyAdmin, async (req, res) => {
   const { role, status, warning, search, page = 1, limit = 20 } = req.query;
   const offset = (page - 1) * limit;
   
-  let query = "SELECT id, name, nickname, email, role, is_active, is_blocked, warning_count, created_at, last_login FROM users WHERE 1=1";
+  // Use matric_number instead of student_id
+  let query = "SELECT id, name, nickname, email, role, is_active, is_blocked, warning_count, created_at, last_login, matric_number FROM users WHERE 1=1";
   let params = [];
   
   if (role && role !== 'all') {
@@ -199,12 +198,12 @@ router.delete("/users/:userId", verifyAdmin, async (req, res) => {
 router.get("/users/export", verifyAdmin, async (req, res) => {
   try {
     const [users] = await db.promise().query(
-      "SELECT id, name, nickname, email, role, is_active, created_at, last_login FROM users ORDER BY created_at DESC"
+      "SELECT id, name, nickname, email, role, is_active, created_at, last_login, matric_number FROM users ORDER BY created_at DESC"
     );
     
-    const csvHeader = "ID,Name,Nickname,Email,Role,Active,Created At,Last Login\n";
+    const csvHeader = "ID,Name,Nickname,Email,Role,Active,Created At,Last Login,Matric Number\n";
     const csvRows = users.map(user => 
-      `${user.id},${user.name},${user.nickname || ''},${user.email},${user.role},${user.is_active},${user.created_at},${user.last_login || ''}`
+      `${user.id},${user.name},${user.nickname || ''},${user.email},${user.role},${user.is_active},${user.created_at},${user.last_login || ''},${user.matric_number || ''}`
     );
     const csv = csvHeader + csvRows.join('\n');
     
@@ -756,14 +755,11 @@ router.get("/settings", verifyAdmin, async (req, res) => {
     
     const settingsObj = {};
     settings.forEach(s => {
-      // Convert string values to proper types
       if (s.setting_value === 'true') settingsObj[s.setting_key] = true;
       else if (s.setting_value === 'false') settingsObj[s.setting_key] = false;
       else if (!isNaN(s.setting_value)) settingsObj[s.setting_key] = parseInt(s.setting_value);
       else settingsObj[s.setting_key] = s.setting_value;
     });
-    
-    console.log("Settings fetched:", settingsObj);
     
     res.json(settingsObj);
   } catch (error) {
@@ -775,8 +771,6 @@ router.get("/settings", verifyAdmin, async (req, res) => {
 router.put("/settings", verifyAdmin, async (req, res) => {
   const { maintenanceMode, allowRegistrations, defaultUserRole, sessionTimeout } = req.body;
   
-  console.log("Updating system settings:", req.body);
-  
   try {
     const updates = {
       maintenanceMode: maintenanceMode ? "true" : "false",
@@ -786,11 +780,10 @@ router.put("/settings", verifyAdmin, async (req, res) => {
     };
     
     for (const [key, value] of Object.entries(updates)) {
-      const [result] = await db.promise().query(
+      await db.promise().query(
         "UPDATE system_settings SET setting_value = ? WHERE setting_key = ?",
         [value, key]
       );
-      console.log(`Updated ${key} to ${value}, affected rows: ${result.affectedRows}`);
     }
     
     await logAdminAction(
@@ -890,8 +883,6 @@ router.get("/counsellor-requests", verifyAdmin, async (req, res) => {
   const { status, page = 1, limit = 20 } = req.query;
   const offset = (page - 1) * limit;
 
-  console.log("Fetching counsellor requests. Status filter:", status);
-
   try {
     let query = `
       SELECT r.*, un.name as university_name
@@ -916,8 +907,6 @@ router.get("/counsellor-requests", verifyAdmin, async (req, res) => {
 
     const [requests] = await db.promise().query(query, params);
 
-    console.log("Found requests:", requests.length);
-
     res.json({
       requests,
       total,
@@ -930,7 +919,7 @@ router.get("/counsellor-requests", verifyAdmin, async (req, res) => {
   }
 });
 
-// Approve counsellor registration request
+// Approve counsellor registration request (UPDATED)
 router.put("/counsellor-requests/:id/approve", verifyAdmin, async (req, res) => {
   const { id } = req.params;
   const { admin_notes } = req.body;
@@ -955,30 +944,24 @@ router.put("/counsellor-requests/:id/approve", verifyAdmin, async (req, res) => 
 
     const reqData = request[0];
 
-    // ✅ Generate default password
     const defaultPassword = "password123";
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
-    // ✅ Create the user with the hashed password
+    // ✅ Removed: student_id, emergency_contact_*
     const insertResult = await db.promise().query(
       `INSERT INTO users 
        (name, nickname, email, password, dob, gender,
-        university_id, student_id,
-        emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
+        university_id,
         role, is_active) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'counsellor', 1)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'counsellor', 1)`,
       [
         reqData.name,
         reqData.nickname,
         reqData.email,
-        hashedPassword, // ✅ Hashed password stored in database
+        hashedPassword,
         reqData.dob,
         reqData.gender,
-        reqData.university_id,
-        reqData.student_id,
-        reqData.emergency_contact_name,
-        reqData.emergency_contact_phone,
-        reqData.emergency_contact_relationship
+        reqData.university_id
       ]
     );
 
@@ -993,11 +976,10 @@ router.put("/counsellor-requests/:id/approve", verifyAdmin, async (req, res) => 
 
     console.log("Counsellor approved and user created. User ID:", newUserId);
 
-    // ✅ Send email with the default password
     await sendCounsellorApprovalEmail(
       reqData.email,
       reqData.name,
-      defaultPassword // ✅ Send the plain text password in email
+      defaultPassword
     );
     console.log(`✅ Approval email sent to ${reqData.email} with password: ${defaultPassword}`);
 
@@ -1027,14 +1009,12 @@ router.put("/counsellor-requests/:id/approve", verifyAdmin, async (req, res) => 
   }
 });
 
-// Reject counsellor registration request
+// Reject counsellor registration request (unchanged)
 router.put("/counsellor-requests/:id/reject", verifyAdmin, async (req, res) => {
   const { id } = req.params;
   const { admin_notes } = req.body;
   const adminId = req.user.id;
   const ipAddress = req.ip;
-
-  console.log("Rejecting request:", id);
 
   try {
     const [request] = await db.promise().query(
@@ -1050,7 +1030,6 @@ router.put("/counsellor-requests/:id/reject", verifyAdmin, async (req, res) => {
       return res.status(400).json({ msg: `Request is already ${request[0].status}` });
     }
 
-    // ✅ Send rejection email
     await sendCounsellorRejectionEmail(
       request[0].email,
       request[0].name,
@@ -1064,8 +1043,6 @@ router.put("/counsellor-requests/:id/reject", verifyAdmin, async (req, res) => {
        WHERE id = ?`,
       [admin_notes || null, adminId, id]
     );
-
-    console.log("Counsellor rejected:", request[0].email);
 
     await logAdminAction(
       adminId,
@@ -1086,7 +1063,7 @@ router.put("/counsellor-requests/:id/reject", verifyAdmin, async (req, res) => {
   }
 });
 
-// Delete counsellor registration request
+// Delete counsellor registration request (unchanged)
 router.delete("/counsellor-requests/:id", verifyAdmin, async (req, res) => {
   const { id } = req.params;
   const adminId = req.user.id;

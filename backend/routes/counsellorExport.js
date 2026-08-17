@@ -8,6 +8,7 @@ const { Parser } = require('json2csv');
 // ============================================
 // 1. EXPORT STUDENT ROSTER AS CSV
 // ============================================
+
 router.get("/students/:counsellor_id/csv", verifyCounsellor, async (req, res) => {
   const counsellorId = parseInt(req.params.counsellor_id);
   
@@ -16,7 +17,6 @@ router.get("/students/:counsellor_id/csv", verifyCounsellor, async (req, res) =>
   }
 
   try {
-    // Get counsellor's university
     const [counsellor] = await db.promise().query(
       "SELECT university_id FROM users WHERE id = ?",
       [counsellorId]
@@ -28,7 +28,6 @@ router.get("/students/:counsellor_id/csv", verifyCounsellor, async (req, res) =>
       return res.status(404).json({ msg: "No university found for counsellor" });
     }
 
-    // ✅ Get ONLY consented students
     const [students] = await db.promise().query(
       `SELECT 
         u.id,
@@ -37,6 +36,7 @@ router.get("/students/:counsellor_id/csv", verifyCounsellor, async (req, res) =>
         u.email,
         u.is_active as status,
         u.counsellor_consent as consent,
+        u.matric_number,
         u.created_at as joined_date,
         u.last_login,
         (SELECT AVG(mood) FROM moods WHERE user_id = u.id AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as avg_mood,
@@ -58,6 +58,7 @@ router.get("/students/:counsellor_id/csv", verifyCounsellor, async (req, res) =>
       'Name': s.name,
       'Nickname': s.nickname || 'N/A',
       'Email': s.email,
+      'Matric Number': s.matric_number || 'N/A',
       'Status': s.status ? 'Active' : 'Inactive',
       'Consent': s.consent ? 'Yes' : 'No',
       'Avg Mood (7d)': s.avg_mood ? parseFloat(s.avg_mood).toFixed(1) : 'N/A',
@@ -68,7 +69,7 @@ router.get("/students/:counsellor_id/csv", verifyCounsellor, async (req, res) =>
       'Last Login': s.last_login ? new Date(s.last_login).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Never'
     }));
 
-    const fields = ['Student ID', 'Name', 'Nickname', 'Email', 'Status', 'Consent', 'Avg Mood (7d)', 'Avg Sleep (7d)', 'Pending Alerts', 'Total Sessions', 'Joined Date', 'Last Login'];
+    const fields = ['Student ID', 'Name', 'Nickname', 'Email', 'Matric Number', 'Status', 'Consent', 'Avg Mood (7d)', 'Avg Sleep (7d)', 'Pending Alerts', 'Total Sessions', 'Joined Date', 'Last Login'];
     const parser = new Parser({ fields });
     const csv = parser.parse(formattedData);
 
@@ -86,6 +87,7 @@ router.get("/students/:counsellor_id/csv", verifyCounsellor, async (req, res) =>
 // ============================================
 // 2. EXPORT APPOINTMENTS AS CSV
 // ============================================
+
 router.get("/appointments/:counsellor_id/csv", verifyCounsellor, async (req, res) => {
   const counsellorId = parseInt(req.params.counsellor_id);
   
@@ -148,6 +150,7 @@ router.get("/appointments/:counsellor_id/csv", verifyCounsellor, async (req, res
 // ============================================
 // 3. EXPORT ANALYTICS AS CSV
 // ============================================
+
 router.get("/analytics/:counsellor_id/csv", verifyCounsellor, async (req, res) => {
   const counsellorId = parseInt(req.params.counsellor_id);
   
@@ -276,6 +279,7 @@ router.get("/analytics/:counsellor_id/csv", verifyCounsellor, async (req, res) =
 // ============================================
 // 4. EXPORT STUDENT PROGRESS REPORT AS CSV
 // ============================================
+
 router.get("/student-progress/:student_id/:counsellor_id/csv", verifyCounsellor, async (req, res) => {
   const { student_id, counsellor_id } = req.params;
   
@@ -297,6 +301,7 @@ router.get("/student-progress/:student_id/:counsellor_id/csv", verifyCounsellor,
     // 1. Student Info
     const [studentInfo] = await db.promise().query(
       `SELECT u.id, u.name, u.nickname, u.email, u.counsellor_consent, 
+              u.matric_number,
               u.created_at, u.last_login, un.name as university_name
        FROM users u
        LEFT JOIN universities un ON u.university_id = un.id
@@ -361,6 +366,7 @@ router.get("/student-progress/:student_id/:counsellor_id/csv", verifyCounsellor,
     csvContent.push(`Name,${studentInfo[0].name}`);
     csvContent.push(`Nickname,${studentInfo[0].nickname || 'N/A'}`);
     csvContent.push(`Email,${studentInfo[0].email}`);
+    csvContent.push(`Matric Number,${studentInfo[0].matric_number || 'N/A'}`);
     csvContent.push(`University,${studentInfo[0].university_name || 'N/A'}`);
     csvContent.push(`Joined Date,${new Date(studentInfo[0].created_at).toLocaleDateString()}`);
     csvContent.push(`Last Login,${studentInfo[0].last_login ? new Date(studentInfo[0].last_login).toLocaleDateString() : 'Never'}`);

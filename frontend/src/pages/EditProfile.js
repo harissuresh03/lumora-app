@@ -33,7 +33,7 @@ function EditProfile() {
     email: "",
     university: "",
     university_id: "",
-    student_id: "",
+    matric_number: "",
     faculty: "",
     department: "",
     counsellor_consent: 0,
@@ -83,7 +83,7 @@ function EditProfile() {
           email: res.data.email || "",
           university: res.data.university || "",
           university_id: matchedUni?.id || "",
-          student_id: res.data.student_id || "",
+          matric_number: res.data.matric_number || "",
           faculty: res.data.faculty || "",
           department: res.data.department || "",
           counsellor_consent: res.data.counsellor_consent || 0,
@@ -151,7 +151,7 @@ function EditProfile() {
       dob: form.dob,
       gender: form.gender,
       university_id: form.university_id || null,
-      student_id: form.student_id,
+      matric_number: form.matric_number || null,
       faculty: form.faculty || null,
       department: form.department || null,
       counsellor_consent: form.counsellor_consent,
@@ -177,7 +177,6 @@ function EditProfile() {
 
   return (
     <Layout>
-      {/* Page Header */}
       <div className="page-header">
         <button onClick={() => navigate("/profile")} className="back-arrow-btn">
           <ArrowLeft size={18} />
@@ -188,10 +187,8 @@ function EditProfile() {
         </div>
       </div>
 
-      {/* Edit Profile Card */}
       <div className="edit-profile-card">
         <form onSubmit={updateProfile} className="edit-profile-form">
-          {/* Personal Information */}
           <div className="form-section-title">
             <User size={14} style={{ display: "inline", marginRight: "8px" }} />
             Personal Information
@@ -228,7 +225,6 @@ function EditProfile() {
             </div>
           </div>
 
-          {/* Academic Information */}
           <div className="form-section-title">
             <BookOpen size={14} style={{ display: "inline", marginRight: "8px" }} />
             Academic Information
@@ -269,17 +265,16 @@ function EditProfile() {
           )}
 
           <div className="input-group">
-            <label className="input-label">Student ID (optional)</label>
+            <label className="input-label">Matric Number (optional)</label>
             <input
-              name="student_id"
-              value={form.student_id}
+              name="matric_number"
+              value={form.matric_number}
               onChange={handleChange}
               className="input-field"
               placeholder="e.g., B012310101"
             />
           </div>
 
-          {/* Faculty and Department */}
           <div className="form-row">
             <div className="input-group">
               <label className="input-label">Faculty (optional)</label>
@@ -304,7 +299,6 @@ function EditProfile() {
             </div>
           </div>
 
-          {/* Privacy & Consent Section */}
           <div className="form-section-title">
             <Shield size={14} style={{ display: "inline", marginRight: "8px" }} />
             Privacy & Consent
@@ -356,7 +350,6 @@ function EditProfile() {
             </label>
           </div>
 
-          {/* Emergency Contact */}
           <div className="form-section-title">
             <Heart size={14} style={{ display: "inline", marginRight: "8px" }} />
             Emergency Contact
@@ -398,7 +391,6 @@ function EditProfile() {
             />
           </div>
 
-          {/* Account Information */}
           <div className="form-section-title">
             <Lock size={14} style={{ display: "inline", marginRight: "8px" }} />
             Account Information

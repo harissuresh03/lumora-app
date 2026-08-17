@@ -122,6 +122,7 @@ function AdminUsers() {
     switch(role) {
       case 'admin': return '#ef4444';
       case 'counsellor': return '#f59e0b';
+      case 'parent': return '#8b5cf6';
       default: return '#22c55e';
     }
   };
@@ -135,7 +136,6 @@ function AdminUsers() {
 
   return (
     <div>
-      {/* Filters */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           <div style={{ position: 'relative' }}>
@@ -174,7 +174,6 @@ function AdminUsers() {
         </button>
       </div>
 
-      {/* Users Table */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -298,7 +297,6 @@ function AdminUsers() {
         </table>
       </motion.div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '24px' }}>
           <button
@@ -319,7 +317,6 @@ function AdminUsers() {
         </div>
       )}
 
-      {/* Ban Modal */}
       {showBanModal && selectedUser && (
         <div className="modal-overlay" onClick={() => setShowBanModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>

@@ -20,7 +20,7 @@ function Register() {
     confirmPassword: "",
     university_id: "",
     university_other: "",
-    student_id: "",
+    matric_number: "",
     faculty: "",
     department: "",
     counsellor_consent: false,
@@ -29,7 +29,7 @@ function Register() {
     emergency_contact_relationship: "",
     qualification: "",
     experience: "",
-    parent_email: "" // ✅ NEW
+    parent_email: ""
   });
 
   const [error, setError] = useState("");
@@ -74,7 +74,7 @@ function Register() {
     setError("");
 
     const { name, nickname, dob, gender, email, password, confirmPassword, 
-            university_id, university_other, student_id, faculty, department,
+            university_id, university_other, matric_number, faculty, department,
             emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
             counsellor_consent, qualification, experience, parent_email } = form;
 
@@ -97,7 +97,6 @@ function Register() {
 
     try {
       if (registerAs === "student") {
-        // STUDENT: Register directly to users table
         const response = await api.post("/auth/register", {
           name: form.name,
           nickname: form.nickname,
@@ -106,14 +105,14 @@ function Register() {
           dob: form.dob,
           gender: form.gender,
           university_id: form.university_id || null,
-          student_id: form.student_id,
+          matric_number: form.matric_number || null,
           faculty: form.faculty || null,
           department: form.department || null,
           counsellor_consent: form.counsellor_consent,
           emergency_contact_name: form.emergency_contact_name,
           emergency_contact_phone: form.emergency_contact_phone,
           emergency_contact_relationship: form.emergency_contact_relationship,
-          parent_email: form.parent_email // ✅ NEW
+          parent_email: form.parent_email
         });
 
         if (response.data.user_id) {
@@ -128,7 +127,6 @@ function Register() {
       }
 
       if (registerAs === "counsellor") {
-        // COUNSELLOR: Submit application to counsellor_requests table
         const counsellorRes = await api.post("/counsellor-requests/apply", {
           name: form.name,
           nickname: form.nickname || "",
@@ -137,12 +135,6 @@ function Register() {
           dob: form.dob,
           gender: form.gender,
           university_id: form.university_id || null,
-          student_id: form.student_id || "",
-          faculty: form.faculty || null,
-          department: form.department || null,
-          emergency_contact_name: form.emergency_contact_name || "",
-          emergency_contact_phone: form.emergency_contact_phone || "",
-          emergency_contact_relationship: form.emergency_contact_relationship || "",
           qualification: form.qualification || "",
           experience: form.experience || ""
         });
@@ -223,7 +215,6 @@ function Register() {
           </div>
           <p style={styles.subtitle}>Begin your calm journey 🌿</p>
 
-          {/* Role Selection */}
           <div style={styles.roleSelector}>
             <button
               type="button"
@@ -264,7 +255,6 @@ function Register() {
           )}
 
           <form onSubmit={handleRegister} style={styles.form}>
-            {/* Personal Information Section */}
             <div style={styles.sectionTitle}>
               <span>👤 Personal Information</span>
             </div>
@@ -330,7 +320,6 @@ function Register() {
               </div>
             </div>
 
-            {/* Academic Information Section */}
             <div style={styles.sectionTitle}>
               <span>🎓 Academic Information</span>
             </div>
@@ -373,11 +362,11 @@ function Register() {
 
             <div style={styles.row}>
               <div style={styles.inputGroup}>
-                <label style={styles.label}>Student ID (optional)</label>
+                <label style={styles.label}>Matric Number (optional)</label>
                 <input
-                  name="student_id"
+                  name="matric_number"
                   placeholder="e.g., B012310101"
-                  value={form.student_id}
+                  value={form.matric_number}
                   onChange={handleChange}
                   style={styles.input}
                   disabled={loading}
@@ -411,7 +400,6 @@ function Register() {
               </div>
             </div>
 
-            {/* ✅ Parent/Guardian Email Field */}
             <div style={styles.sectionTitle}>
               <span>👨‍👩‍👦 Parent/Guardian (Optional)</span>
               <p style={styles.sectionHint}>Add a parent or guardian to view your well-being summary</p>
@@ -432,7 +420,6 @@ function Register() {
               </p>
             </div>
 
-            {/* Consent Section - Only for Students */}
             {registerAs === "student" && (
               <div style={styles.consentSection}>
                 <div style={styles.consentHeader}>
@@ -456,7 +443,6 @@ function Register() {
               </div>
             )}
 
-            {/* Emergency Contact Section */}
             <div style={styles.sectionTitle}>
               <span>🆘 Emergency / Support Contact</span>
               <p style={styles.sectionHint}>Someone you trust who can support you</p>
@@ -500,7 +486,6 @@ function Register() {
               />
             </div>
 
-            {/* Counsellor Additional Info */}
             {registerAs === "counsellor" && (
               <>
                 <div style={styles.sectionTitle}>
@@ -533,7 +518,6 @@ function Register() {
               </>
             )}
 
-            {/* Account Information Section */}
             <div style={styles.sectionTitle}>
               <span>🔐 Account Information</span>
             </div>
@@ -618,7 +602,6 @@ function Register() {
   );
 }
 
-// Floating Emojis Component
 function FloatingEmojis() {
   const emojis = ["😊", "😌", "💙", "✨", "🌙", "🫶", "🌸", "🌟", "🌿", "🕯️"];
 
@@ -922,7 +905,6 @@ const styles = {
   },
 };
 
-// Add keyframes
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
   @keyframes floatUp {

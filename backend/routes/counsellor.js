@@ -104,8 +104,6 @@ router.get("/students/:counsellor_id", verifyCounsellor, async (req, res) => {
   const counsellorId = parseInt(req.params.counsellor_id);
   const { search, filter, page = 1, limit = 20 } = req.query;
   const offset = (page - 1) * limit;
-  
-  console.log("🔍 Counsellor ID:", counsellorId); // ✅ DEBUG
 
   if (req.user.id !== counsellorId) {
     return res.status(403).json({ msg: "Unauthorized" });
@@ -117,14 +115,9 @@ router.get("/students/:counsellor_id", verifyCounsellor, async (req, res) => {
       [counsellorId]
     );
     
-    console.log("🔍 Counsellor data:", counsellor); // ✅ DEBUG
-    
     const universityId = counsellor[0]?.university_id;
     
-    console.log("🔍 University ID:", universityId); // ✅ DEBUG
-    
     if (!universityId) {
-      console.log("⚠️ No university found for counsellor:", counsellorId);
       return res.json({
         students: [],
         total: 0,
@@ -137,6 +130,7 @@ router.get("/students/:counsellor_id", verifyCounsellor, async (req, res) => {
     let query = `
       SELECT u.id, u.name, u.nickname, u.email, u.last_login, u.is_active, 
              u.counsellor_consent,
+             u.matric_number,
              (SELECT AVG(mood) FROM moods WHERE user_id = u.id AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as avg_mood,
              (SELECT AVG(quality) FROM sleep WHERE user_id = u.id AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as avg_sleep_quality,
              (SELECT COUNT(*) FROM crisis_alerts WHERE student_id = u.id AND is_resolved = 0) as pending_alerts,
@@ -152,7 +146,7 @@ router.get("/students/:counsellor_id", verifyCounsellor, async (req, res) => {
       AND u.counsellor_consent = 1
     `;
     
-    let params = [universityId]; // ✅ FIX: Use universityId, not counsellorId
+    let params = [universityId];
     
     if (search) {
       query += " AND (u.name LIKE ? OR u.nickname LIKE ? OR u.email LIKE ?)";
@@ -184,12 +178,7 @@ router.get("/students/:counsellor_id", verifyCounsellor, async (req, res) => {
     query += " ORDER BY u.last_login DESC LIMIT ? OFFSET ?";
     params.push(parseInt(limit), offset);
     
-    console.log("🔍 SQL Query:", query); // ✅ DEBUG
-    console.log("🔍 Params:", params); // ✅ DEBUG
-    
     const [students] = await db.promise().query(query, params);
-    
-    console.log("🔍 Students found:", students.length); // ✅ DEBUG
     
     res.json({
       students: students || [],
@@ -225,6 +214,7 @@ router.get("/student/:student_id/:counsellor_id", verifyCounsellor, async (req, 
               u.emergency_contact_name, 
               u.emergency_contact_phone, 
               u.emergency_contact_relationship,
+              u.matric_number,
               un.id as university_id, un.name as university_name
        FROM users u
        LEFT JOIN universities un ON u.university_id = un.id
@@ -424,7 +414,7 @@ router.get("/stress-forecast/:student_id/:counsellor_id", verifyCounsellor, asyn
 });
 
 // ============================================
-// SEND NOTE TO STUDENT (Replaces Messaging)
+// SEND NOTE TO STUDENT
 // ============================================
 
 router.post("/send-note", verifyCounsellor, async (req, res) => {
@@ -472,7 +462,7 @@ router.post("/send-note", verifyCounsellor, async (req, res) => {
 // APPOINTMENTS
 // ============================================
 
-// STUDENT: Create appointment request (pending)
+// STUDENT: Create appointment request (pending) - unchanged
 router.post("/appointments/student", verifyToken, async (req, res) => {
   const { student_id, counsellor_id, session_date, duration, notes } = req.body;
   
@@ -544,7 +534,7 @@ router.post("/appointments/student", verifyToken, async (req, res) => {
   }
 });
 
-// STUDENT: Get their appointments
+// STUDENT: Get their appointments - unchanged
 router.get("/appointments/student/:student_id", verifyToken, async (req, res) => {
   const studentId = parseInt(req.params.student_id);
   
@@ -571,7 +561,7 @@ router.get("/appointments/student/:student_id", verifyToken, async (req, res) =>
   }
 });
 
-// COUNSELLOR: Get appointments
+// COUNSELLOR: Get appointments - unchanged
 router.get("/appointments/:counsellor_id", verifyCounsellor, async (req, res) => {
   const counsellorId = parseInt(req.params.counsellor_id);
   const { status } = req.query;
@@ -608,7 +598,7 @@ router.get("/appointments/:counsellor_id", verifyCounsellor, async (req, res) =>
   }
 });
 
-// COUNSELLOR: Update appointment status
+// COUNSELLOR: Update appointment status - unchanged
 router.put("/appointments/:id/status", verifyCounsellor, async (req, res) => {
   const { id } = req.params;
   const { status, notes } = req.body;
@@ -667,7 +657,7 @@ router.put("/appointments/:id/status", verifyCounsellor, async (req, res) => {
   }
 });
 
-// COUNSELLOR: Create appointment (counsellor-initiated, auto-confirmed)
+// COUNSELLOR: Create appointment (counsellor-initiated, auto-confirmed) - unchanged
 router.post("/appointments", verifyCounsellor, async (req, res) => {
   const { counsellor_id, student_id, session_date, duration, notes } = req.body;
   
@@ -712,6 +702,37 @@ router.post("/appointments", verifyCounsellor, async (req, res) => {
   } catch (error) {
     console.error("Create appointment error:", error);
     res.status(500).json({ msg: "Failed to create appointment" });
+  }
+});
+
+// COUNSELLOR: Delete appointment - unchanged
+router.delete("/appointments/:id", verifyCounsellor, async (req, res) => {
+  const { id } = req.params;
+  const counsellorId = req.user.id;
+
+  try {
+    const [appointment] = await db.promise().query(
+      "SELECT counsellor_id FROM counselling_sessions WHERE id = ?",
+      [id]
+    );
+
+    if (!appointment.length) {
+      return res.status(404).json({ msg: "Appointment not found" });
+    }
+
+    if (appointment[0].counsellor_id !== counsellorId) {
+      return res.status(403).json({ msg: "Unauthorized" });
+    }
+
+    await db.promise().query(
+      "DELETE FROM counselling_sessions WHERE id = ?",
+      [id]
+    );
+
+    res.json({ msg: "Appointment deleted successfully" });
+  } catch (error) {
+    console.error("Delete appointment error:", error);
+    res.status(500).json({ msg: "Failed to delete appointment" });
   }
 });
 
@@ -911,42 +932,6 @@ router.get("/analytics/:counsellor_id", verifyCounsellor, async (req, res) => {
   } catch (error) {
     console.error("Analytics error:", error);
     res.status(500).json({ msg: "Failed to fetch analytics" });
-  }
-});
-
-// ============================================
-// COUNSELLOR: Delete Appointment
-// ============================================
-
-router.delete("/appointments/:id", verifyCounsellor, async (req, res) => {
-  const { id } = req.params;
-  const counsellorId = req.user.id;
-
-  try {
-    // Check if appointment exists and belongs to this counsellor
-    const [appointment] = await db.promise().query(
-      "SELECT counsellor_id FROM counselling_sessions WHERE id = ?",
-      [id]
-    );
-
-    if (!appointment.length) {
-      return res.status(404).json({ msg: "Appointment not found" });
-    }
-
-    if (appointment[0].counsellor_id !== counsellorId) {
-      return res.status(403).json({ msg: "Unauthorized" });
-    }
-
-    // Delete the appointment
-    await db.promise().query(
-      "DELETE FROM counselling_sessions WHERE id = ?",
-      [id]
-    );
-
-    res.json({ msg: "Appointment deleted successfully" });
-  } catch (error) {
-    console.error("Delete appointment error:", error);
-    res.status(500).json({ msg: "Failed to delete appointment" });
   }
 });
 

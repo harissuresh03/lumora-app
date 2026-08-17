@@ -5,9 +5,7 @@ const db = require("../db");
 const bcrypt = require("bcryptjs");
 const verifyToken = require("../middleware/authmiddleware");
 
-/* =========================
-   GET PROFILE - Join with universities to get name
-========================= */
+/* GET PROFILE - Join with universities to get name */
 router.get("/:id", verifyToken, (req, res) => {
   const userId = parseInt(req.params.id);
   
@@ -17,7 +15,7 @@ router.get("/:id", verifyToken, (req, res) => {
 
   db.query(
     `SELECT u.id, u.name, u.nickname, u.email, u.dob, u.gender, 
-            u.university_id, u.student_id,
+            u.university_id, u.matric_number,
             u.faculty, u.department,
             u.counsellor_consent,
             u.emergency_contact_name, u.emergency_contact_phone, u.emergency_contact_relationship,
@@ -40,9 +38,7 @@ router.get("/:id", verifyToken, (req, res) => {
   );
 });
 
-/* =========================
-   UPDATE PROFILE - Only update university_id
-========================= */
+/* UPDATE PROFILE */
 router.put("/update/:id", verifyToken, async (req, res) => {
   const userId = parseInt(req.params.id);
   
@@ -51,14 +47,14 @@ router.put("/update/:id", verifyToken, async (req, res) => {
   }
 
   const { 
-    name, nickname, email, dob, gender, university_id, student_id,
+    name, nickname, email, dob, gender, university_id, matric_number,
     faculty, department,
     counsellor_consent,
     emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
     password 
   } = req.body;
 
-  console.log("Update data received:", { name, nickname, email, university_id, faculty, department, counsellor_consent });
+  console.log("Update data received:", { name, nickname, email, university_id, matric_number, faculty, department, counsellor_consent });
 
   if (!name || !email) {
     return res.status(400).json({ msg: "Name and Email required" });
@@ -82,7 +78,7 @@ router.put("/update/:id", verifyToken, async (req, res) => {
         `UPDATE users SET 
           name = ?, nickname = ?, email = ?, dob = ?, gender = ?, 
           university_id = ?,
-          student_id = ?,
+          matric_number = ?,
           faculty = ?,
           department = ?,
           counsellor_consent = ?,
@@ -92,7 +88,7 @@ router.put("/update/:id", verifyToken, async (req, res) => {
         [
           name, nickname || null, email, dob || null, gender || null,
           university_id || null,
-          student_id || null,
+          matric_number || null,
           faculty || null,
           department || null,
           counsellor_consent !== undefined ? (counsellor_consent ? 1 : 0) : 0,
@@ -115,7 +111,7 @@ router.put("/update/:id", verifyToken, async (req, res) => {
         `UPDATE users SET 
           name = ?, nickname = ?, email = ?, dob = ?, gender = ?, 
           university_id = ?,
-          student_id = ?,
+          matric_number = ?,
           faculty = ?,
           department = ?,
           counsellor_consent = ?,
@@ -124,7 +120,7 @@ router.put("/update/:id", verifyToken, async (req, res) => {
         [
           name, nickname || null, email, dob || null, gender || null,
           university_id || null,
-          student_id || null,
+          matric_number || null,
           faculty || null,
           department || null,
           counsellor_consent !== undefined ? (counsellor_consent ? 1 : 0) : 0,

@@ -118,7 +118,7 @@ router.post("/invite", verifyToken, async (req, res) => {
       if (!existingParent[0].parent_invitation_token) {
         await db.promise().query(
           `INSERT INTO parent_student_links 
-           (parent_id, student_id, consent_granted, consent_granted_at) 
+           (parent_id, student_id, consent_granted) 
            VALUES (?, ?, TRUE, NOW())`,
           [parentId, studentId]
         );
@@ -142,8 +142,8 @@ router.post("/invite", verifyToken, async (req, res) => {
       
       await db.promise().query(
         `INSERT INTO parent_student_links 
-         (parent_id, student_id, consent_granted, consent_granted_at) 
-         VALUES (?, ?, TRUE, NOW())`,
+         (parent_id, student_id, consent_granted) 
+         VALUES (?, ?, TRUE)`,
         [parentId, studentId]
       );
       
@@ -173,7 +173,7 @@ router.post("/invite", verifyToken, async (req, res) => {
     // Create link with consent granted (parent can login directly)
     await db.promise().query(
       `INSERT INTO parent_student_links 
-       (parent_id, student_id, consent_granted, consent_granted_at) 
+       (parent_id, student_id, consent_granted)) 
        VALUES (?, ?, TRUE, NOW())`,
       [parentId, studentId]
     );
@@ -277,7 +277,7 @@ router.get("/students", verifyToken, async (req, res) => {
     const [students] = await db.promise().query(
       `SELECT 
         u.id, u.name, u.nickname, u.email,
-        ps.consent_granted, ps.consent_granted_at,
+        ps.consent_granted,
         ps.share_mood, ps.share_sleep, ps.share_stress, ps.share_assessments,
         (SELECT AVG(mood) FROM moods WHERE user_id = u.id AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as avg_mood,
         (SELECT AVG(quality) FROM sleep WHERE user_id = u.id AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as avg_sleep,
@@ -337,7 +337,6 @@ router.get("/student/:student_id/summary", verifyToken, async (req, res) => {
       student: student[0],
       consent: {
         granted: linkData.consent_granted,
-        granted_at: linkData.consent_granted_at,
         share_mood: linkData.share_mood,
         share_sleep: linkData.share_sleep,
         share_stress: linkData.share_stress,
