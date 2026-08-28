@@ -81,7 +81,7 @@ async function detectCrisisWithAI(content) {
     console.log("🤖 Calling Groq API for crisis detection...");
     const chatCompletion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
-      model: "gpt-oss-120b",
+      model: "openai/gpt-oss-120b",
       temperature: 0.2,
       max_tokens: 256,
     });
@@ -193,7 +193,7 @@ async function moderatePost(content) {
     console.log("🤖 Calling Groq API...");
     const chatCompletion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
-      model: "gpt-oss-120b",
+      model: "openai/gpt-oss-120b",
       temperature: 0.3,
       max_tokens: 512,
     });

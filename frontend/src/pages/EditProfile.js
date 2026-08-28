@@ -5,25 +5,21 @@ import api from "../utils/api";
 import Layout from "./components/Layout";
 import {
   User,
-  Mail,
   BookOpen,
   Heart,
   ArrowLeft,
   Save,
-  Building,
   Lock,
-  Calendar,
-  Users,
-  GraduationCap,
   Shield
 } from "lucide-react";
 
 function EditProfile() {
   const navigate = useNavigate();
   const user_id = localStorage.getItem("user_id");
-  const [userNickname, setUserNickname] = useState("");
   const [universities, setUniversities] = useState([]);
   const [loadingUniversities, setLoadingUniversities] = useState(true);
+  const [parentData, setParentData] = useState(null);
+  const [parentConsent, setParentConsent] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -63,6 +59,22 @@ function EditProfile() {
     fetchUniversities();
   }, []);
 
+  // Fetch parent data
+  useEffect(() => {
+    const fetchParent = async () => {
+      try {
+        const res = await api.get("/parent/my-parent");
+        if (res.data.hasParent) {
+          setParentData(res.data);
+          setParentConsent(res.data.consent_granted);
+        }
+      } catch (err) {
+        console.error("Failed to fetch parent data:", err);
+      }
+    };
+    fetchParent();
+  }, []);
+
   // Fetch user profile
   useEffect(() => {
     const fetchProfile = async () => {
@@ -91,8 +103,6 @@ function EditProfile() {
           emergency_contact_phone: res.data.emergency_contact_phone || "",
           emergency_contact_relationship: res.data.emergency_contact_relationship || "",
         }));
-        
-        setUserNickname(res.data.nickname || res.data.name.split(" ")[0]);
         
         if (matchedUni?.short_name === "Other" || (res.data.university && !matchedUni)) {
           setShowOtherUniversity(true);
@@ -165,6 +175,20 @@ function EditProfile() {
 
     try {
       await api.put(`/profile/update/${user_id}`, payload);
+      
+      // Update parent consent if parent is linked
+      if (parentData) {
+        await api.put("/parent/settings", {
+          consent_granted: parentConsent ? 1 : 0
+        });
+        // Refresh parent data
+        const parentRes = await api.get("/parent/my-parent");
+        if (parentRes.data.hasParent) {
+          setParentData(parentRes.data);
+          setParentConsent(parentRes.data.consent_granted);
+        }
+      }
+      
       alert("Profile updated successfully");
       navigate("/profile");
     } catch (err) {
@@ -305,12 +329,13 @@ function EditProfile() {
             <p className="form-section-hint">Control how your data is shared</p>
           </div>
 
+          {/* Counsellor Consent */}
           <div style={{ 
             padding: "16px", 
             background: "rgba(102, 126, 234, 0.05)", 
             borderRadius: "12px", 
             border: "1px solid rgba(102, 126, 234, 0.2)",
-            marginBottom: "16px"
+            marginBottom: "12px"
           }}>
             <label style={{ 
               display: "flex", 
@@ -345,6 +370,53 @@ function EditProfile() {
                   {form.counsellor_consent === 1 
                     ? "✅ You have given consent. Your counsellor can see your data." 
                     : "❌ You have not given consent. Your counsellor cannot see your data."}
+                </span>
+              </div>
+            </label>
+          </div>
+
+          {/* Parent Consent - moved here */}
+          <div style={{
+            padding: "16px",
+            background: "rgba(99, 102, 241, 0.05)",
+            borderRadius: "12px",
+            border: "1px solid rgba(99, 102, 241, 0.2)"
+          }}>
+            <label style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "12px",
+              cursor: parentData ? "pointer" : "default"
+            }}>
+              <input
+                type="checkbox"
+                checked={parentConsent}
+                onChange={(e) => setParentConsent(e.target.checked)}
+                disabled={!parentData}
+                style={{
+                  marginTop: "3px",
+                  width: "18px",
+                  height: "18px",
+                  cursor: parentData ? "pointer" : "not-allowed",
+                  flexShrink: 0
+                }}
+              />
+              <div>
+                <span style={{ fontSize: "14px", color: "#374151", lineHeight: "1.5" }}>
+                  {parentData 
+                    ? `Allow linked parent (${parentData.email}) to view my well-being summary` 
+                    : "No parent is currently linked to your account."}
+                </span>
+                <span style={{
+                  display: "block",
+                  fontSize: "12px",
+                  color: "#9ca3af",
+                  marginTop: "4px",
+                  fontStyle: "italic"
+                }}>
+                  {parentData
+                    ? (parentConsent ? "✅ Parent access is enabled." : "❌ Parent access is revoked.")
+                    : "Invite a parent from your Profile page first."}
                 </span>
               </div>
             </label>

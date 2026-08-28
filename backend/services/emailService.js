@@ -592,11 +592,170 @@ const sendCrisisAlertEmail = async (counsellorEmail, counsellorName, studentName
   return await sendEmail({ to: counsellorEmail, subject, html, text });
 };
 
+/**
+ * Send email verification OTP
+ */
+const sendVerificationEmail = async (email, name, otp) => {
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const subject = "Verify Your Email Address - Lumora";
+
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Verify Your Email</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8fafc; }
+        .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 32px 30px; text-align: center; border-radius: 12px 12px 0 0; }
+        .header h1 { margin: 0; font-size: 28px; font-weight: 700; }
+        .header p { margin: 8px 0 0; opacity: 0.9; font-size: 14px; }
+        .content { background: #ffffff; padding: 32px 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none; }
+        .otp-box { background: #eef2ff; padding: 20px; border-radius: 12px; text-align: center; margin: 16px 0; border-left: 4px solid #6366f1; }
+        .otp-code { font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #4f46e5; font-family: monospace; }
+        .warning { background: #fef3c7; padding: 12px 16px; border-radius: 8px; margin: 12px 0; border-left: 4px solid #f59e0b; font-size: 13px; color: #92400e; }
+        .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
+        .button { display: inline-block; padding: 10px 24px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; text-decoration: none; border-radius: 30px; font-weight: 600; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>✨ Lumora</h1>
+        <p>Mental Health Support Platform</p>
+      </div>
+      <div class="content">
+        <h2>Verify Your Email Address</h2>
+        <p>Hi <strong>${name}</strong>,</p>
+        <p>Thank you for registering with Lumora. Please use the verification code below to confirm your email address.</p>
+        <div class="otp-box">
+          <div style="font-size: 14px; color: #475569; margin-bottom: 8px;">Your Verification Code</div>
+          <div class="otp-code">${otp}</div>
+        </div>
+        <p>This code will expire in <strong>10 minutes</strong>.</p>
+        <div class="warning">
+          ⚠️ <strong>Do not share this code with anyone.</strong> Lumora will never ask for your verification code outside of the official platform.
+        </div>
+        <p style="margin-top: 16px;">If you did not create an account on Lumora, please ignore this email.</p>
+        <p style="margin-top: 16px; color: #475569;">
+          Warm regards,<br>
+          <strong>The Lumora Team 💙</strong>
+        </p>
+      </div>
+      <div class="footer">
+        <p>This email was sent to ${email}. If you did not request this, please ignore it.</p>
+        <p>© ${new Date().getFullYear()} Lumora Mental Health Platform. All rights reserved.</p>
+      </div>
+    </body>
+    </html>
+    `;
+
+    const text = `
+    Lumora - Verify Your Email Address
+
+    Hi ${name},
+
+    Thank you for registering with Lumora. Please use the verification code below to confirm your email address.
+
+    Your Verification Code: ${otp}
+
+    This code will expire in 10 minutes.
+
+    Do not share this code with anyone. Lumora will never ask for your verification code outside of the official platform.
+
+    If you did not create an account on Lumora, please ignore this email.
+
+    Warm regards,
+    The Lumora Team 💙
+    `;
+
+    return await sendEmail({ to: email, subject, html, text });
+};
+
+/**
+ * Send password reset OTP
+ */
+const sendPasswordResetEmail = async (email, name, otp) => {
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const subject = "Password Reset Request - Lumora";
+
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Password Reset</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8fafc; }
+        .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 32px 30px; text-align: center; border-radius: 12px 12px 0 0; }
+        .header h1 { margin: 0; font-size: 28px; font-weight: 700; }
+        .header p { margin: 8px 0 0; opacity: 0.9; font-size: 14px; }
+        .content { background: #ffffff; padding: 32px 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none; }
+        .otp-box { background: #eef2ff; padding: 20px; border-radius: 12px; text-align: center; margin: 16px 0; border-left: 4px solid #6366f1; }
+        .otp-code { font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #4f46e5; font-family: monospace; }
+        .warning { background: #fef3c7; padding: 12px 16px; border-radius: 8px; margin: 12px 0; border-left: 4px solid #f59e0b; font-size: 13px; color: #92400e; }
+        .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>✨ Lumora</h1>
+        <p>Mental Health Support Platform</p>
+      </div>
+      <div class="content">
+        <h2>Password Reset Request</h2>
+        <p>Hi <strong>${name}</strong>,</p>
+        <p>We received a request to reset your password. Use the verification code below to proceed.</p>
+        <div class="otp-box">
+          <div style="font-size: 14px; color: #475569; margin-bottom: 8px;">Your Password Reset Code</div>
+          <div class="otp-code">${otp}</div>
+        </div>
+        <p>This code will expire in <strong>10 minutes</strong>.</p>
+        <div class="warning">
+          ⚠️ <strong>Do not share this code with anyone.</strong> If you did not request a password reset, please ignore this email.
+        </div>
+        <p style="margin-top: 16px; color: #475569;">
+          Warm regards,<br>
+          <strong>The Lumora Team 💙</strong>
+        </p>
+      </div>
+      <div class="footer">
+        <p>This email was sent to ${email}. If you did not request this, please ignore it.</p>
+        <p>© ${new Date().getFullYear()} Lumora Mental Health Platform. All rights reserved.</p>
+      </div>
+    </body>
+    </html>
+    `;
+
+    const text = `
+    Lumora - Password Reset Request
+
+    Hi ${name},
+
+    We received a request to reset your password. Use the verification code below to proceed.
+
+    Your Password Reset Code: ${otp}
+
+    This code will expire in 10 minutes.
+
+    Do not share this code with anyone. If you did not request a password reset, please ignore this email.
+
+    Warm regards,
+    The Lumora Team 💙
+    `;
+
+    return await sendEmail({ to: email, subject, html, text });
+};
+
+// Make sure to export the new functions
 module.exports = {
-  sendEmail,
-  sendCounsellorApprovalEmail,
-  sendCounsellorRejectionEmail,
-  sendAccountApprovalEmail,
-  sendParentInvitationEmail,
-  sendCrisisAlertEmail,
+    sendEmail,
+    sendCounsellorApprovalEmail,
+    sendCounsellorRejectionEmail,
+    sendAccountApprovalEmail,
+    sendParentInvitationEmail,
+    sendCrisisAlertEmail,
+    sendVerificationEmail,      // NEW
+    sendPasswordResetEmail      // NEW
 };

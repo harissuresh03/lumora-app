@@ -4,21 +4,24 @@ const router = express.Router();
 const db = require("../db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const verifyToken = require("../middleware/authmiddleware");
 
 const JWT_SECRET = "lumora_secret_key";
 
-/* REGISTER - Check if registrations are allowed */
+/* REGISTER - with email verification */
 router.post("/register", async (req, res) => {
   const { 
     name, nickname, email, password, dob, gender, 
     university_id, matric_number, faculty, department,
     emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
-    counsellor_consent
+    counsellor_consent,
+    parent_email
   } = req.body;
 
   console.log("Registration data received:", { 
-    name, nickname, email, university_id, matric_number, faculty, department, counsellor_consent
+    name, nickname, email, university_id, matric_number, faculty, department, counsellor_consent,
+    parent_email
   });
 
   if (!name || !email || !password) {
@@ -28,7 +31,7 @@ router.post("/register", async (req, res) => {
 
   // Check if registrations are allowed
   try {
-    const [settings] = await db.promise().query(
+    const [settings] = await db.query(
       "SELECT setting_value FROM system_settings WHERE setting_key = 'allowRegistrations'"
     );
     
@@ -36,60 +39,136 @@ router.post("/register", async (req, res) => {
       return res.status(403).json({ msg: "Registrations are currently disabled. Please try again later." });
     }
     
-    // Get default user role
-    const [roleSetting] = await db.promise().query(
+    const [roleSetting] = await db.query(
       "SELECT setting_value FROM system_settings WHERE setting_key = 'defaultUserRole'"
     );
     const defaultRole = roleSetting[0]?.setting_value || 'student';
     
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    db.query(
-      `INSERT INTO users (name, nickname, email, password, dob, gender, 
-        university_id, matric_number, faculty, department,
-        emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, 
-        counsellor_consent, role)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        name, 
-        nickname || null, 
-        email, 
-        hashedPassword, 
-        dob || null, 
-        gender || null,
-        university_id || null,
-        matric_number || null,
-        faculty || null,
-        department || null,
-        emergency_contact_name || null, 
-        emergency_contact_phone || null, 
-        emergency_contact_relationship || null,
-        counsellor_consent ? 1 : 0,
-        defaultRole
-      ],
-      (err, result) => {
-        if (err) {
-          console.error("Register error:", err);
-          if (err.code === 'ER_DUP_ENTRY') {
-            return res.status(400).json({ msg: "Email already registered" });
+    // Get a connection from the pool for transaction
+    const connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    try {
+      // Insert user with is_verified = FALSE
+      const [result] = await connection.query(
+        `INSERT INTO users 
+         (name, nickname, email, password, dob, gender, 
+          university_id, matric_number, faculty, department,
+          emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, 
+          counsellor_consent, role, is_verified) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, FALSE)`,
+        [
+          name, 
+          nickname || null, 
+          email, 
+          hashedPassword, 
+          dob || null, 
+          gender || null,
+          university_id || null,
+          matric_number || null,
+          faculty || null,
+          department || null,
+          emergency_contact_name || null, 
+          emergency_contact_phone || null, 
+          emergency_contact_relationship || null,
+          counsellor_consent ? 1 : 0,
+          defaultRole
+        ]
+      );
+
+      const userId = result.insertId;
+
+      // Send verification OTP
+      const { createVerification } = require("../services/verificationService");
+      await createVerification(userId, 'email_verification', email, name);
+
+      // Handle parent email if provided
+      let parentInvited = false;
+      if (parent_email && parent_email.trim() !== "") {
+        try {
+          const [existingParent] = await connection.query(
+            "SELECT id, email, parent_invitation_token FROM users WHERE email = ? AND role = 'parent'",
+            [parent_email]
+          );
+
+          let parentId;
+
+          if (existingParent.length > 0) {
+            parentId = existingParent[0].id;
+            
+            const [existingLink] = await connection.query(
+              "SELECT id FROM parent_student_links WHERE parent_id = ? AND student_id = ?",
+              [parentId, userId]
+            );
+
+            if (existingLink.length === 0) {
+              const isConsented = !existingParent[0].parent_invitation_token;
+              await connection.query(
+                `INSERT INTO parent_student_links 
+                 (parent_id, student_id, consent_granted, consent_granted_at) 
+                 VALUES (?, ?, ?, ?)`,
+                [parentId, userId, isConsented ? 1 : 0, isConsented ? new Date() : null]
+              );
+            }
+            parentInvited = true;
+          } else {
+            const defaultPassword = "password123";
+            const hashedParentPassword = await bcrypt.hash(defaultPassword, 10);
+            const token = crypto.randomBytes(32).toString('hex');
+            const tokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+            const [parentResult] = await connection.query(
+              `INSERT INTO users 
+               (email, password, role, parent_invitation_token, parent_invitation_expires, is_active, created_at) 
+               VALUES (?, ?, 'parent', ?, ?, 1, NOW())`,
+              [parent_email, hashedParentPassword, token, tokenExpiry]
+            );
+
+            parentId = parentResult.insertId;
+
+            await connection.query(
+              `INSERT INTO parent_student_links 
+               (parent_id, student_id, consent_granted, consent_granted_at) 
+               VALUES (?, ?, FALSE, NULL)`,
+              [parentId, userId]
+            );
+
+            const { sendParentInvitationEmail } = require("../services/emailService");
+            await sendParentInvitationEmail(parent_email, name);
+            
+            parentInvited = true;
+            console.log(`✅ Parent invitation sent to ${parent_email} during registration`);
           }
-          return res.status(500).json({ 
-            msg: "Register failed", 
-            error: err.message,
-            code: err.code 
-          });
+        } catch (parentError) {
+          console.error("Parent invitation error during registration:", parentError);
         }
-
-        console.log("User registered successfully. ID:", result.insertId);
-
-        res.json({
-          msg: "User created",
-          user_id: result.insertId,
-        });
       }
-    );
+
+      await connection.commit();
+      connection.release();
+
+      console.log("User registered successfully. ID:", userId);
+      res.json({
+        msg: "Registration successful! Please check your email for the verification code.",
+        user_id: userId,
+        email: email,
+        needsVerification: true,
+        parent_invited: parentInvited
+      });
+
+    } catch (error) {
+      await connection.rollback();
+      connection.release();
+      throw error;
+    }
+
   } catch (error) {
     console.error("Server error:", error);
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ msg: "Email already registered" });
+    }
     res.status(500).json({ msg: "Server error", error: error.message });
   }
 });
@@ -122,6 +201,15 @@ router.post("/login", (req, res) => {
         return res.status(400).json({ msg: "Invalid credentials" });
       }
 
+      if (!user.is_verified) {
+        return res.status(403).json({
+          msg: "Please verify your email address before logging in.",
+          needsVerification: true,
+          email: user.email,
+          user_id: user.id
+        });
+      }
+
       if (!user.is_active && user.role !== 'admin') {
         return res.status(403).json({ msg: "Your account has been deactivated. Please contact support." });
       }
@@ -134,7 +222,7 @@ router.post("/login", (req, res) => {
         if (user.banned_until && new Date(user.banned_until) > new Date()) {
           banMessage += ` Banned until: ${new Date(user.banned_until).toLocaleDateString()}`;
         } else if (user.banned_until) {
-          await db.promise().query(
+          await db.query(
             "UPDATE users SET is_blocked = FALSE, ban_reason = NULL, banned_until = NULL WHERE id = ?",
             [user.id]
           );
@@ -145,7 +233,7 @@ router.post("/login", (req, res) => {
       }
 
       try {
-        const [settings] = await db.promise().query(
+        const [settings] = await db.query(
           "SELECT setting_value FROM system_settings WHERE setting_key = 'sessionTimeout'"
         );
         const timeoutMinutes = parseInt(settings[0]?.setting_value) || 60;
@@ -185,17 +273,17 @@ router.post("/login", (req, res) => {
   );
 });
 
-// Check if email exists - unchanged
+/* CHECK EMAIL - unchanged */
 router.post("/check-email", async (req, res) => {
   const { email } = req.body;
 
   try {
-    const [users] = await db.promise().query(
+    const [users] = await db.query(
       "SELECT id FROM users WHERE email = ?",
       [email]
     );
     
-    const [requests] = await db.promise().query(
+    const [requests] = await db.query(
       "SELECT id FROM counsellor_requests WHERE email = ? AND status = 'pending'",
       [email]
     );
@@ -210,7 +298,7 @@ router.post("/check-email", async (req, res) => {
   }
 });
 
-/* DELETE ACCOUNT - unchanged (no student_id reference) */
+/* DELETE ACCOUNT - unchanged */
 router.delete("/account/:user_id", verifyToken, (req, res) => {
   const userId = parseInt(req.params.user_id);
   

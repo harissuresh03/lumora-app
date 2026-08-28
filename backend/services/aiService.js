@@ -108,7 +108,7 @@ async function processChatMessage(userMessage, conversationHistory = []) {
     // Groq API call
     const chatCompletion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
-      model: "gpt-oss-120b",
+      model: "openai/gpt-oss-120b",
       temperature: 0.7,
       max_tokens: 1024,
     });
@@ -193,7 +193,7 @@ async function generateJournalSummary(conversationHistory, detectedMood, primary
     // Groq API call
     const chatCompletion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
-      model: "gpt-oss-120b",
+      model: "openai/gpt-oss-120b",
       temperature: 0.7,
       max_tokens: 512,
     });

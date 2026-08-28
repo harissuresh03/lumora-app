@@ -3,6 +3,7 @@ const express = require("express");
 const db = require("../db");
 const verifyToken = require("../middleware/authmiddleware");
 const { detectCrisisWithAI, createCrisisAlert } = require("../services/ModerationService");
+const { logGamificationActivity } = require("../services/gamificationService");
 
 const router = express.Router();
 
@@ -63,7 +64,10 @@ router.post("/", verifyToken, async (req, res) => {
       "INSERT INTO journals (user_id, content) VALUES (?, ?)",
       [user_id, content]
     );
-    
+
+    // ✅ GAMIFICATION: Log journal activity & award badges
+    await logGamificationActivity(user_id, 'journal');
+
     // If crisis detected, return with warning
     if (crisisDetected) {
       return res.json({
@@ -80,7 +84,6 @@ router.post("/", verifyToken, async (req, res) => {
     }
     
     res.json({ msg: "Journal saved 🌿", id: result.insertId });
-    
   } catch (err) {
     console.error("Journal save error:", err);
     res.status(500).json({ msg: "Failed to save journal", error: err.message });

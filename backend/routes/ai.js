@@ -9,6 +9,7 @@ const {
   updateMoodFromAI 
 } = require("../services/aiService");
 const { detectCrisisWithAI, createCrisisAlert } = require("../services/ModerationService");
+const { logGamificationActivity } = require("../services/gamificationService");
 
 // Helper function to get mood label
 function getMoodLabel(mood) {
@@ -81,6 +82,9 @@ router.post("/chat", verifyToken, async (req, res) => {
     if (autoSaveMood && aiAnalysis.detectedMood) {
       moodSaved = await updateMoodFromAI(user_id, aiAnalysis.detectedMood);
     }
+
+    // ✅ GAMIFICATION: Log chat activity & award badges (even if mood wasn't saved)
+    await logGamificationActivity(user_id, 'chat');
     
     // Return response with crisis flag and resources
     res.json({
@@ -145,46 +149,40 @@ router.post("/save-journal", verifyToken, async (req, res) => {
     }
     
     // Insert journal entry with summary as content
-    db.query(
+    const [result] = await db.promise().query(
       "INSERT INTO journals (user_id, content) VALUES (?, ?)",
-      [user_id, journalContent],
-      async (err, result) => {
-        if (err) {
-          console.error("Save journal error:", err);
-          return res.status(500).json({ msg: "Failed to save journal entry" });
-        }
-        
-        const journalId = result.insertId;
-        
-        // Save AI analysis to ai_analysis table (only if mood analysis exists)
-        if (moodAnalysis && moodAnalysis.detectedMood) {
-          db.query(
-            `INSERT INTO ai_analysis 
-             (journal_id, user_id, detected_mood, primary_emotion, intensity, themes, confidence, ai_response)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-              journalId, user_id,
-              moodAnalysis.detectedMood || 3,
-              moodAnalysis.primaryEmotion || "neutral",
-              moodAnalysis.intensity || 2,
-              JSON.stringify(moodAnalysis.keyThemes || []),
-              moodAnalysis.confidence || 0.5,
-              conversationHistory[conversationHistory.length - 1]?.content || ""
-            ],
-            (err) => {
-              if (err) console.error("Save AI analysis error:", err);
-            }
-          );
-        }
-        
-        res.json({
-          success: true,
-          msg: "Journal saved successfully 🌿",
-          journalId: journalId,
-          content: journalContent
-        });
-      }
+      [user_id, journalContent]
     );
+    
+    const journalId = result.insertId;
+    
+    // ✅ GAMIFICATION: Log journal activity (AI-generated journal)
+    await logGamificationActivity(user_id, 'journal');
+    
+    // Save AI analysis to ai_analysis table (only if mood analysis exists)
+    if (moodAnalysis && moodAnalysis.detectedMood) {
+      await db.promise().query(
+        `INSERT INTO ai_analysis 
+         (journal_id, user_id, detected_mood, primary_emotion, intensity, themes, confidence, ai_response)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          journalId, user_id,
+          moodAnalysis.detectedMood || 3,
+          moodAnalysis.primaryEmotion || "neutral",
+          moodAnalysis.intensity || 2,
+          JSON.stringify(moodAnalysis.keyThemes || []),
+          moodAnalysis.confidence || 0.5,
+          conversationHistory[conversationHistory.length - 1]?.content || ""
+        ]
+      );
+    }
+    
+    res.json({
+      success: true,
+      msg: "Journal saved successfully 🌿",
+      journalId: journalId,
+      content: journalContent
+    });
     
   } catch (error) {
     console.error("Save journal error:", error);

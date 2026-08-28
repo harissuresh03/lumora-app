@@ -8,7 +8,6 @@ import {
   Flag,
   BookOpen,
   AlertCircle,
-  Activity,
   LogOut,
   Menu,
   X,
@@ -26,6 +25,15 @@ function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [adminName, setAdminName] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const userId = localStorage.getItem("user_id");
+  const userRole = localStorage.getItem("user_role") || "admin";
+
+  // Format user ID with role prefix
+  const getFormattedUserId = () => {
+    if (!userId) return "";
+    const prefix = userRole === 'student' ? 'S' : userRole === 'counsellor' ? 'C' : userRole === 'parent' ? 'P' : userRole === 'admin' ? 'A' : 'U';
+    return `${prefix}${String(userId).padStart(2, '0')}`;
+  };
 
   useEffect(() => {
     if (!requireAdmin(navigate)) {
@@ -245,6 +253,16 @@ function AdminLayout() {
                 whiteSpace: 'nowrap'
               }}>
                 {adminName || "Admin"}
+                {userId && (
+                  <span style={{ 
+                    fontSize: '11px', 
+                    fontWeight: 400, 
+                    color: 'var(--text-muted)',
+                    marginLeft: '4px'
+                  }}>
+                    ({getFormattedUserId()})
+                  </span>
+                )}
               </span>
             </div>
 

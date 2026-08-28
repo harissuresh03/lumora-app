@@ -24,6 +24,15 @@ function CounsellorLayout() {
   const [counsellorName, setCounsellorName] = useState("");
   const [pendingAlerts, setPendingAlerts] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const userId = localStorage.getItem("user_id");
+  const userRole = localStorage.getItem("user_role") || "counsellor";
+
+  // Format user ID with role prefix
+  const getFormattedUserId = () => {
+    if (!userId) return "";
+    const prefix = userRole === 'student' ? 'S' : userRole === 'counsellor' ? 'C' : userRole === 'parent' ? 'P' : userRole === 'admin' ? 'A' : 'U';
+    return `${prefix}${String(userId).padStart(2, '0')}`;
+  };
 
   const counsellorId = localStorage.getItem("user_id");
 
@@ -244,6 +253,16 @@ function CounsellorLayout() {
                 }}
               >
                 {counsellorName || 'Counsellor'}
+                {userId && (
+                  <span style={{ 
+                    fontSize: '11px', 
+                    fontWeight: 400, 
+                    color: 'var(--text-muted)',
+                    marginLeft: '4px'
+                  }}>
+                    ({getFormattedUserId()})
+                  </span>
+                )}
               </span>
             </div>
 

@@ -11,7 +11,7 @@ const { sendParentInvitationEmail } = require("../services/emailService");
 const JWT_SECRET = "lumora_secret_key";
 
 // ============================================
-// STUDENT: Get My Parent (if linked)
+// STUDENT: Get My Parent
 // ============================================
 
 router.get("/my-parent", verifyToken, async (req, res) => {
@@ -40,11 +40,7 @@ router.get("/my-parent", verifyToken, async (req, res) => {
       parent_id: link[0].parent_id,
       email: link[0].email,
       name: link[0].name,
-      consent_granted: link[0].consent_granted === 1,
-      share_mood: link[0].share_mood === 1,
-      share_sleep: link[0].share_sleep === 1,
-      share_stress: link[0].share_stress === 1,
-      share_assessments: link[0].share_assessments === 1
+      consent_granted: link[0].consent_granted === 1
     });
   } catch (error) {
     console.error("Get my parent error:", error);
@@ -53,7 +49,7 @@ router.get("/my-parent", verifyToken, async (req, res) => {
 });
 
 // ============================================
-// STUDENT: Invite Parent (One Parent Per Student)
+// STUDENT: Invite Parent
 // ============================================
 
 router.post("/invite", verifyToken, async (req, res) => {
@@ -65,7 +61,6 @@ router.post("/invite", verifyToken, async (req, res) => {
   }
 
   try {
-    // Check if student exists
     const [student] = await db.promise().query(
       "SELECT id, name FROM users WHERE id = ? AND role = 'student'",
       [studentId]
@@ -75,7 +70,7 @@ router.post("/invite", verifyToken, async (req, res) => {
       return res.status(404).json({ msg: "Student not found" });
     }
 
-    // ✅ CHECK: Student already has an active parent linked?
+    // Check if student already has a linked parent
     const [existingLink] = await db.promise().query(
       "SELECT * FROM parent_student_links WHERE student_id = ? AND consent_granted = 1",
       [studentId]
@@ -87,7 +82,7 @@ router.post("/invite", verifyToken, async (req, res) => {
       });
     }
 
-    // ✅ Check if there's a pending invitation already
+    // Check if there's a pending invitation already
     const [pendingLink] = await db.promise().query(
       "SELECT * FROM parent_student_links WHERE student_id = ? AND consent_granted = 0",
       [studentId]
@@ -119,7 +114,7 @@ router.post("/invite", verifyToken, async (req, res) => {
         await db.promise().query(
           `INSERT INTO parent_student_links 
            (parent_id, student_id, consent_granted) 
-           VALUES (?, ?, TRUE, NOW())`,
+           VALUES (?, ?, TRUE)`,
           [parentId, studentId]
         );
         return res.json({
@@ -147,7 +142,7 @@ router.post("/invite", verifyToken, async (req, res) => {
         [parentId, studentId]
       );
       
-      await sendParentInvitationEmail(parent_email, student[0].name, true);
+      await sendParentInvitationEmail(parent_email, student[0].name);
       return res.json({
         msg: "New invitation sent! Parent can login with the provided credentials.",
         parent_id: parentId,
@@ -170,16 +165,16 @@ router.post("/invite", verifyToken, async (req, res) => {
 
     parentId = result.insertId;
 
-    // Create link with consent granted (parent can login directly)
+    // Create link with consent granted
     await db.promise().query(
       `INSERT INTO parent_student_links 
-       (parent_id, student_id, consent_granted)) 
-       VALUES (?, ?, TRUE, NOW())`,
+       (parent_id, student_id, consent_granted) 
+       VALUES (?, ?, TRUE)`,
       [parentId, studentId]
     );
 
     // Send invitation email
-    await sendParentInvitationEmail(parent_email, student[0].name, true);
+    await sendParentInvitationEmail(parent_email, student[0].name);
 
     res.json({
       msg: "Parent account created! An email with login credentials has been sent.",
@@ -221,7 +216,7 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ msg: "Invalid credentials" });
     }
 
-    // ✅ CLEAR INVITATION TOKEN ON LOGIN
+    // Clear invitation token on login
     if (parentData.parent_invitation_token) {
       await db.promise().query(
         `UPDATE users 
@@ -229,14 +224,8 @@ router.post("/login", async (req, res) => {
          WHERE id = ?`,
         [parentData.id]
       );
-      console.log(`✅ Parent ${parentData.email} confirmed, token cleared.`);
+      console.log(`Parent ${parentData.email} confirmed, token cleared.`);
     }
-
-    // Check if parent has linked students
-    const [link] = await db.promise().query(
-      "SELECT consent_granted FROM parent_student_links WHERE parent_id = ? AND consent_granted = 1",
-      [parentData.id]
-    );
 
     const token = jwt.sign(
       { id: parentData.id, email: parentData.email, role: parentData.role },
@@ -263,6 +252,33 @@ router.post("/login", async (req, res) => {
 });
 
 // ============================================
+// STUDENT: Update Parent Consent (simplified - single toggle)
+// ============================================
+
+router.put("/settings", verifyToken, async (req, res) => {
+  const studentId = req.user.id;
+  const { consent_granted } = req.body;
+
+  if (req.user.role !== "student") {
+    return res.status(403).json({ msg: "Access denied. Student only." });
+  }
+
+  try {
+    await db.promise().query(
+      `UPDATE parent_student_links SET 
+        consent_granted = ?
+       WHERE student_id = ?`,
+      [consent_granted, studentId]
+    );
+
+    res.json({ msg: "Parent consent updated successfully" });
+  } catch (error) {
+    console.error("Update parent consent error:", error);
+    res.status(500).json({ msg: "Failed to update parent consent" });
+  }
+});
+
+// ============================================
 // PARENT: Get Linked Students
 // ============================================
 
@@ -278,7 +294,6 @@ router.get("/students", verifyToken, async (req, res) => {
       `SELECT 
         u.id, u.name, u.nickname, u.email,
         ps.consent_granted,
-        ps.share_mood, ps.share_sleep, ps.share_stress, ps.share_assessments,
         (SELECT AVG(mood) FROM moods WHERE user_id = u.id AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as avg_mood,
         (SELECT AVG(quality) FROM sleep WHERE user_id = u.id AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as avg_sleep,
         (SELECT 
@@ -301,7 +316,7 @@ router.get("/students", verifyToken, async (req, res) => {
 });
 
 // ============================================
-// PARENT: Get Student Summary (Read-Only)
+// PARENT: Get Student Summary
 // ============================================
 
 router.get("/student/:student_id/summary", verifyToken, async (req, res) => {
@@ -322,8 +337,6 @@ router.get("/student/:student_id/summary", verifyToken, async (req, res) => {
       return res.status(403).json({ msg: "No consent to view this student's data" });
     }
 
-    const linkData = link[0];
-
     const [student] = await db.promise().query(
       "SELECT id, name, nickname, email FROM users WHERE id = ? AND role = 'student'",
       [studentId]
@@ -333,153 +346,112 @@ router.get("/student/:student_id/summary", verifyToken, async (req, res) => {
       return res.status(404).json({ msg: "Student not found" });
     }
 
+    // If consent_granted = 1, show ALL data
     const result = {
       student: student[0],
       consent: {
-        granted: linkData.consent_granted,
-        share_mood: linkData.share_mood,
-        share_sleep: linkData.share_sleep,
-        share_stress: linkData.share_stress,
-        share_assessments: linkData.share_assessments
+        granted: link[0].consent_granted
       }
     };
 
-    if (linkData.share_mood) {
-      const [moodData] = await db.promise().query(
-        `SELECT 
-          DATE(created_at) as date,
-          AVG(mood) as avg_mood
-         FROM moods 
-         WHERE user_id = ? 
-         AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-         GROUP BY DATE(created_at)
-         ORDER BY date ASC`,
-        [studentId]
-      );
-      result.mood_trend = moodData;
+    // Mood data
+    const [moodData] = await db.promise().query(
+      `SELECT 
+        DATE(created_at) as date,
+        AVG(mood) as avg_mood
+       FROM moods 
+       WHERE user_id = ? 
+       AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+       GROUP BY DATE(created_at)
+       ORDER BY date ASC`,
+      [studentId]
+    );
+    result.mood_trend = moodData;
 
-      const [avgMood] = await db.promise().query(
-        "SELECT AVG(mood) as avg_mood FROM moods WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)",
-        [studentId]
-      );
-      result.average_mood = avgMood[0]?.avg_mood ? parseFloat(avgMood[0].avg_mood).toFixed(1) : null;
-    }
+    const [avgMood] = await db.promise().query(
+      "SELECT AVG(mood) as avg_mood FROM moods WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)",
+      [studentId]
+    );
+    result.average_mood = avgMood[0]?.avg_mood ? parseFloat(avgMood[0].avg_mood).toFixed(1) : null;
 
-    if (linkData.share_sleep) {
-      const [sleepData] = await db.promise().query(
-        `SELECT 
-          DATE(created_at) as date,
-          AVG(quality) as avg_quality
-         FROM sleep 
-         WHERE user_id = ? 
-         AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-         GROUP BY DATE(created_at)
-         ORDER BY date ASC`,
-        [studentId]
-      );
-      result.sleep_trend = sleepData;
+    // Sleep data
+    const [sleepData] = await db.promise().query(
+      `SELECT 
+        DATE(created_at) as date,
+        AVG(quality) as avg_quality
+       FROM sleep 
+       WHERE user_id = ? 
+       AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+       GROUP BY DATE(created_at)
+       ORDER BY date ASC`,
+      [studentId]
+    );
+    result.sleep_trend = sleepData;
 
-      const [avgSleep] = await db.promise().query(
-        "SELECT AVG(quality) as avg_quality FROM sleep WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)",
-        [studentId]
-      );
-      result.average_sleep = avgSleep[0]?.avg_quality ? parseFloat(avgSleep[0].avg_quality).toFixed(1) : null;
-    }
+    const [avgSleep] = await db.promise().query(
+      "SELECT AVG(quality) as avg_quality FROM sleep WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)",
+      [studentId]
+    );
+    result.average_sleep = avgSleep[0]?.avg_quality ? parseFloat(avgSleep[0].avg_quality).toFixed(1) : null;
 
-    if (linkData.share_stress) {
-      const [stress] = await db.promise().query(
-        `SELECT 
-           JSON_EXTRACT(forecast_data, '$[0].score') as current_score,
-           JSON_EXTRACT(forecast_data, '$[0].risk_level') as risk_level
-         FROM stress_forecast 
-         WHERE user_id = ? 
-         ORDER BY created_at DESC 
-         LIMIT 1`,
-        [studentId]
-      );
-      result.current_stress = stress[0] || null;
-    }
+    // Stress data
+    const [stress] = await db.promise().query(
+      `SELECT 
+         JSON_EXTRACT(forecast_data, '$[0].score') as current_score,
+         JSON_EXTRACT(forecast_data, '$[0].risk_level') as risk_level
+       FROM stress_forecast 
+       WHERE user_id = ? 
+       ORDER BY created_at DESC 
+       LIMIT 1`,
+      [studentId]
+    );
+    result.current_stress = stress[0] || null;
 
-    if (linkData.share_assessments) {
-      const [assessments] = await db.promise().query(
-        `SELECT type, score, severity, taken_at 
-         FROM assessments 
-         WHERE user_id = ? 
-         ORDER BY taken_at DESC 
-         LIMIT 3`,
-        [studentId]
-      );
-      result.recent_assessments = assessments;
+    // Assessment data
+    const [assessments] = await db.promise().query(
+      `SELECT type, score, severity, taken_at 
+       FROM assessments 
+       WHERE user_id = ? 
+       ORDER BY taken_at DESC 
+       LIMIT 3`,
+      [studentId]
+    );
+    result.recent_assessments = assessments;
 
-      const [phq9] = await db.promise().query(
-        `SELECT score, severity, taken_at 
-         FROM assessments 
-         WHERE user_id = ? AND type = 'phq9' 
-         ORDER BY taken_at DESC 
-         LIMIT 1`,
-        [studentId]
-      );
-      result.latest_phq9 = phq9[0] || null;
+    const [phq9] = await db.promise().query(
+      `SELECT score, severity, taken_at 
+       FROM assessments 
+       WHERE user_id = ? AND type = 'phq9' 
+       ORDER BY taken_at DESC 
+       LIMIT 1`,
+      [studentId]
+    );
+    result.latest_phq9 = phq9[0] || null;
 
-      const [gad7] = await db.promise().query(
-        `SELECT score, severity, taken_at 
-         FROM assessments 
-         WHERE user_id = ? AND type = 'gad7' 
-         ORDER BY taken_at DESC 
-         LIMIT 1`,
-        [studentId]
-      );
-      result.latest_gad7 = gad7[0] || null;
+    const [gad7] = await db.promise().query(
+      `SELECT score, severity, taken_at 
+       FROM assessments 
+       WHERE user_id = ? AND type = 'gad7' 
+       ORDER BY taken_at DESC 
+       LIMIT 1`,
+      [studentId]
+    );
+    result.latest_gad7 = gad7[0] || null;
 
-      const [pss] = await db.promise().query(
-        `SELECT score, severity, taken_at 
-         FROM assessments 
-         WHERE user_id = ? AND type = 'pss' 
-         ORDER BY taken_at DESC 
-         LIMIT 1`,
-        [studentId]
-      );
-      result.latest_pss = pss[0] || null;
-    }
+    const [pss] = await db.promise().query(
+      `SELECT score, severity, taken_at 
+       FROM assessments 
+       WHERE user_id = ? AND type = 'pss' 
+       ORDER BY taken_at DESC 
+       LIMIT 1`,
+      [studentId]
+    );
+    result.latest_pss = pss[0] || null;
 
     res.json(result);
   } catch (error) {
     console.error("Student summary error:", error);
     res.status(500).json({ msg: "Failed to fetch student summary" });
-  }
-});
-
-// ============================================
-// STUDENT: Update Sharing Settings
-// ============================================
-
-router.put("/settings", verifyToken, async (req, res) => {
-  const studentId = req.user.id;
-  const { share_mood, share_sleep, share_stress, share_assessments } = req.body;
-
-  if (req.user.role !== "student") {
-    return res.status(403).json({ msg: "Access denied. Student only." });
-  }
-
-  try {
-    await db.promise().query(
-      `UPDATE parent_student_links SET 
-        share_mood = ?,
-        share_sleep = ?,
-        share_stress = ?,
-        share_assessments = ?
-       WHERE student_id = ? AND consent_granted = 1`,
-      [share_mood !== undefined ? share_mood : 1,
-       share_sleep !== undefined ? share_sleep : 1,
-       share_stress !== undefined ? share_stress : 1,
-       share_assessments !== undefined ? share_assessments : 1,
-       studentId]
-    );
-
-    res.json({ msg: "Sharing settings updated successfully" });
-  } catch (error) {
-    console.error("Update sharing settings error:", error);
-    res.status(500).json({ msg: "Failed to update sharing settings" });
   }
 });
 
@@ -498,8 +470,7 @@ router.post("/revoke/:parent_id", verifyToken, async (req, res) => {
   try {
     await db.promise().query(
       `UPDATE parent_student_links SET 
-        consent_granted = FALSE, 
-        consent_revoked_at = NOW() 
+        consent_granted = FALSE
        WHERE parent_id = ? AND student_id = ?`,
       [parentId, studentId]
     );

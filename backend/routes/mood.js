@@ -1,7 +1,8 @@
-// routes/mood.js
+// backend/routes/mood.js
 const express = require("express");
 const db = require("../db");
 const verifyToken = require("../middleware/authmiddleware");
+const { logGamificationActivity } = require("../services/gamificationService");
 
 const router = express.Router();
 
@@ -15,7 +16,6 @@ router.get("/:user_id", verifyToken, (req, res) => {
   const userId = parseInt(req.params.user_id);
   const { date } = req.query;
   
-  // Check if user is accessing their own data
   if (req.user.id !== userId) {
     return res.status(403).json({ msg: "Unauthorized: Cannot access another user's data" });
   }
@@ -115,21 +115,18 @@ router.get("/week/:user_id", verifyToken, (req, res) => {
  * Insert or update mood for today (UPSERT)
  * Mood scale: 1=Terrible, 2=Sad, 3=Okay, 4=Good, 5=Great
  */
-router.post("/", verifyToken, (req, res) => {
+router.post("/", verifyToken, async (req, res) => {
   const { user_id, mood } = req.body;
   const today = new Date().toISOString().split('T')[0];
   
-  // Check if user is posting for themselves
   if (req.user.id !== user_id) {
     return res.status(403).json({ msg: "Unauthorized: Cannot add mood for another user" });
   }
 
-  // Validate required fields
   if (!user_id || !mood) {
     return res.status(400).json({ msg: "Missing required fields: user_id and mood" });
   }
 
-  // Validate mood range (1-5)
   if (mood < 1 || mood > 5) {
     return res.status(400).json({ 
       msg: "Invalid mood value. Must be between 1 and 5",
@@ -137,55 +134,46 @@ router.post("/", verifyToken, (req, res) => {
     });
   }
 
-  // Check if mood already exists for today
-  db.query(
-    "SELECT id FROM moods WHERE user_id = ? AND DATE(created_at) = ?",
-    [user_id, today],
-    (err, results) => {
-      if (err) return res.status(500).json(err);
-      
-      if (results.length > 0) {
-        // Update existing mood
-        db.query(
-          "UPDATE moods SET mood = ? WHERE id = ?",
-          [mood, results[0].id],
-          (err) => {
-            if (err) return res.status(500).json(err);
-            
-            // Get the mood label for response
-            const moodLabels = { 1: "Terrible", 2: "Sad", 3: "Okay", 4: "Good", 5: "Great" };
-            
-            res.json({ 
-              msg: "Mood updated for today 🌿", 
-              id: results[0].id, 
-              updated: true,
-              mood: mood,
-              moodLabel: moodLabels[mood]
-            });
-          }
-        );
-      } else {
-        // Insert new mood
-        db.query(
-          "INSERT INTO moods (user_id, mood) VALUES (?, ?)",
-          [user_id, mood],
-          (err, result) => {
-            if (err) return res.status(500).json(err);
-            
-            const moodLabels = { 1: "Terrible", 2: "Sad", 3: "Okay", 4: "Good", 5: "Great" };
-            
-            res.json({ 
-              msg: "Mood saved for today 🌿", 
-              id: result.insertId, 
-              updated: false,
-              mood: mood,
-              moodLabel: moodLabels[mood]
-            });
-          }
-        );
-      }
+  try {
+    const [existing] = await db.promise().query(
+      "SELECT id FROM moods WHERE user_id = ? AND DATE(created_at) = ?",
+      [user_id, today]
+    );
+
+    let result;
+    let updated = false;
+
+    if (existing.length > 0) {
+      await db.promise().query(
+        "UPDATE moods SET mood = ? WHERE id = ?",
+        [mood, existing[0].id]
+      );
+      result = { id: existing[0].id };
+      updated = true;
+    } else {
+      const [insertResult] = await db.promise().query(
+        "INSERT INTO moods (user_id, mood) VALUES (?, ?)",
+        [user_id, mood]
+      );
+      result = { id: insertResult.insertId };
     }
-  );
+
+    // ✅ GAMIFICATION: Log mood activity & award badges
+    await logGamificationActivity(user_id, 'mood');
+
+    const moodLabels = { 1: "Terrible", 2: "Sad", 3: "Okay", 4: "Good", 5: "Great" };
+
+    res.json({ 
+      msg: updated ? "Mood updated for today 🌿" : "Mood saved for today 🌿",
+      id: result.id,
+      updated: updated,
+      mood: mood,
+      moodLabel: moodLabels[mood]
+    });
+  } catch (error) {
+    console.error("Mood save error:", error);
+    res.status(500).json({ msg: "Failed to save mood" });
+  }
 });
 
 /* ==================== BULK MOOD OPERATIONS ==================== */
@@ -226,7 +214,6 @@ router.post("/bulk", verifyToken, (req, res) => {
 router.delete("/:id", verifyToken, (req, res) => {
   const moodId = req.params.id;
   
-  // First verify ownership
   db.query(
     "SELECT user_id FROM moods WHERE id = ?",
     [moodId],
@@ -236,12 +223,10 @@ router.delete("/:id", verifyToken, (req, res) => {
         return res.status(404).json({ msg: "Mood entry not found" });
       }
       
-      // Check ownership
       if (results[0].user_id !== req.user.id) {
         return res.status(403).json({ msg: "Unauthorized" });
       }
       
-      // Delete the mood
       db.query("DELETE FROM moods WHERE id = ?", [moodId], (err) => {
         if (err) return res.status(500).json(err);
         res.json({ msg: "Mood entry deleted successfully" });
@@ -282,7 +267,6 @@ router.get("/stats/:user_id", verifyToken, (req, res) => {
       if (err) return res.status(500).json(err);
       const stats = results[0];
       
-      // Add mood labels
       const moodLabels = { 1: "Terrible", 2: "Sad", 3: "Okay", 4: "Good", 5: "Great" };
       
       res.json({

@@ -17,7 +17,3 @@ Launches the test runner.
 
 Builds the app for production to the `build` folder.
 
-## Learn More
-
-- [React Documentation](https://reactjs.org/)
-- [Create React App Documentation](https://create-react-app.dev/docs/getting-started/)

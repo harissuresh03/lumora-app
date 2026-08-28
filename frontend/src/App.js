@@ -15,6 +15,10 @@ import StudentSupport from "./pages/StudentSupport";
 import PeerSupport from "./pages/PeerSupport";
 import Settings from "./pages/Settings";
 import Achievements from "./pages/Achievements";
+import VerifyEmail from "./pages/VerifyEmail";
+import ForgotPassword from "./pages/ForgotPassword";
+import VerifyResetCode from "./pages/VerifyResetCode";
+import ResetPassword from "./pages/ResetPassword";
 
 // Parent Routes
 import ParentDashboard from "./pages/Parent/ParentDashboard";
@@ -79,6 +83,10 @@ function App() {
               {/* Public Routes */}
               <Route path="/" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/verify-reset-code" element={<VerifyResetCode />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
 
               {/* Student Routes */}
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

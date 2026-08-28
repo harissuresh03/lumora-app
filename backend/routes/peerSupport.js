@@ -4,6 +4,7 @@ const router = express.Router();
 const verifyToken = require("../middleware/authmiddleware");
 const db = require("../db");
 const { moderatePost, createCrisisAlert, getUserWarningCount, incrementWarningCount } = require("../services/ModerationService");
+const { logGamificationActivity } = require("../services/gamificationService");
 const admin = require("firebase-admin");
 const path = require("path");
 const sendAdminNotification = require("../utilityAdmin/notificationHelper");
@@ -195,16 +196,12 @@ router.post("/moderate-comment", verifyToken, async (req, res) => {
   }
 
   try {
-    // Use the same moderation function for comments
     const moderationResult = await moderatePost(content);
     console.log("📝 Comment moderation result:", moderationResult);
     
-    // ✅ If crisis is detected in comment
     if (moderationResult.action === 'crisis' && moderationResult.isCrisis) {
-      // ✅ Create crisis alert with source 'comment'
       await createCrisisAlert(userId, content, null, 'comment');
       
-      // Return crisis response
       return res.json({
         action: 'crisis',
         reason: 'We noticed you might be going through a difficult time. Help is available.',
@@ -216,9 +213,7 @@ router.post("/moderate-comment", verifyToken, async (req, res) => {
       });
     }
     
-    // ✅ If comment is blocked (harassment/bullying)
     if (moderationResult.action === 'blocked') {
-      // Increment warning for the user
       const warningResult = await incrementWarningCount(userId);
       
       return res.json({
@@ -229,7 +224,6 @@ router.post("/moderate-comment", verifyToken, async (req, res) => {
       });
     }
     
-    // ✅ Comment approved
     res.json({
       action: 'approved',
       reason: 'Comment approved',
@@ -247,7 +241,7 @@ router.post("/moderate-comment", verifyToken, async (req, res) => {
 });
 
 // ============================================
-// ADD COMMENT WITH MODERATION
+// ADD COMMENT WITH MODERATION & GAMIFICATION
 // ============================================
 
 router.post("/comment", verifyToken, async (req, res) => {
@@ -259,10 +253,8 @@ router.post("/comment", verifyToken, async (req, res) => {
   }
   
   try {
-    // First, moderate the comment
     const moderationResult = await moderatePost(content);
     
-    // ✅ If crisis is detected
     if (moderationResult.action === 'crisis' && moderationResult.isCrisis) {
       await createCrisisAlert(userId, content, null, 'comment');
       
@@ -277,7 +269,6 @@ router.post("/comment", verifyToken, async (req, res) => {
       });
     }
     
-    // ❌ If blocked
     if (moderationResult.action === 'blocked') {
       const warningResult = await incrementWarningCount(userId);
       
@@ -312,6 +303,9 @@ router.post("/comment", verifyToken, async (req, res) => {
     comments.push(newComment);
     
     await postRef.update({ comments: comments });
+
+    // ✅ GAMIFICATION: Log comment activity
+    await logGamificationActivity(userId, 'comment');
     
     res.json({
       action: 'approved',
@@ -322,6 +316,27 @@ router.post("/comment", verifyToken, async (req, res) => {
   } catch (error) {
     console.error("❌ Add comment error:", error);
     res.status(500).json({ msg: "Failed to add comment" });
+  }
+});
+
+// ============================================
+// ADD POST WITH GAMIFICATION
+// ============================================
+
+// Note: The frontend creates posts directly in Firebase.
+// This route is for gamification logging after post creation.
+// The frontend can call this after successfully creating a post.
+
+router.post("/post-log", verifyToken, async (req, res) => {
+  const userId = req.user.id;
+  
+  try {
+    // ✅ GAMIFICATION: Log post activity
+    await logGamificationActivity(userId, 'post');
+    res.json({ success: true, msg: "Post activity logged" });
+  } catch (error) {
+    console.error("Post log error:", error);
+    res.status(500).json({ msg: "Failed to log post activity" });
   }
 });
 

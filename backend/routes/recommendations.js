@@ -20,13 +20,22 @@ router.get("/:user_id", verifyToken, async (req, res) => {
   }
 
   try {
-    // Get user profile data (last 7 days)
+    console.log(`🔍 Fetching recommendations for user ${userId}`);
+    
+    // Get user profile data
     const profile = await getUserProfile(userId);
+    console.log(`📊 Profile from getUserProfile:`, {
+      moodCount: profile.moodCount,
+      sleepCount: profile.sleepCount,
+      journalCount: profile.journalCount,
+      assessmentCount: profile.assessmentCount
+    });
     
     // Check for crisis indicators first
     const crisis = await detectCrisis(userId);
     
     if (crisis.hasCrisis) {
+      console.log(`🚨 Crisis detected for user ${userId}`);
       return res.json({
         crisis: true,
         crisisMessage: crisis.message,
@@ -35,37 +44,26 @@ router.get("/:user_id", verifyToken, async (req, res) => {
       });
     }
     
-    // Check if user has enough data
-    const hasEnoughData = profile.moodCount > 2 || profile.sleepCount > 2 || profile.journalCount > 0;
-    
-    if (!hasEnoughData) {
-      return res.json({
-        crisis: false,
-        hasEnoughData: false,
-        message: "Start logging your mood, sleep, or journal to get personalized recommendations!",
-        recommendations: []
-      });
-    }
-    
     // Get articles from database
     const articles = await getArticlesFromDatabase();
+    console.log(`📚 Found ${articles.length} articles`);
     
-    // Generate recommendations using database articles
-    const recommendations = await generateRecommendations(profile, articles);
+    // Generate recommendations
+    const result = await generateRecommendations(profile, articles);
+    console.log(`📊 Final result: hasEnoughData=${result.hasEnoughData}, recommendations=${result.recommendations.length}`);
     
     // Get assessment recommendation
     const assessmentRecommendation = await getAssessmentRecommendation(userId);
     
     res.json({
       crisis: false,
-      hasEnoughData: true,
-      recommendations,
+      ...result,
       assessmentRecommendation
     });
     
   } catch (error) {
-    console.error("Recommendation error:", error);
-    res.status(500).json({ msg: "Failed to generate recommendations" });
+    console.error("❌ Recommendation error:", error);
+    res.status(500).json({ msg: "Failed to generate recommendations", error: error.message });
   }
 });
 

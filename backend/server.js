@@ -39,6 +39,7 @@ const stressForecastRoutes = require("./routes/stressForecast");
 const recommendationsRoutes = require("./routes/recommendations");
 const gamificationRoutes = require("./routes/gamification");
 const parentRoutes = require("./routes/parent");
+const verificationRoutes = require("./routes/verification");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/mood", moodRoutes);
@@ -48,6 +49,7 @@ app.use("/api/sleep", sleepRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/universities", universityRoutes);
 app.use("/api/support", supportRoutes);
+app.use("/api/verification", verificationRoutes);
 app.use("/api/peer-support", peerSupportRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/notifications", notificationRoutes);

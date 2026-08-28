@@ -1,5 +1,5 @@
 // frontend/src/pages/Parent/ParentDashboard.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -14,44 +14,37 @@ import {
 } from 'recharts';
 import api from "../../utils/api";
 import Layout from "../components/Layout";
-import { showSuccessToast, showErrorToast } from "../components/ToastNotification";
+import {  showErrorToast } from "../components/ToastNotification";
 import { 
-  LayoutDashboard, Settings, User, Eye, Smile, Moon, Activity, RefreshCw 
+  LayoutDashboard, Settings, User, Eye, Smile, Moon, Activity
 } from "lucide-react";
 
 function ParentDashboard() {
   const navigate = useNavigate();
-  const [parentName, setParentName] = useState("");
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [studentData, setStudentData] = useState(null);
   const [viewingStudent, setViewingStudent] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const parentId = localStorage.getItem("user_id");
 
-  // ✅ Custom menu items for parent (Dashboard and Settings)
+  // Parent menu items
   const parentMenuItems = [
     { path: "/parent/dashboard", icon: <LayoutDashboard size={18} />, label: "Dashboard" },
     { path: "/parent/settings", icon: <Settings size={18} />, label: "Settings" },
   ];
 
-  useEffect(() => {
-    fetchParentProfile();
-    fetchStudents();
-  }, []);
-
-  const fetchParentProfile = async () => {
+  const fetchParentProfile = useCallback(async () => {
     try {
       const res = await api.get(`/profile/${parentId}`);
-      setParentName(res.data.nickname || res.data.name || "Parent");
-      localStorage.setItem("user_nickname", res.data.nickname || res.data.name || "Parent");
+      const name = res.data.nickname || res.data.name || "Parent";
+      localStorage.setItem("user_nickname", name);
     } catch (err) {
       console.error("Fetch parent error:", err);
     }
-  };
+  }, [parentId]);
 
-  const fetchStudents = async () => {
+  const fetchStudents = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get("/parent/students");
@@ -62,14 +55,12 @@ function ParentDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const refreshData = async () => {
-    setRefreshing(true);
-    await fetchStudents();
-    setRefreshing(false);
-    showSuccessToast("Dashboard refreshed!");
-  };
+  useEffect(() => {
+    fetchParentProfile();
+    fetchStudents();
+  }, [fetchParentProfile, fetchStudents]);
 
   const viewStudent = async (studentId, e) => {
     if (e) e.stopPropagation();
@@ -92,8 +83,6 @@ function ParentDashboard() {
     setViewingStudent(false);
     setStudentData(null);
   };
-
-  const getInitial = (name) => name?.charAt(0)?.toUpperCase() || "P";
 
   const getStressColor = (score) => {
     if (!score) return "#9ca3af";
@@ -147,8 +136,8 @@ function ParentDashboard() {
         <div style={{ maxWidth: '600px', margin: '60px auto', textAlign: 'center', padding: '40px', background: 'var(--card-bg-glass)', borderRadius: '20px', border: '1px solid var(--border-glass)' }}>
           <User size={64} style={{ marginBottom: '16px', opacity: 0.3 }} />
           <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>No Students Linked</h2>
-          <p style={{ color: 'var(--text-secondary)' }}>You don't have any students linked to your account yet.</p>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '8px' }}>Your child needs to invite you from their profile settings.</p>
+          <p style={{ color: 'var(--text-secondary)' }}>You currently don't have any students linked to your account.</p>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '8px' }}>Your child needs to give access from their profile settings.</p>
           <button onClick={() => navigate("/parent/settings")} style={{ marginTop: '20px', padding: '10px 24px', background: 'var(--accent-gradient)', border: 'none', borderRadius: '30px', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: 500 }}>
             Go to Settings
           </button>

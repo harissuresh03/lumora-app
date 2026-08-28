@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const verifyToken = require("../middleware/authmiddleware");
+const { logGamificationActivity } = require("../services/gamificationService");
 
 /* GET sleep records - with auth & ownership check */
 router.get("/:user_id", verifyToken, (req, res) => {
@@ -41,12 +42,12 @@ router.get("/today/:user_id", verifyToken, (req, res) => {
   );
 });
 
-/* UPSERT sleep (insert or update for today) - FIXED */
-router.post("/", verifyToken, (req, res) => {
+/* UPSERT sleep (insert or update for today) */
+router.post("/", verifyToken, async (req, res) => {
   const { user_id, bedtime, wake_time, duration, quality } = req.body;
   const today = new Date().toISOString().split('T')[0];
   
-  console.log("Sleep save request:", { user_id, bedtime, wake_time, duration, quality }); // Debug log
+  console.log("Sleep save request:", { user_id, bedtime, wake_time, duration, quality });
   
   if (req.user.id !== user_id) {
     return res.status(403).json({ msg: "Unauthorized: Cannot add sleep data for another user" });
@@ -66,51 +67,47 @@ router.post("/", verifyToken, (req, res) => {
     return res.status(400).json({ msg: "Quality must be between 1 and 5" });
   }
 
-  // Validate time format (HH:MM)
   const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
   if (!timeRegex.test(bedtime) || !timeRegex.test(wake_time)) {
     return res.status(400).json({ msg: "Invalid time format. Use HH:MM (24-hour format)" });
   }
 
-  // Check if sleep already exists for today
-  db.query(
-    "SELECT id FROM sleep WHERE user_id = ? AND DATE(created_at) = ?",
-    [user_id, today],
-    (err, results) => {
-      if (err) {
-        console.error("Check existing sleep error:", err);
-        return res.status(500).json(err);
-      }
-      
-      if (results.length > 0) {
-        // Update existing sleep
-        db.query(
-          `UPDATE sleep SET bedtime = ?, wake_time = ?, duration = ?, quality = ? WHERE id = ?`,
-          [bedtime, wake_time, duration || null, quality || null, results[0].id],
-          (err, result) => {
-            if (err) {
-              console.error("Update sleep error:", err);
-              return res.status(500).json(err);
-            }
-            res.json({ msg: "Sleep updated for today 💤", id: results[0].id, updated: true });
-          }
-        );
-      } else {
-        // Insert new sleep
-        db.query(
-          `INSERT INTO sleep (user_id, bedtime, wake_time, duration, quality) VALUES (?, ?, ?, ?, ?)`,
-          [user_id, bedtime, wake_time, duration || null, quality || null],
-          (err, result) => {
-            if (err) {
-              console.error("Insert sleep error:", err);
-              return res.status(500).json(err);
-            }
-            res.json({ msg: "Sleep saved for today 💤", id: result.insertId, updated: false });
-          }
-        );
-      }
+  try {
+    const [existing] = await db.promise().query(
+      "SELECT id FROM sleep WHERE user_id = ? AND DATE(created_at) = ?",
+      [user_id, today]
+    );
+
+    let result;
+    let updated = false;
+
+    if (existing.length > 0) {
+      await db.promise().query(
+        "UPDATE sleep SET bedtime = ?, wake_time = ?, duration = ?, quality = ? WHERE id = ?",
+        [bedtime, wake_time, duration || null, quality || null, existing[0].id]
+      );
+      result = { id: existing[0].id };
+      updated = true;
+    } else {
+      const [insertResult] = await db.promise().query(
+        "INSERT INTO sleep (user_id, bedtime, wake_time, duration, quality) VALUES (?, ?, ?, ?, ?)",
+        [user_id, bedtime, wake_time, duration || null, quality || null]
+      );
+      result = { id: insertResult.insertId };
     }
-  );
+
+    // ✅ GAMIFICATION: Log sleep activity & award badges
+    await logGamificationActivity(user_id, 'sleep');
+
+    res.json({ 
+      msg: updated ? "Sleep updated for today 💤" : "Sleep saved for today 💤", 
+      id: result.id, 
+      updated: updated 
+    });
+  } catch (error) {
+    console.error("Sleep save error:", error);
+    res.status(500).json({ msg: "Failed to save sleep" });
+  }
 });
 
 module.exports = router;

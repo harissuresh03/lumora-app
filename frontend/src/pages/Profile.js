@@ -8,46 +8,28 @@ import {
   Mail, 
   BookOpen, 
   Heart, 
-  LogOut, 
   ArrowLeft, 
-  Building, 
-  Calendar, 
-  GraduationCap, 
   Shield,
   Award,
   Star,
-  Sparkles
 } from "lucide-react";
-import { showSuccessToast, showErrorToast } from "./components/ToastNotification";
 
 function Profile() {
   const navigate = useNavigate();
   const user_id = localStorage.getItem("user_id");
-  const [userNickname, setUserNickname] = useState("");
   const [user, setUser] = useState(null);
   const [gamificationStats, setGamificationStats] = useState(null);
   const [loadingGamification, setLoadingGamification] = useState(true);
 
   // Parent/Guardian state
-  const [parentEmail, setParentEmail] = useState("");
-  const [inviting, setInviting] = useState(false);
   const [parentData, setParentData] = useState(null);
   const [parentLoading, setParentLoading] = useState(true);
-  const [shareMood, setShareMood] = useState(true);
-  const [shareSleep, setShareSleep] = useState(true);
-  const [shareStress, setShareStress] = useState(true);
-  const [shareAssessments, setShareAssessments] = useState(true);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
         const res = await api.get(`/profile/${user_id}`);
         setUser(res.data);
-        if (res.data.nickname) {
-          setUserNickname(res.data.nickname);
-        } else {
-          setUserNickname(res.data.name.split(" ")[0]);
-        }
       } catch (err) {
         console.log("Profile fetch error:", err);
         if (err.response?.status === 401) navigate("/");
@@ -72,16 +54,8 @@ function Profile() {
           setParentData({
             parent_id: res.data.parent_id,
             email: res.data.email,
-            consent_granted: res.data.consent_granted,
-            share_mood: res.data.share_mood,
-            share_sleep: res.data.share_sleep,
-            share_stress: res.data.share_stress,
-            share_assessments: res.data.share_assessments
+            consent_granted: res.data.consent_granted
           });
-          setShareMood(res.data.share_mood);
-          setShareSleep(res.data.share_sleep);
-          setShareStress(res.data.share_stress);
-          setShareAssessments(res.data.share_assessments);
         }
       } catch (err) {
         console.error("Fetch parent data error:", err);
@@ -95,110 +69,6 @@ function Profile() {
     fetchParentData();
   }, [user_id, navigate]);
 
-  const logout = () => {
-    localStorage.clear();
-    navigate("/");
-  };
-
-  const inviteParent = async () => {
-    if (!parentEmail.trim()) {
-      showErrorToast("Please enter a valid email address");
-      return;
-    }
-
-    setInviting(true);
-    try {
-      const res = await api.post("/parent/invite", { parent_email: parentEmail });
-      showSuccessToast(res.data.msg || "Invitation sent successfully!");
-      setParentEmail("");
-      const parentRes = await api.get(`/parent/my-parent`);
-      if (parentRes.data.hasParent) {
-        setParentData({
-          parent_id: parentRes.data.parent_id,
-          email: parentRes.data.email,
-          consent_granted: parentRes.data.consent_granted,
-          share_mood: parentRes.data.share_mood,
-          share_sleep: parentRes.data.share_sleep,
-          share_stress: parentRes.data.share_stress,
-          share_assessments: parentRes.data.share_assessments
-        });
-        setShareMood(parentRes.data.share_mood);
-        setShareSleep(parentRes.data.share_sleep);
-        setShareStress(parentRes.data.share_stress);
-        setShareAssessments(parentRes.data.share_assessments);
-      }
-    } catch (err) {
-      showErrorToast(err.response?.data?.msg || "Failed to send invitation");
-    } finally {
-      setInviting(false);
-    }
-  };
-
-  const toggleShare = async (type) => {
-    let updatedValue;
-    let payload = {};
-
-    switch(type) {
-      case 'mood':
-        updatedValue = !shareMood;
-        setShareMood(updatedValue);
-        payload.share_mood = updatedValue ? 1 : 0;
-        break;
-      case 'sleep':
-        updatedValue = !shareSleep;
-        setShareSleep(updatedValue);
-        payload.share_sleep = updatedValue ? 1 : 0;
-        break;
-      case 'stress':
-        updatedValue = !shareStress;
-        setShareStress(updatedValue);
-        payload.share_stress = updatedValue ? 1 : 0;
-        break;
-      case 'assessments':
-        updatedValue = !shareAssessments;
-        setShareAssessments(updatedValue);
-        payload.share_assessments = updatedValue ? 1 : 0;
-        break;
-      default:
-        return;
-    }
-
-    try {
-      await api.put("/parent/settings", payload);
-      showSuccessToast("Sharing settings updated!");
-    } catch (err) {
-      showErrorToast("Failed to update sharing settings");
-      switch(type) {
-        case 'mood': setShareMood(!updatedValue); break;
-        case 'sleep': setShareSleep(!updatedValue); break;
-        case 'stress': setShareStress(!updatedValue); break;
-        case 'assessments': setShareAssessments(!updatedValue); break;
-      }
-    }
-  };
-
-  const revokeParentAccess = async () => {
-    if (!parentData || !parentData.parent_id) {
-      showErrorToast("No parent linked to revoke");
-      return;
-    }
-    if (!window.confirm("Are you sure you want to revoke your parent's access? They will no longer be able to view your data.")) {
-      return;
-    }
-
-    try {
-      await api.post(`/parent/revoke/${parentData.parent_id}`);
-      showSuccessToast("Parent access revoked successfully");
-      setParentData(null);
-      setShareMood(true);
-      setShareSleep(true);
-      setShareStress(true);
-      setShareAssessments(true);
-    } catch (err) {
-      showErrorToast("Failed to revoke parent access");
-    }
-  };
-
   if (!user) return <div className="loading-container"><div className="spinner"></div><p className="loading-text">Loading profile...</p></div>;
 
   const getConsentStatus = () => {
@@ -209,7 +79,21 @@ function Profile() {
     }
   };
 
+  const getParentStatus = () => {
+    if (parentData) {
+      if (parentData.consent_granted) {
+        return { text: "Access Granted ✅", color: "#22c55e", email: parentData.email };
+      } else {
+        return { text: "Access Revoked ❌", color: "#ef4444", email: parentData.email };
+      }
+    } else {
+      return { text: "No Parent Linked", color: "#6b7280", email: null };
+    }
+  };
+
   const consentStatus = getConsentStatus();
+  const parentStatus = getParentStatus();
+
   const levelTitle = gamificationStats?.points?.level 
     ? getLevelTitle(gamificationStats.points.level) 
     : "Well-being Starter 🌱";
@@ -365,8 +249,10 @@ function Profile() {
               <Shield size={16} style={{ display: "inline", marginRight: "8px" }} />
               Privacy & Consent
             </h4>
+            
+            {/* Counsellor Consent - Read Only */}
             <div className="profile-info-item">
-              <span className="profile-label">Data Sharing Consent</span>
+              <span className="profile-label">Counsellor Data Sharing</span>
               <span className="profile-value" style={{ color: consentStatus.color }}>
                 {consentStatus.text}
               </span>
@@ -374,102 +260,49 @@ function Profile() {
             <div style={{ 
               fontSize: "12px", 
               color: "var(--text-muted)", 
-              marginTop: "8px", 
+              marginTop: "4px", 
               padding: "8px", 
               background: "var(--bg-secondary)", 
-              borderRadius: "8px" 
+              borderRadius: "8px",
+              marginBottom: "16px"
             }}>
               {user.counsellor_consent === 1 
                 ? "You have given consent to share your data with your university counsellor." 
                 : "You have not given consent to share your data with your university counsellor."}
             </div>
 
-            <div style={{ marginTop: "16px" }}>
-              <h5 style={{ fontSize: "14px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-                <Heart size={16} color="#6366f1" />
-                Parent/Guardian Access
-              </h5>
-
-              {parentLoading ? (
-                <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>Loading...</div>
-              ) : parentData ? (
-                <div>
-                  <div className="profile-info-item">
-                    <span className="profile-label">Linked Parent</span>
-                    <span className="profile-value">{parentData.email}</span>
-                  </div>
-                  <div className="profile-info-item">
-                    <span className="profile-label">Status</span>
-                    <span className="profile-value" style={{ color: parentData.consent_granted ? '#22c55e' : '#f59e0b' }}>
-                      {parentData.consent_granted ? '✅ Active' : '⏳ Pending'}
-                    </span>
-                  </div>
-                  
-                  {parentData.consent_granted && (
-                    <div style={{ marginTop: "12px" }}>
-                      <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "8px" }}>
-                        Data Sharing Settings:
-                      </p>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', marginBottom: '4px', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={shareMood} onChange={() => toggleShare('mood')} style={{ cursor: 'pointer' }} />
-                        Share Mood Data
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', marginBottom: '4px', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={shareSleep} onChange={() => toggleShare('sleep')} style={{ cursor: 'pointer' }} />
-                        Share Sleep Data
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', marginBottom: '4px', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={shareStress} onChange={() => toggleShare('stress')} style={{ cursor: 'pointer' }} />
-                        Share Stress Data
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', marginBottom: '4px', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={shareAssessments} onChange={() => toggleShare('assessments')} style={{ cursor: 'pointer' }} />
-                        Share Assessment Results
-                      </label>
-                      <button
-                        onClick={revokeParentAccess}
-                        style={{
-                          marginTop: '12px',
-                          padding: '6px 14px',
-                          background: '#ef4444',
-                          border: 'none',
-                          borderRadius: '6px',
-                          color: 'white',
-                          cursor: 'pointer',
-                          fontSize: '12px'
-                        }}
-                      >
-                        Revoke Parent Access
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div>
-                  <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "12px" }}>
-                    Invite a parent or guardian to view your mental health summary. They will receive an email with instructions.
-                  </p>
-                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    <input
-                      type="email"
-                      value={parentEmail}
-                      onChange={(e) => setParentEmail(e.target.value)}
-                      placeholder="Enter parent's email"
-                      className="input-field"
-                      style={{ flex: 1, minWidth: '180px' }}
-                    />
-                    <button
-                      onClick={inviteParent}
-                      disabled={!parentEmail.trim() || inviting}
-                      className="primary-btn"
-                      style={{ width: 'auto', padding: '10px 20px' }}
-                    >
-                      {inviting ? 'Sending...' : 'Send Invitation'}
-                    </button>
-                  </div>
-                </div>
-              )}
+            {/* Parent Consent - Read Only */}
+            <div className="profile-info-item">
+              <span className="profile-label">Parent/Guardian Access</span>
+              <span className="profile-value" style={{ color: parentStatus.color }}>
+                {parentStatus.text}
+              </span>
             </div>
+            <div style={{ 
+              fontSize: "12px", 
+              color: "var(--text-muted)", 
+              marginTop: "4px", 
+              padding: "8px", 
+              background: "var(--bg-secondary)", 
+              borderRadius: "8px" 
+            }}>
+              {parentLoading 
+                ? "Loading parent status..." 
+                : parentData 
+                  ? (parentData.consent_granted 
+                      ? `Your parent (${parentData.email}) can view your well-being summary.` 
+                      : `Your parent (${parentData.email}) cannot view your data.`)
+                  : "No parent/guardian is currently linked to your account."}
+            </div>
+            {parentData && (
+              <div style={{
+                fontSize: "12px",
+                color: "var(--text-muted)",
+                marginTop: "8px",
+                fontStyle: "italic"
+              }}>
+              </div>
+            )}
           </div>
 
           <div className="profile-section">

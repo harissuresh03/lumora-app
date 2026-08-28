@@ -6,7 +6,7 @@ import CrisisModal from "./CrisisModal";
 import NotificationBell from "./NotificationBell";
 import { Shield, Heart, RefreshCw } from "lucide-react";
 import api from "../../utils/api";
-import { showSuccessToast, showErrorToast } from "./ToastNotification";
+import { showErrorToast } from "./ToastNotification";
 
 function Layout({ children, customMenuItems }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -16,6 +16,14 @@ function Layout({ children, customMenuItems }) {
   const [refreshing, setRefreshing] = useState(false);
   const userId = localStorage.getItem("user_id");
   const userNickname = localStorage.getItem("user_nickname") || "User";
+  const userRole = localStorage.getItem("user_role") || "student";
+
+  // Format user ID with role prefix
+  const getFormattedUserId = () => {
+    if (!userId) return "";
+    const prefix = userRole === 'student' ? 'S' : userRole === 'counsellor' ? 'C' : userRole === 'parent' ? 'P' : userRole === 'admin' ? 'A' : 'U';
+    return `${prefix}${String(userId).padStart(2, '0')}`;
+  };
 
   useEffect(() => {
     fetchCrisisResources();
@@ -161,7 +169,17 @@ function Layout({ children, customMenuItems }) {
                 color: 'var(--text-primary)',
                 whiteSpace: 'nowrap'
               }}>
-                {userNickname || "User"}
+                {userNickname}
+                {userId && (
+                  <span style={{ 
+                    fontSize: '11px', 
+                    fontWeight: 400, 
+                    color: 'var(--text-muted)',
+                    marginLeft: '4px'
+                  }}>
+                    ({getFormattedUserId()})
+                  </span>
+                )}
               </span>
             </div>
 

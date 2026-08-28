@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
-import { showSuccessToast, showErrorToast } from "./components/ToastNotification";
+import { showSuccessToast } from "./components/ToastNotification";
 
 function Register() {
   const navigate = useNavigate();
@@ -32,6 +32,13 @@ function Register() {
     parent_email: ""
   });
 
+  // Real-time validation state
+  const [errors, setErrors] = useState({
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showOtherUniversity, setShowOtherUniversity] = useState(false);
@@ -53,11 +60,20 @@ function Register() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setForm({ 
-      ...form, 
-      [name]: type === 'checkbox' ? checked : value 
-    });
-    
+    setForm({ ...form, [name]: type === 'checkbox' ? checked : value });
+
+    // Real-time validation
+    if (name === "email") {
+      validateEmail(value);
+    }
+    if (name === "password") {
+      validatePassword(value);
+    }
+    if (name === "confirmPassword") {
+      validateConfirmPassword(value, form.password);
+    }
+
+    // University logic
     if (name === "university_id") {
       const selectedUniversity = universities.find(u => u.id === parseInt(value));
       if (selectedUniversity?.short_name === "Other") {
@@ -69,26 +85,93 @@ function Register() {
     }
   };
 
+  // Validation functions
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) {
+      setErrors(prev => ({ ...prev, email: "" }));
+      return;
+    }
+    if (!emailRegex.test(email)) {
+      setErrors(prev => ({ ...prev, email: "Please enter a valid email address (e.g., name@domain.com)." }));
+    } else {
+      setErrors(prev => ({ ...prev, email: "" }));
+    }
+  };
+
+  const validatePassword = (password) => {
+    if (!password) {
+      setErrors(prev => ({ ...prev, password: "" }));
+      return;
+    }
+    if (password.length < 6) {
+      setErrors(prev => ({ ...prev, password: "Password must be at least 6 characters." }));
+    } else {
+      setErrors(prev => ({ ...prev, password: "" }));
+    }
+    // Also re-check confirm password if it has a value
+    if (form.confirmPassword) {
+      validateConfirmPassword(form.confirmPassword, password);
+    }
+  };
+
+  const validateConfirmPassword = (confirm, password = form.password) => {
+    if (!confirm) {
+      setErrors(prev => ({ ...prev, confirmPassword: "" }));
+      return;
+    }
+    if (confirm !== password) {
+      setErrors(prev => ({ ...prev, confirmPassword: "Passwords do not match." }));
+    } else {
+      setErrors(prev => ({ ...prev, confirmPassword: "" }));
+    }
+  };
+
+  // Check if email already exists (on blur)
+  const checkEmailExists = async () => {
+    if (!form.email || errors.email) return;
+    try {
+      const res = await api.post("/auth/check-email", { email: form.email });
+      if (res.data.exists) {
+        setErrors(prev => ({ ...prev, email: "This email is already registered. Please use a different email or login." }));
+      } else {
+        setErrors(prev => ({ ...prev, email: "" }));
+      }
+    } catch (err) {
+      console.error("Email check error:", err);
+    }
+  };
+
   const handleRegister = async (e) => {
     e.preventDefault();
     setError("");
 
-    const { name, nickname, dob, gender, email, password, confirmPassword, 
-            university_id, university_other, matric_number, faculty, department,
-            emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
-            counsellor_consent, qualification, experience, parent_email } = form;
+    // Validate all fields before submit
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!form.email || !emailRegex.test(form.email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (form.password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
 
-    if (!name || !dob || !gender || !email || !password) {
+    if (!form.name || !form.dob || !form.gender || !form.email || !form.password) {
       setError("Please fill in all required fields 🌙");
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (form.password !== form.confirmPassword) {
       setError("Passwords do not match ⚠️");
       return;
     }
 
-    if (password.length < 6) {
+    if (form.password.length < 6) {
       setError("Password must be at least 6 characters");
       return;
     }
@@ -116,11 +199,11 @@ function Register() {
         });
 
         if (response.data.user_id) {
+          navigate(`/verify-email?email=${encodeURIComponent(form.email)}&userId=${response.data.user_id}`);
           const msg = response.data.parent_invited 
-            ? "Registration successful! A parent invitation email has been sent. 🌿" 
-            : "Registration successful! Welcome to Lumora 🌿";
+            ? "Registration successful! Please check your email for the verification code. A parent invitation has also been sent. 🌿" 
+            : "Registration successful! Please check your email for the verification code. 🌿";
           showSuccessToast(msg);
-          navigate("/");
         }
         setLoading(false);
         return;
@@ -530,10 +613,12 @@ function Register() {
                 placeholder="you@example.com"
                 value={form.email}
                 onChange={handleChange}
+                onBlur={checkEmailExists}
                 style={styles.input}
                 disabled={loading}
                 required
               />
+              {errors.email && <div style={styles.errorText}>{errors.email}</div>}
             </div>
 
             {registerAs === "student" && (
@@ -550,6 +635,7 @@ function Register() {
                     disabled={loading}
                     required
                   />
+                  {errors.password && <div style={styles.errorText}>{errors.password}</div>}
                 </div>
 
                 <div style={styles.inputGroup}>
@@ -564,6 +650,7 @@ function Register() {
                     disabled={loading}
                     required
                   />
+                  {errors.confirmPassword && <div style={styles.errorText}>{errors.confirmPassword}</div>}
                 </div>
               </div>
             )}
@@ -630,21 +717,6 @@ function FloatingEmojis() {
 }
 
 const styles = {
-  textarea: {
-    width: "100%",
-    padding: "12px 14px",
-    borderRadius: "12px",
-    border: "1.5px solid #e5e7eb",
-    fontSize: "14px",
-    transition: "all 0.2s",
-    outline: "none",
-    fontFamily: "inherit",
-    boxSizing: "border-box",
-    background: "white",
-    minHeight: "80px",
-    resize: "vertical",
-    lineHeight: "1.5",
-  },
   container: {
     width: "100%",
     minHeight: "100vh",
@@ -809,6 +881,12 @@ const styles = {
     fontFamily: "inherit",
     backgroundColor: "white",
     cursor: "pointer",
+  },
+  errorText: {
+    color: "#ef4444",
+    fontSize: "12px",
+    marginTop: "4px",
+    fontWeight: "400",
   },
   consentSection: {
     marginTop: "8px",

@@ -1,77 +1,45 @@
-// frontend/src/pages/Login.js
+// frontend/src/pages/ForgotPassword.js
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
-import { showSuccessToast, showErrorToast, showInfoToast } from "./components/ToastNotification";
+import { showSuccessToast, showErrorToast } from "./components/ToastNotification";
+import { ArrowLeft } from "lucide-react";
 
-function Login() {
+function ForgotPassword() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [userId, setUserId] = useState(null);
 
-  const handleLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
 
-    if (!email || !password) {
-      setError("Please enter your details gently 💙");
+    if (!email.trim()) {
+      setError("Please enter your email address");
       return;
     }
 
+    setLoading(true);
+
     try {
-      setLoading(true);
+      const res = await api.post("/verification/forgot-password", { email });
+      setSuccess(res.data.msg);
+      showSuccessToast("Check your email for the reset code");
 
-      // Try regular login first
-      const res = await api.post("/auth/login", {
-        email,
-        password,
-      });
-
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("user_id", res.data.user_id);
-      localStorage.setItem("user_role", res.data.role);
-      localStorage.setItem("user_name", res.data.name);
-      localStorage.setItem("user_nickname", res.data.nickname || "");
-
-      // Redirect based on role
-      if (res.data.role === 'admin') {
-        navigate("/admin");
-      } else if (res.data.role === 'counsellor') {
-        navigate("/counsellor");
-      } else if (res.data.role === 'parent') {
-        navigate("/parent/dashboard");
-      } else {
-        navigate("/dashboard");
+      if (res.data.userId) {
+        setUserId(res.data.userId);
+        // Redirect to verify reset code page after 2 seconds
+        setTimeout(() => {
+          navigate(`/verify-reset-code?email=${encodeURIComponent(email)}&userId=${res.data.userId}`);
+        }, 2000);
       }
     } catch (err) {
-      console.error("Login error:", err);
-
-      // ✅ Check if user needs email verification
-      if (err.response?.status === 403 && err.response?.data?.needsVerification) {
-        // Redirect to verification page
-        navigate(`/verify-email?email=${encodeURIComponent(err.response.data.email)}&userId=${err.response.data.user_id}`);
-        showInfoToast("Please verify your email before logging in. A verification code has been sent.");
-        return;
-      }
-
-      // If student login fails, try parent login
-      try {
-        const parentRes = await api.post("/parent/login", {
-          email,
-          password,
-        });
-        
-        localStorage.setItem("token", parentRes.data.token);
-        localStorage.setItem("user_id", parentRes.data.user_id);
-        localStorage.setItem("user_role", parentRes.data.role);
-        localStorage.setItem("user_name", parentRes.data.name || "Parent");
-        
-        navigate("/parent/dashboard");
-      } catch (parentErr) {
-        setError(err.response?.data?.msg || "We couldn't log you in 🌙");
-      }
+      setError(err.response?.data?.msg || "Failed to send reset code");
+      showErrorToast(err.response?.data?.msg || "Failed to send reset code");
     } finally {
       setLoading(false);
     }
@@ -87,15 +55,34 @@ function Login() {
 
       <div style={styles.contentWrapper}>
         <div style={styles.card}>
+          {/* ✅ Back Button */}
+          <button
+            onClick={() => navigate("/")}
+            style={styles.backBtn}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "var(--accent-soft)";
+              e.currentTarget.style.transform = "translateX(-2px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.transform = "translateX(0)";
+            }}
+          >
+            <ArrowLeft size={18} style={{ color: "var(--accent-primary)" }} />
+            <span style={{ marginLeft: "6px", fontSize: "13px", color: "var(--accent-primary)" }}>
+              Back to Login
+            </span>
+          </button>
+
           <div style={styles.logoSection}>
             <div style={styles.logoIcon}>✨</div>
             <h1 style={styles.logo}>Lumora</h1>
           </div>
-          <p style={styles.subtitle}>A calm space for your mind</p>
+          <p style={styles.subtitle}>Reset your password</p>
 
-          <form onSubmit={handleLogin} style={styles.form}>
+          <form onSubmit={handleSubmit}>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Email address</label>
+              <label style={styles.label}>Email Address</label>
               <input
                 type="email"
                 placeholder="you@example.com"
@@ -103,50 +90,22 @@ function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 style={styles.input}
                 disabled={loading}
+                required
               />
-            </div>
-
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>Password</label>
-              <input
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                style={styles.input}
-                disabled={loading}
-              />
-            </div>
-
-            {/* ✅ Forgot Password Link */}
-            <div style={{ textAlign: "right", marginTop: "-12px", marginBottom: "16px" }}>
-              <span
-                onClick={() => navigate("/forgot-password")}
-                style={{
-                  fontSize: "13px",
-                  color: "#667eea",
-                  cursor: "pointer",
-                  fontWeight: "500",
-                  transition: "all 0.2s",
-                }}
-                onMouseEnter={(e) => e.target.style.textDecoration = "underline"}
-                onMouseLeave={(e) => e.target.style.textDecoration = "none"}
-              >
-                Forgot password?
-              </span>
             </div>
 
             {error && <div style={styles.error}>{error}</div>}
+            {success && <div style={styles.success}>{success}</div>}
 
             <button type="submit" style={styles.button} disabled={loading}>
-              {loading ? "Entering..." : "Enter Lumora"}
+              {loading ? "Sending..." : "Send Reset Code"}
             </button>
           </form>
 
           <p style={styles.footer}>
-            Don't have an account?{" "}
-            <span onClick={() => navigate("/register")} style={styles.link}>
-              Create one
+            Remember your password?{" "}
+            <span onClick={() => navigate("/")} style={styles.link}>
+              Sign in
             </span>
           </p>
         </div>
@@ -158,7 +117,7 @@ function Login() {
 }
 
 function FloatingEmojis() {
-  const emojis = ["😊", "😌", "💙", "✨", "🌙", "🫶", "🌸", "🌟"];
+  const emojis = ["😊", "😌", "💙", "✨", "🌙", "🫶", "🌸", "🌟", "🌿"];
 
   return (
     <div style={styles.emojiLayer}>
@@ -194,6 +153,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    padding: "20px",
   },
   bgDecoration: {
     position: "fixed",
@@ -239,10 +199,9 @@ const styles = {
     position: "relative",
     zIndex: 2,
     width: "100%",
-    padding: "20px",
+    maxWidth: "440px",
   },
   card: {
-    maxWidth: "440px",
     margin: "0 auto",
     padding: "48px 40px",
     borderRadius: "28px",
@@ -250,6 +209,23 @@ const styles = {
     backdropFilter: "blur(20px)",
     boxShadow: "0 25px 50px rgba(0,0,0,0.2)",
     textAlign: "center",
+    position: "relative",
+  },
+  backBtn: {
+    position: "absolute",
+    top: "20px",
+    left: "24px",
+    display: "flex",
+    alignItems: "center",
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    padding: "4px 8px",
+    borderRadius: "8px",
+    transition: "all 0.2s",
+    color: "var(--accent-primary)",
+    fontSize: "13px",
+    fontWeight: "500",
   },
   logoSection: {
     display: "flex",
@@ -257,6 +233,7 @@ const styles = {
     justifyContent: "center",
     gap: "8px",
     marginBottom: "12px",
+    marginTop: "8px",
   },
   logoIcon: { fontSize: "36px" },
   logo: {
@@ -271,15 +248,11 @@ const styles = {
   subtitle: {
     fontSize: "14px",
     color: "#6b7280",
-    marginBottom: "32px",
-  },
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "20px",
+    marginBottom: "24px",
   },
   inputGroup: {
     textAlign: "left",
+    marginBottom: "20px",
   },
   label: {
     display: "block",
@@ -298,9 +271,26 @@ const styles = {
     outline: "none",
     fontFamily: "inherit",
     boxSizing: "border-box",
+    background: "white",
+  },
+  error: {
+    color: "#ef4444",
+    fontSize: "13px",
+    padding: "8px 12px",
+    backgroundColor: "#fef2f2",
+    borderRadius: "10px",
+    marginBottom: "16px",
+  },
+  success: {
+    color: "#22c55e",
+    fontSize: "13px",
+    padding: "8px 12px",
+    backgroundColor: "#f0fdf4",
+    borderRadius: "10px",
+    marginBottom: "16px",
   },
   button: {
-    marginTop: "8px",
+    width: "100%",
     padding: "14px",
     borderRadius: "12px",
     border: "none",
@@ -311,15 +301,8 @@ const styles = {
     cursor: "pointer",
     transition: "all 0.2s",
   },
-  error: {
-    color: "#ef4444",
-    fontSize: "13px",
-    padding: "8px 12px",
-    backgroundColor: "#fef2f2",
-    borderRadius: "10px",
-  },
   footer: {
-    marginTop: "28px",
+    marginTop: "24px",
     fontSize: "13px",
     color: "#6b7280",
   },
@@ -348,22 +331,12 @@ const styles = {
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
   @keyframes floatUp {
-    0% {
-      transform: translateY(0) rotate(0deg);
-      opacity: 0;
-    }
-    10% {
-      opacity: 1;
-    }
-    90% {
-      opacity: 1;
-    }
-    100% {
-      transform: translateY(-100vh) rotate(360deg);
-      opacity: 0;
-    }
+    0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateY(-100vh) rotate(360deg); opacity: 0; }
   }
 `;
 document.head.appendChild(styleSheet);
 
-export default Login;
+export default ForgotPassword;

@@ -19,15 +19,12 @@ function initializeFirebase() {
   try {
     const serviceAccountPath = path.join(__dirname, "../firebase-service-account.json");
     
-    // Check if file exists
     if (!fs.existsSync(serviceAccountPath)) {
       console.error("❌ firebase-service-account.json not found at:", serviceAccountPath);
       return false;
     }
     
     const serviceAccount = require(serviceAccountPath);
-    
-    // Validate required fields
     const requiredFields = ['project_id', 'private_key', 'client_email'];
     const missingFields = requiredFields.filter(field => !serviceAccount[field]);
     
@@ -51,7 +48,6 @@ function initializeFirebase() {
   }
 }
 
-// Attempt initialization
 initializeFirebase();
 
 // Crisis keywords
@@ -111,7 +107,6 @@ const TIPS = {
   ]
 };
 
-// Activities
 const ACTIVITIES = {
   breathing: [
     { name: '4-7-8 Breathing Exercise', description: 'Inhale for 4 seconds, hold for 7 seconds, exhale for 8 seconds. Repeat 4-5 times.', duration: '5 min', category: 'anxiety' },
@@ -131,16 +126,10 @@ const ACTIVITIES = {
   ]
 };
 
-// ============================================
-// NEW: PEER CONTENT ANALYSIS FUNCTIONS
-// ============================================
-
 function analyzeContentThemes(texts) {
   const themes = {};
   const allText = texts.join(' ').toLowerCase();
-  
   if (!allText) return themes;
-  
   for (const [emotion, keywords] of Object.entries(EMOTION_KEYWORDS)) {
     let count = 0;
     for (const keyword of keywords) {
@@ -148,11 +137,8 @@ function analyzeContentThemes(texts) {
       const matches = allText.match(regex);
       if (matches) count += matches.length;
     }
-    if (count > 0) {
-      themes[emotion] = count;
-    }
+    if (count > 0) themes[emotion] = count;
   }
-  
   return themes;
 }
 
@@ -164,30 +150,18 @@ function getPrimaryEmotion(themes) {
 
 async function analyzePeerContent(userId) {
   try {
-    // Check if Firebase is initialized
     if (!firebaseInitialized || !firestore) {
       console.log("⚠️ Firebase not initialized, skipping peer content analysis");
-      return { 
-        postThemes: [], 
-        commentThemes: [], 
-        postEmotion: 'neutral', 
-        commentEmotion: 'neutral',
-        primaryEmotion: 'neutral',
-        postCount: 0,
-        commentCount: 0
-      };
+      return { postThemes: [], commentThemes: [], postEmotion: 'neutral', commentEmotion: 'neutral', primaryEmotion: 'neutral', postCount: 0, commentCount: 0 };
     }
 
-    // Get user's posts from last 7 days
     const postsSnapshot = await firestore.collection("posts")
       .where("user_id", "==", userId)
       .where("createdAt", ">=", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
       .get();
     
-    // Get user's comments from all posts
     const allPostsSnapshot = await firestore.collection("posts").get();
     let userComments = [];
-    
     for (const doc of allPostsSnapshot.docs) {
       const post = doc.data();
       if (post.comments && Array.isArray(post.comments)) {
@@ -196,26 +170,17 @@ async function analyzePeerContent(userId) {
       }
     }
     
-    // Extract text content from posts and comments
     const postTexts = [];
     postsSnapshot.forEach(doc => {
       const data = doc.data();
-      if (data.content) {
-        postTexts.push(data.content);
-      }
+      if (data.content) postTexts.push(data.content);
     });
-    
     const commentTexts = userComments.map(c => c.content).filter(Boolean);
     
-    // Analyze posts
     const postThemes = analyzeContentThemes(postTexts);
     const postEmotion = getPrimaryEmotion(postThemes);
-    
-    // Analyze comments
     const commentThemes = analyzeContentThemes(commentTexts);
     const commentEmotion = getPrimaryEmotion(commentThemes);
-    
-    // Combined emotion from both posts and comments
     const combinedThemes = { ...postThemes, ...commentThemes };
     const primaryEmotion = getPrimaryEmotion(combinedThemes);
     
@@ -234,24 +199,11 @@ async function analyzePeerContent(userId) {
       combinedThemes,
       primaryEmotion: primaryEmotion !== 'neutral' ? primaryEmotion : null
     };
-    
   } catch (error) {
     console.error("❌ Error analyzing peer content:", error);
-    return { 
-      postThemes: [], 
-      commentThemes: [], 
-      postEmotion: 'neutral', 
-      commentEmotion: 'neutral',
-      primaryEmotion: null,
-      postCount: 0,
-      commentCount: 0
-    };
+    return { postThemes: [], commentThemes: [], postEmotion: 'neutral', commentEmotion: 'neutral', primaryEmotion: null, postCount: 0, commentCount: 0 };
   }
 }
-
-// ============================================
-// MAIN FUNCTIONS
-// ============================================
 
 async function getArticlesFromDatabase() {
   return new Promise((resolve, reject) => {
@@ -288,160 +240,193 @@ async function getUserProfile(userId) {
     journalThemes: [],
     primaryEmotion: null,
     peerActivity: { posts: 0, comments: 0 },
-    peerThemes: {},        // ✅ NEW
-    peerEmotion: 'neutral', // ✅ NEW
+    peerThemes: {},
+    peerEmotion: 'neutral',
     lastAssessment: null,
     isSociallyInactive: false,
     assessmentHistory: []
   };
   
-  // Get moods (last 7 days)
-  const moodQuery = await db.promise().query(
-    `SELECT mood, DATE(created_at) as date, created_at 
-     FROM moods 
-     WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-     ORDER BY created_at ASC`,
-    [userId]
-  );
-  profile.moods = moodQuery[0];
-  profile.moodCount = profile.moods.length;
-  
-  if (profile.moodCount > 0) {
-    const moodSum = profile.moods.reduce((sum, m) => sum + m.mood, 0);
-    profile.averageMood = parseFloat((moodSum / profile.moodCount).toFixed(1));
+  try {
+    const moodQuery = await db.promise().query(
+      `SELECT mood, DATE(created_at) as date, created_at 
+       FROM moods 
+       WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+       ORDER BY created_at ASC`,
+      [userId]
+    );
+    profile.moods = moodQuery[0];
+    profile.moodCount = profile.moods.length;
     
-    if (profile.moodCount >= 3) {
-      const firstHalf = profile.moods.slice(0, Math.ceil(profile.moodCount / 2));
-      const secondHalf = profile.moods.slice(Math.ceil(profile.moodCount / 2));
-      const firstAvg = firstHalf.reduce((s, m) => s + m.mood, 0) / firstHalf.length;
-      const secondAvg = secondHalf.reduce((s, m) => s + m.mood, 0) / secondHalf.length;
-      profile.moodTrend = parseFloat((secondAvg - firstAvg).toFixed(1));
-    } else {
-      profile.moodTrend = 0;
+    if (profile.moodCount > 0) {
+      const moodSum = profile.moods.reduce((sum, m) => sum + m.mood, 0);
+      profile.averageMood = parseFloat((moodSum / profile.moodCount).toFixed(1));
+      if (profile.moodCount >= 3) {
+        const firstHalf = profile.moods.slice(0, Math.ceil(profile.moodCount / 2));
+        const secondHalf = profile.moods.slice(Math.ceil(profile.moodCount / 2));
+        const firstAvg = firstHalf.reduce((s, m) => s + m.mood, 0) / firstHalf.length;
+        const secondAvg = secondHalf.reduce((s, m) => s + m.mood, 0) / secondHalf.length;
+        profile.moodTrend = parseFloat((secondAvg - firstAvg).toFixed(1));
+      } else {
+        profile.moodTrend = 0;
+      }
     }
+  } catch (error) {
+    console.error("Error fetching moods:", error);
   }
-  
-  // Get sleep (last 7 days)
-  const sleepQuery = await db.promise().query(
-    `SELECT quality, duration, DATE(created_at) as date 
-     FROM sleep 
-     WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-     ORDER BY created_at ASC`,
-    [userId]
-  );
-  profile.sleep = sleepQuery[0];
-  profile.sleepCount = profile.sleep.length;
-  
-  if (profile.sleepCount > 0) {
-    const qualitySum = profile.sleep.reduce((s, sl) => s + sl.quality, 0);
-    const durationSum = profile.sleep.reduce((s, sl) => s + parseFloat(sl.duration), 0);
-    profile.averageSleepQuality = parseFloat((qualitySum / profile.sleepCount).toFixed(1));
-    profile.averageSleepDuration = parseFloat((durationSum / profile.sleepCount).toFixed(1));
+
+  try {
+    const sleepQuery = await db.promise().query(
+      `SELECT quality, duration, DATE(created_at) as date 
+       FROM sleep 
+       WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+       ORDER BY created_at ASC`,
+      [userId]
+    );
+    profile.sleep = sleepQuery[0];
+    profile.sleepCount = profile.sleep.length;
+    
+    if (profile.sleepCount > 0) {
+      const qualitySum = profile.sleep.reduce((s, sl) => s + sl.quality, 0);
+      const durationSum = profile.sleep.reduce((s, sl) => s + parseFloat(sl.duration), 0);
+      profile.averageSleepQuality = parseFloat((qualitySum / profile.sleepCount).toFixed(1));
+      profile.averageSleepDuration = parseFloat((durationSum / profile.sleepCount).toFixed(1));
+    }
+  } catch (error) {
+    console.error("Error fetching sleep:", error);
   }
-  
-  // Get journals (last 7 days)
-  const journalQuery = await db.promise().query(
-    `SELECT content, created_at 
-     FROM journals 
-     WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-     ORDER BY created_at DESC`,
-    [userId]
-  );
-  profile.journals = journalQuery[0];
-  profile.journalCount = profile.journals.length;
-  
-  if (profile.journalCount > 0) {
-    profile.journalThemes = analyzeContentThemes(profile.journals.map(j => j.content));
-    profile.primaryEmotion = getPrimaryEmotion(profile.journalThemes);
+
+  try {
+    const journalQuery = await db.promise().query(
+      `SELECT content, created_at 
+       FROM journals 
+       WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+       ORDER BY created_at DESC`,
+      [userId]
+    );
+    profile.journals = journalQuery[0];
+    profile.journalCount = profile.journals.length;
+    
+    if (profile.journalCount > 0) {
+      profile.journalThemes = analyzeContentThemes(profile.journals.map(j => j.content));
+      profile.primaryEmotion = getPrimaryEmotion(profile.journalThemes);
+    }
+  } catch (error) {
+    console.error("Error fetching journals:", error);
   }
-  
-  // Get all assessments
-  const assessmentQuery = await db.promise().query(
-    `SELECT type, score, severity, taken_at 
-     FROM assessments 
-     WHERE user_id = ? 
-     ORDER BY taken_at DESC`,
-    [userId]
-  );
-  profile.assessmentHistory = assessmentQuery[0];
-  profile.assessmentCount = assessmentQuery[0].length;
-  if (assessmentQuery[0].length > 0) {
-    profile.lastAssessment = assessmentQuery[0][0];
+
+  try {
+    const assessmentQuery = await db.promise().query(
+      `SELECT type, score, severity, taken_at 
+       FROM assessments 
+       WHERE user_id = ? 
+       ORDER BY taken_at DESC`,
+      [userId]
+    );
+    console.log(`📊 Assessment query for user ${userId}: found ${assessmentQuery[0].length} records`);
+    if (assessmentQuery[0].length > 0) {
+      console.log(`📊 Latest assessment: ${assessmentQuery[0][0].type} (${assessmentQuery[0][0].score})`);
+    }
+    profile.assessmentHistory = assessmentQuery[0];
+    profile.assessmentCount = assessmentQuery[0].length;
+    if (assessmentQuery[0].length > 0) {
+      profile.lastAssessment = assessmentQuery[0][0];
+    }
+  } catch (error) {
+    console.error("Error fetching assessments:", error);
   }
-  
-  // ✅ Get peer support activity AND analyze content
+
+  // Peer content
   if (firebaseInitialized && firestore) {
     try {
-      // Get peer content analysis
       const peerAnalysis = await analyzePeerContent(userId);
-      
       profile.peerActivity.posts = peerAnalysis.postCount;
       profile.peerActivity.comments = peerAnalysis.commentCount;
       profile.peerThemes = peerAnalysis.combinedThemes || {};
       profile.peerEmotion = peerAnalysis.primaryEmotion || 'neutral';
-      
-      // Check social inactivity
       profile.isSociallyInactive = profile.peerActivity.posts === 0 && profile.peerActivity.comments === 0;
-      
       console.log(`📊 Peer content analysis complete for user ${userId}:`);
       console.log(`   Peer Emotion: ${profile.peerEmotion}`);
       console.log(`   Peer Themes:`, profile.peerThemes);
-      
-    } catch (firebaseError) {
-      console.error("Firebase peer activity error for user", userId, ":", firebaseError.message);
+    } catch (error) {
+      console.error("Firebase peer activity error:", error);
       profile.isSociallyInactive = true;
     }
   } else {
-    console.log("⚠️ Firebase not initialized, skipping peer activity for user:", userId);
     profile.isSociallyInactive = true;
   }
-  
+
+  console.log(`📊 Final profile for user ${userId}:`, {
+    moodCount: profile.moodCount,
+    sleepCount: profile.sleepCount,
+    journalCount: profile.journalCount,
+    assessmentCount: profile.assessmentCount,
+    averageMood: profile.averageMood,
+    averageSleepQuality: profile.averageSleepQuality
+  });
+
   return profile;
 }
 
 async function detectCrisis(userId) {
-  const journalQuery = await db.promise().query(
-    `SELECT content FROM journals WHERE user_id = ? ORDER BY created_at DESC LIMIT 5`,
-    [userId]
-  );
-  
-  const journals = journalQuery[0];
-  for (const journal of journals) {
-    const content = journal.content.toLowerCase();
-    for (const keyword of CRISIS_KEYWORDS) {
-      if (content.includes(keyword)) {
-        return {
-          hasCrisis: true,
-          message: "We're here for you. You're not alone. ❤️",
-          resources: [
-            { name: "Talian Kasih", number: "15999", hours: "24/7" },
-            { name: "Befrienders KL", number: "03-7627 2929", hours: "24/7" },
-            { name: "Talian HEAL", number: "15555", hours: "8.30 am – 11.59 pm" }
-          ]
-        };
+  try {
+    const journalQuery = await db.promise().query(
+      `SELECT content FROM journals WHERE user_id = ? ORDER BY created_at DESC LIMIT 5`,
+      [userId]
+    );
+    const journals = journalQuery[0];
+    for (const journal of journals) {
+      const content = journal.content.toLowerCase();
+      for (const keyword of CRISIS_KEYWORDS) {
+        if (content.includes(keyword)) {
+          return {
+            hasCrisis: true,
+            message: "We're here for you. You're not alone. ❤️",
+            resources: [
+              { name: "Talian Kasih", number: "15999", hours: "24/7" },
+              { name: "Befrienders KL", number: "03-7627 2929", hours: "24/7" },
+              { name: "Talian HEAL", number: "15555", hours: "8.30 am – 11.59 pm" }
+            ]
+          };
+        }
       }
     }
+  } catch (error) {
+    console.error("Error detecting crisis:", error);
   }
-  
   return { hasCrisis: false };
 }
 
 async function generateRecommendations(profile, articles) {
+  // 🔍 EXTRA LOGGING: Show what was received
+  console.log('📊 generateRecommendations received profile:', {
+    moodCount: profile.moodCount,
+    sleepCount: profile.sleepCount,
+    journalCount: profile.journalCount,
+    assessmentCount: profile.assessmentCount
+  });
+
+  // 🛡️ DEFENSIVE: Ensure counts are numbers
+  profile.moodCount = Number(profile.moodCount) || 0;
+  profile.sleepCount = Number(profile.sleepCount) || 0;
+  profile.journalCount = Number(profile.journalCount) || 0;
+  profile.assessmentCount = Number(profile.assessmentCount) || 0;
+
   const recommendations = [];
   const scores = calculateNeedScores(profile);
   
-  // Log peer data for debugging
   console.log(`📊 Peer Data Summary for user ${profile.userId}:`);
   console.log(`   Peer Emotion: ${profile.peerEmotion}`);
   console.log(`   Peer Themes:`, profile.peerThemes);
   console.log(`   Socially Inactive: ${profile.isSociallyInactive}`);
   console.log(`   Social Score: ${scores.socialSupport}`);
   
-  // ✅ Check if user has enough data
-  const hasEnoughData = profile.moodCount > 2 || 
-                        profile.sleepCount > 2 || 
+  const hasEnoughData = profile.moodCount > 3 || 
+                        profile.sleepCount > 3 || 
                         profile.journalCount > 0 ||
                         profile.assessmentCount > 0;
+  
+  console.log(`📊 Has enough data: ${hasEnoughData} (mood:${profile.moodCount}, sleep:${profile.sleepCount}, journal:${profile.journalCount}, assessment:${profile.assessmentCount})`);
   
   if (!hasEnoughData) {
     return {
@@ -451,7 +436,7 @@ async function generateRecommendations(profile, articles) {
     };
   }
   
-  // Article recommendations from database
+  // Article recommendations
   const articleRecommendations = getArticleRecommendationsFromDB(profile, scores, articles);
   recommendations.push(...articleRecommendations);
   
@@ -464,6 +449,8 @@ async function generateRecommendations(profile, articles) {
   recommendations.push(...activityRecommendations);
   
   recommendations.sort((a, b) => b.score - a.score);
+  
+  console.log(`📊 Generated ${recommendations.length} recommendations`);
   
   return {
     hasEnoughData: true,
@@ -483,30 +470,19 @@ function calculateNeedScores(profile) {
   
   if (profile.averageMood !== null) {
     scores.moodSupport = (5 - profile.averageMood) * 8;
-    if (profile.moodTrend < -0.5) {
-      scores.moodSupport += 10;
-    }
+    if (profile.moodTrend < -0.5) scores.moodSupport += 10;
   }
   
   if (profile.averageSleepQuality !== null) {
     scores.sleepSupport = (5 - profile.averageSleepQuality) * 6;
-    if (profile.averageSleepDuration < 6) {
-      scores.sleepSupport += 15;
-    }
-    if (profile.averageSleepDuration > 10) {
-      scores.sleepSupport += 5;
-    }
+    if (profile.averageSleepDuration < 6) scores.sleepSupport += 15;
+    if (profile.averageSleepDuration > 10) scores.sleepSupport += 5;
   }
   
-  if (profile.primaryEmotion === 'anxiety') {
-    scores.anxietySupport += 20;
-  } else if (profile.primaryEmotion === 'depression') {
-    scores.depressionSupport += 20;
-  } else if (profile.primaryEmotion === 'stress') {
-    scores.academicSupport += 15;
-  }
+  if (profile.primaryEmotion === 'anxiety') scores.anxietySupport += 20;
+  else if (profile.primaryEmotion === 'depression') scores.depressionSupport += 20;
+  else if (profile.primaryEmotion === 'stress') scores.academicSupport += 15;
   
-  // ✅ Journal theme-based scoring
   for (const [theme, count] of Object.entries(profile.journalThemes || {})) {
     if (theme === 'anxiety') scores.anxietySupport += count * 2;
     if (theme === 'depression') scores.depressionSupport += count * 2;
@@ -515,20 +491,12 @@ function calculateNeedScores(profile) {
     if (theme === 'social') scores.socialSupport += count * 2;
   }
   
-  // ✅ NEW: Peer emotion-based scoring
-  if (profile.peerEmotion === 'anxiety') {
-    scores.anxietySupport += 10;
-  } else if (profile.peerEmotion === 'depression') {
-    scores.depressionSupport += 10;
-  } else if (profile.peerEmotion === 'stress') {
-    scores.academicSupport += 10;
-  } else if (profile.peerEmotion === 'social') {
-    scores.socialSupport += 10;
-  } else if (profile.peerEmotion === 'sleep') {
-    scores.sleepSupport += 10;
-  }
+  if (profile.peerEmotion === 'anxiety') scores.anxietySupport += 10;
+  else if (profile.peerEmotion === 'depression') scores.depressionSupport += 10;
+  else if (profile.peerEmotion === 'stress') scores.academicSupport += 10;
+  else if (profile.peerEmotion === 'social') scores.socialSupport += 10;
+  else if (profile.peerEmotion === 'sleep') scores.sleepSupport += 10;
   
-  // ✅ NEW: Peer theme-based scoring (from post/comment content)
   for (const [theme, count] of Object.entries(profile.peerThemes || {})) {
     if (theme === 'anxiety') scores.anxietySupport += count * 1.5;
     if (theme === 'depression') scores.depressionSupport += count * 1.5;
@@ -537,12 +505,8 @@ function calculateNeedScores(profile) {
     if (theme === 'social') scores.socialSupport += count * 1.5;
   }
   
-  // ✅ Social inactivity from peer activity
-  if (profile.isSociallyInactive && profile.journalCount > 0) {
-    scores.socialSupport += 15;
-  }
+  if (profile.isSociallyInactive && profile.journalCount > 0) scores.socialSupport += 15;
   
-  // Combined mood-sleep correlation
   if (profile.averageMood !== null && profile.averageSleepQuality !== null) {
     if (profile.averageMood < 3 && profile.averageSleepQuality < 3) {
       scores.moodSupport += 10;
@@ -559,12 +523,8 @@ function calculateNeedScores(profile) {
 
 function getArticleRecommendationsFromDB(profile, scores, articles) {
   const recommendations = [];
+  if (!articles || articles.length === 0) return recommendations;
   
-  if (!articles || articles.length === 0) {
-    return recommendations;
-  }
-  
-  // Map scores to categories
   const categoryScores = {
     anxiety: scores.anxietySupport,
     depression: scores.depressionSupport,
@@ -575,18 +535,15 @@ function getArticleRecommendationsFromDB(profile, scores, articles) {
     academic: scores.academicSupport
   };
   
-  // Sort categories by score
   const sortedCategories = Object.entries(categoryScores)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3);
   
   for (const [category, score] of sortedCategories) {
     if (score > 20) {
-      // Find articles matching this category
       const matchingArticles = articles.filter(a => 
         a.category && a.category.toLowerCase() === category.toLowerCase()
       );
-      
       if (matchingArticles.length > 0) {
         const article = matchingArticles[0];
         const reason = getArticleReason(category, profile, scores);
@@ -606,7 +563,6 @@ function getArticleRecommendationsFromDB(profile, scores, articles) {
     }
   }
   
-  // If less than 2 recommendations, add general articles
   if (recommendations.length < 2) {
     const generalArticles = articles.filter(a => 
       !a.category || a.category.toLowerCase() === 'general' || a.category.toLowerCase() === 'wellness'
@@ -647,39 +603,28 @@ function getArticleReason(category, profile, scores) {
 
 function getTipRecommendations(profile, scores) {
   const recommendations = [];
-  
-  // Get relevant tips based on user's state
   let tipCategories = [];
   
   if (profile.averageMood < 3.5) {
     tipCategories.push('depression');
     tipCategories.push('anxiety');
   }
-  
   if (profile.averageSleepQuality < 3.5 || profile.averageSleepDuration < 6) {
     tipCategories.push('sleep');
   }
-  
   if (profile.primaryEmotion === 'stress' || scores.academicSupport > 40) {
     tipCategories.push('academic');
   }
-  
   if (profile.isSociallyInactive || scores.socialSupport > 30) {
     tipCategories.push('social');
   }
   
-  // Always include morning and evening tips
   let tipPool = [];
-  
-  // Morning tip
   const morningTip = TIPS.morning[Math.floor(Math.random() * TIPS.morning.length)];
   tipPool.push({ ...morningTip, type: 'morning', score: 60 });
-  
-  // Evening tip
   const eveningTip = TIPS.evening[Math.floor(Math.random() * TIPS.evening.length)];
   tipPool.push({ ...eveningTip, type: 'evening', score: 50 });
   
-  // Category-specific tips
   for (const category of tipCategories) {
     if (TIPS[category]) {
       const tip = TIPS[category][Math.floor(Math.random() * TIPS[category].length)];
@@ -692,7 +637,6 @@ function getTipRecommendations(profile, scores) {
     }
   }
   
-  // Sort by score and take top 3 unique tips
   const uniqueTips = [];
   const seenTitles = new Set();
   for (const tip of tipPool.sort((a, b) => b.score - a.score)) {
@@ -739,21 +683,16 @@ function getActivityRecommendations(profile, scores) {
   if (scores.anxietySupport > 50) {
     activities.push(...ACTIVITIES.breathing.map(a => ({ ...a, score: 75, category: 'anxiety' })));
   }
-  
   if (profile.averageMood < 3.5 || scores.depressionSupport > 40) {
     activities.push(...ACTIVITIES.journaling.map(a => ({ ...a, score: 70, category: 'depression' })));
   }
-  
   if (scores.academicSupport > 40 || scores.anxietySupport > 40) {
     activities.push(...ACTIVITIES.mindfulness.map(a => ({ ...a, score: 65, category: 'mindfulness' })));
   }
-  
   if (profile.averageMood < 4) {
     activities.push(...ACTIVITIES.movement.map(a => ({ ...a, score: 50, category: 'movement' })));
   }
-  
   if (scores.socialSupport > 40) {
-    // Add social activities if social support is high
     activities.push({ 
       name: 'Call a Friend', 
       description: 'Reach out to a friend you haven\'t spoken to in a while. A simple conversation can boost your mood.', 
@@ -763,13 +702,11 @@ function getActivityRecommendations(profile, scores) {
     });
   }
   
-  // If no specific activities, add general ones
   if (activities.length === 0) {
     activities.push({ ...ACTIVITIES.mindfulness[0], score: 40, category: 'mindfulness' });
     activities.push({ ...ACTIVITIES.movement[0], score: 40, category: 'movement' });
   }
   
-  // Remove duplicates and sort by score
   const uniqueActivities = [];
   const seenNames = new Set();
   for (const activity of activities.sort((a, b) => b.score - a.score)) {
@@ -808,54 +745,51 @@ function getActivityReason(category, profile, scores) {
 }
 
 async function getAssessmentRecommendation(userId) {
-  const query = await db.promise().query(
-    `SELECT type, score, severity, taken_at FROM assessments 
-     WHERE user_id = ? 
-     ORDER BY taken_at DESC`,
-    [userId]
-  );
-  
-  const assessments = query[0];
-  const now = new Date();
-  
-  const result = {
-    phq9: { recommended: false, reason: '', lastScore: null, lastTaken: null },
-    gad7: { recommended: false, reason: '', lastScore: null, lastTaken: null }
-  };
-  
-  // Check PHQ-9
-  const phq9History = assessments.filter(a => a.type === 'phq9');
-  if (phq9History.length === 0) {
-    result.phq9.recommended = true;
-    result.phq9.reason = 'Take your first PHQ-9 depression screening to establish a baseline.';
-  } else {
-    const last = phq9History[0];
-    result.phq9.lastScore = last.score;
-    result.phq9.lastTaken = last.taken_at;
-    const daysSince = Math.floor((now - new Date(last.taken_at)) / (1000 * 60 * 60 * 24));
-    if (daysSince >= 14) {
+  try {
+    const query = await db.promise().query(
+      `SELECT type, score, severity, taken_at FROM assessments 
+       WHERE user_id = ? 
+       ORDER BY taken_at DESC`,
+      [userId]
+    );
+    const assessments = query[0];
+    const now = new Date();
+    const result = { phq9: { recommended: false, reason: '', lastScore: null, lastTaken: null }, gad7: { recommended: false, reason: '', lastScore: null, lastTaken: null } };
+    
+    const phq9History = assessments.filter(a => a.type === 'phq9');
+    if (phq9History.length === 0) {
       result.phq9.recommended = true;
-      result.phq9.reason = `It\'s been ${daysSince} days since your last screening. Track your progress.`;
+      result.phq9.reason = 'Take your first PHQ-9 depression screening to establish a baseline.';
+    } else {
+      const last = phq9History[0];
+      result.phq9.lastScore = last.score;
+      result.phq9.lastTaken = last.taken_at;
+      const daysSince = Math.floor((now - new Date(last.taken_at)) / (1000 * 60 * 60 * 24));
+      if (daysSince >= 14) {
+        result.phq9.recommended = true;
+        result.phq9.reason = `It\'s been ${daysSince} days since your last screening. Track your progress.`;
+      }
     }
-  }
-  
-  // Check GAD-7
-  const gad7History = assessments.filter(a => a.type === 'gad7');
-  if (gad7History.length === 0) {
-    result.gad7.recommended = true;
-    result.gad7.reason = 'Take your first GAD-7 anxiety assessment to establish a baseline.';
-  } else {
-    const last = gad7History[0];
-    result.gad7.lastScore = last.score;
-    result.gad7.lastTaken = last.taken_at;
-    const daysSince = Math.floor((now - new Date(last.taken_at)) / (1000 * 60 * 60 * 24));
-    if (daysSince >= 30) {
+    
+    const gad7History = assessments.filter(a => a.type === 'gad7');
+    if (gad7History.length === 0) {
       result.gad7.recommended = true;
-      result.gad7.reason = `It\'s been ${daysSince} days since your last assessment. Check in with yourself.`;
+      result.gad7.reason = 'Take your first GAD-7 anxiety assessment to establish a baseline.';
+    } else {
+      const last = gad7History[0];
+      result.gad7.lastScore = last.score;
+      result.gad7.lastTaken = last.taken_at;
+      const daysSince = Math.floor((now - new Date(last.taken_at)) / (1000 * 60 * 60 * 24));
+      if (daysSince >= 30) {
+        result.gad7.recommended = true;
+        result.gad7.reason = `It\'s been ${daysSince} days since your last assessment. Check in with yourself.`;
+      }
     }
+    return result;
+  } catch (error) {
+    console.error("Error getting assessment recommendation:", error);
+    return { phq9: { recommended: false, reason: '', lastScore: null, lastTaken: null }, gad7: { recommended: false, reason: '', lastScore: null, lastTaken: null } };
   }
-  
-  return result;
 }
 
 module.exports = {

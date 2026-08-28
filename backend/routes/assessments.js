@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const verifyToken = require("../middleware/authmiddleware");
+const { logGamificationActivity } = require("../services/gamificationService");
 
 // PHQ-9 Questions
 const PHQ9_QUESTIONS = [
@@ -52,7 +53,7 @@ router.get("/phq9/questions", verifyToken, (req, res) => {
 });
 
 // Submit PHQ-9 assessment
-router.post("/phq9", verifyToken, (req, res) => {
+router.post("/phq9", verifyToken, async (req, res) => {
   const { user_id, answers } = req.body;
   
   if (req.user.id !== user_id) {
@@ -76,25 +77,27 @@ router.post("/phq9", verifyToken, (req, res) => {
   // Check for self-harm risk (question 9 score > 0)
   const hasSelfHarmRisk = answers[8] > 0;
   
-  db.query(
-    "INSERT INTO assessments (user_id, type, score, severity, answers) VALUES (?, 'phq9', ?, ?, ?)",
-    [user_id, totalScore, severity, JSON.stringify(answers)],
-    (err, result) => {
-      if (err) {
-        console.error("Save assessment error:", err);
-        return res.status(500).json({ msg: "Failed to save assessment" });
-      }
-      
-      res.json({
-        id: result.insertId,
-        score: totalScore,
-        severity,
-        maxScore: 27,
-        hasSelfHarmRisk,
-        recommendation: getPHQ9Recommendation(severity, hasSelfHarmRisk)
-      });
-    }
-  );
+  try {
+    const [result] = await db.promise().query(
+      "INSERT INTO assessments (user_id, type, score, severity, answers) VALUES (?, 'phq9', ?, ?, ?)",
+      [user_id, totalScore, severity, JSON.stringify(answers)]
+    );
+
+    // ✅ GAMIFICATION: Log PHQ-9 assessment
+    await logGamificationActivity(user_id, 'assessment_phq9');
+    
+    res.json({
+      id: result.insertId,
+      score: totalScore,
+      severity,
+      maxScore: 27,
+      hasSelfHarmRisk,
+      recommendation: getPHQ9Recommendation(severity, hasSelfHarmRisk)
+    });
+  } catch (error) {
+    console.error("Save PHQ-9 assessment error:", error);
+    res.status(500).json({ msg: "Failed to save assessment" });
+  }
 });
 
 function getPHQ9Recommendation(severity, hasSelfHarmRisk) {
@@ -128,7 +131,7 @@ router.get("/gad7/questions", verifyToken, (req, res) => {
 });
 
 // Submit GAD-7 assessment
-router.post("/gad7", verifyToken, (req, res) => {
+router.post("/gad7", verifyToken, async (req, res) => {
   const { user_id, answers } = req.body;
   
   if (req.user.id !== user_id) {
@@ -146,24 +149,26 @@ router.post("/gad7", verifyToken, (req, res) => {
   else if (totalScore <= 14) severity = "Moderate anxiety";
   else severity = "Severe anxiety";
   
-  db.query(
-    "INSERT INTO assessments (user_id, type, score, severity, answers) VALUES (?, 'gad7', ?, ?, ?)",
-    [user_id, totalScore, severity, JSON.stringify(answers)],
-    (err, result) => {
-      if (err) {
-        console.error("Save assessment error:", err);
-        return res.status(500).json({ msg: "Failed to save assessment" });
-      }
-      
-      res.json({
-        id: result.insertId,
-        score: totalScore,
-        severity,
-        maxScore: 21,
-        recommendation: getGAD7Recommendation(severity)
-      });
-    }
-  );
+  try {
+    const [result] = await db.promise().query(
+      "INSERT INTO assessments (user_id, type, score, severity, answers) VALUES (?, 'gad7', ?, ?, ?)",
+      [user_id, totalScore, severity, JSON.stringify(answers)]
+    );
+
+    // ✅ GAMIFICATION: Log GAD-7 assessment
+    await logGamificationActivity(user_id, 'assessment_gad7');
+    
+    res.json({
+      id: result.insertId,
+      score: totalScore,
+      severity,
+      maxScore: 21,
+      recommendation: getGAD7Recommendation(severity)
+    });
+  } catch (error) {
+    console.error("Save GAD-7 assessment error:", error);
+    res.status(500).json({ msg: "Failed to save assessment" });
+  }
 });
 
 function getGAD7Recommendation(severity) {
@@ -191,7 +196,7 @@ router.get("/pss/questions", verifyToken, (req, res) => {
 });
 
 // Submit PSS-10 assessment
-router.post("/pss", verifyToken, (req, res) => {
+router.post("/pss", verifyToken, async (req, res) => {
   const { user_id, answers } = req.body;
   
   if (req.user.id !== user_id) {
@@ -215,24 +220,26 @@ router.post("/pss", verifyToken, (req, res) => {
   else if (totalScore <= 26) severity = "Moderate stress";
   else severity = "High stress";
   
-  db.query(
-    "INSERT INTO assessments (user_id, type, score, severity, answers) VALUES (?, 'pss', ?, ?, ?)",
-    [user_id, totalScore, severity, JSON.stringify(answers)],
-    (err, result) => {
-      if (err) {
-        console.error("Save PSS assessment error:", err);
-        return res.status(500).json({ msg: "Failed to save assessment" });
-      }
-      
-      res.json({
-        id: result.insertId,
-        score: totalScore,
-        severity,
-        maxScore: 40,
-        recommendation: getPSSRecommendation(severity)
-      });
-    }
-  );
+  try {
+    const [result] = await db.promise().query(
+      "INSERT INTO assessments (user_id, type, score, severity, answers) VALUES (?, 'pss', ?, ?, ?)",
+      [user_id, totalScore, severity, JSON.stringify(answers)]
+    );
+
+    // ✅ GAMIFICATION: Log PSS-10 assessment
+    await logGamificationActivity(user_id, 'assessment_pss');
+    
+    res.json({
+      id: result.insertId,
+      score: totalScore,
+      severity,
+      maxScore: 40,
+      recommendation: getPSSRecommendation(severity)
+    });
+  } catch (error) {
+    console.error("Save PSS assessment error:", error);
+    res.status(500).json({ msg: "Failed to save assessment" });
+  }
 });
 
 function getPSSRecommendation(severity) {
@@ -367,7 +374,6 @@ router.get("/history/graph/:user_id", verifyToken, (req, res) => {
         return res.status(500).json({ msg: "Failed to fetch assessment history" });
       }
       
-      // Separate PHQ-9, GAD-7, and PSS data
       const phq9Data = results.filter(r => r.type === 'phq9').map(r => ({
         date: r.date,
         score: r.score,
