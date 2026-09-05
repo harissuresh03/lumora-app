@@ -414,7 +414,7 @@ router.get("/stress-forecast/:student_id/:counsellor_id", verifyCounsellor, asyn
 });
 
 // ============================================
-// SEND NOTE TO STUDENT
+// SEND NOTE TO STUDENT (Works with user_notifications)
 // ============================================
 
 router.post("/send-note", verifyCounsellor, async (req, res) => {
@@ -439,6 +439,7 @@ router.post("/send-note", verifyCounsellor, async (req, res) => {
       return res.status(403).json({ msg: "Student has not given consent to receive notes" });
     }
 
+    // ✅ Insert directly into user_notifications (no separate table needed)
     await db.promise().query(
       `INSERT INTO user_notifications 
        (user_id, title, message, type, related_id, created_at) 
@@ -462,7 +463,7 @@ router.post("/send-note", verifyCounsellor, async (req, res) => {
 // APPOINTMENTS
 // ============================================
 
-// STUDENT: Create appointment request (pending) - unchanged
+// STUDENT: Create appointment request (pending)
 router.post("/appointments/student", verifyToken, async (req, res) => {
   const { student_id, counsellor_id, session_date, duration, notes } = req.body;
   
@@ -534,7 +535,7 @@ router.post("/appointments/student", verifyToken, async (req, res) => {
   }
 });
 
-// STUDENT: Get their appointments - unchanged
+// STUDENT: Get their appointments
 router.get("/appointments/student/:student_id", verifyToken, async (req, res) => {
   const studentId = parseInt(req.params.student_id);
   
@@ -561,7 +562,7 @@ router.get("/appointments/student/:student_id", verifyToken, async (req, res) =>
   }
 });
 
-// COUNSELLOR: Get appointments - unchanged
+// COUNSELLOR: Get appointments
 router.get("/appointments/:counsellor_id", verifyCounsellor, async (req, res) => {
   const counsellorId = parseInt(req.params.counsellor_id);
   const { status } = req.query;
@@ -598,7 +599,7 @@ router.get("/appointments/:counsellor_id", verifyCounsellor, async (req, res) =>
   }
 });
 
-// COUNSELLOR: Update appointment status - unchanged
+// COUNSELLOR: Update appointment status
 router.put("/appointments/:id/status", verifyCounsellor, async (req, res) => {
   const { id } = req.params;
   const { status, notes } = req.body;
@@ -657,7 +658,7 @@ router.put("/appointments/:id/status", verifyCounsellor, async (req, res) => {
   }
 });
 
-// COUNSELLOR: Create appointment (counsellor-initiated, auto-confirmed) - unchanged
+// COUNSELLOR: Create appointment (counsellor-initiated, auto-confirmed)
 router.post("/appointments", verifyCounsellor, async (req, res) => {
   const { counsellor_id, student_id, session_date, duration, notes } = req.body;
   
@@ -705,7 +706,7 @@ router.post("/appointments", verifyCounsellor, async (req, res) => {
   }
 });
 
-// COUNSELLOR: Delete appointment - unchanged
+// COUNSELLOR: Delete appointment
 router.delete("/appointments/:id", verifyCounsellor, async (req, res) => {
   const { id } = req.params;
   const counsellorId = req.user.id;
@@ -787,57 +788,6 @@ router.put("/alerts/:id/resolve", verifyCounsellor, async (req, res) => {
   } catch (error) {
     console.error("Resolve alert error:", error);
     res.status(500).json({ msg: "Failed to resolve alert" });
-  }
-});
-
-// ============================================
-// COUNSELLOR NOTES
-// ============================================
-
-router.get("/notes/:counsellor_id", verifyCounsellor, async (req, res) => {
-  const counsellorId = parseInt(req.params.counsellor_id);
-  const { student_id } = req.query;
-  
-  if (req.user.id !== counsellorId) {
-    return res.status(403).json({ msg: "Unauthorized" });
-  }
-
-  try {
-    let query = "SELECT * FROM counsellor_notes WHERE counsellor_id = ?";
-    let params = [counsellorId];
-    
-    if (student_id) {
-      query += " AND student_id = ?";
-      params.push(student_id);
-    }
-    
-    query += " ORDER BY created_at DESC";
-    
-    const [notes] = await db.promise().query(query, params);
-    res.json(notes);
-    
-  } catch (error) {
-    console.error("Notes error:", error);
-    res.status(500).json({ msg: "Failed to fetch notes" });
-  }
-});
-
-router.post("/notes", verifyCounsellor, async (req, res) => {
-  const { counsellor_id, student_id, note, note_type } = req.body;
-  
-  if (req.user.id !== counsellor_id) {
-    return res.status(403).json({ msg: "Unauthorized" });
-  }
-
-  try {
-    await db.promise().query(
-      "INSERT INTO counsellor_notes (counsellor_id, student_id, note, note_type) VALUES (?, ?, ?, ?)",
-      [counsellor_id, student_id, note, note_type || 'private']
-    );
-    res.json({ msg: "Note added successfully" });
-  } catch (error) {
-    console.error("Add note error:", error);
-    res.status(500).json({ msg: "Failed to add note" });
   }
 });
 

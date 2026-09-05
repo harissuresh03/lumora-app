@@ -83,22 +83,172 @@ const sendEmail = async ({ to, subject, html, text }) => {
 
     const info = await transporter.sendMail(mailOptions);
     console.log(`✅ Email sent to ${to}: ${info.messageId}`);
-    
+
     // If using Ethereal, log the preview URL
     if (process.env.NODE_ENV !== 'production' && info.messageId) {
       console.log(`📧 Preview URL: ${nodemailer.getTestMessageUrl(info)}`);
     }
-    
-    return { 
-      success: true, 
-      messageId: info.messageId, 
-      previewUrl: process.env.NODE_ENV !== 'production' ? nodemailer.getTestMessageUrl(info) : null 
+
+    return {
+      success: true,
+      messageId: info.messageId,
+      previewUrl: process.env.NODE_ENV !== 'production' ? nodemailer.getTestMessageUrl(info) : null
     };
   } catch (error) {
     console.error("❌ Email send error:", error);
     return { success: false, error: error.message };
   }
 };
+
+/* =========================================================================
+ * LUMORA EMAIL DESIGN SYSTEM
+ * Shared style tokens + HTML fragment helpers so every template (approvals,
+ * invitations, crisis alerts, OTP codes, etc.) shares one consistent,
+ * professional, calming visual identity. Plain inline-style-friendly
+ * HTML/CSS for compatibility with Gmail, Outlook, and mobile clients.
+ * Purely presentational — does not touch transporter setup, sendEmail(),
+ * function signatures, dynamic variables, or the exports at the bottom.
+ * ========================================================================= */
+
+const LUMORA_COLORS = {
+  navy: '#1e2a4a',
+  navyDark: '#141c33',
+  slate: '#3d4a63',
+  slateLight: '#64748b',
+  muted: '#94a3b8',
+  blue: '#3b5bdb',
+  purple: '#6c4fd6',
+  purpleDark: '#5638b8',
+  white: '#ffffff',
+  bgLight: '#f3f5fb',
+  border: '#e2e8f0',
+  success: '#0f8a4b',
+  successBg: '#e6f6ec',
+  successBorder: '#0f9d58',
+  warning: '#92400e',
+  warningBg: '#fef3e2',
+  warningBorder: '#f59e0b',
+  crisis: '#b91c1c',
+  crisisDark: '#7f1d1d',
+  crisisBg: '#fdecec',
+  crisisBorder: '#dc2626',
+  neutralBg: '#f1f4f9',
+  neutralBorder: '#94a3b8',
+};
+
+const LUMORA_FONT_STACK = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+
+// Shared base styles injected into every template's <style> block.
+const lumoraBaseStyles = `
+  body { margin:0; padding:0; background:${LUMORA_COLORS.bgLight}; font-family:${LUMORA_FONT_STACK}; }
+  .email-wrapper { max-width:640px; margin:0 auto; padding:28px 16px; }
+  .email-card { background:${LUMORA_COLORS.white}; border-radius:16px; overflow:hidden; border:1px solid ${LUMORA_COLORS.border}; box-shadow:0 4px 18px rgba(15,23,42,0.06); }
+  .email-header { padding:36px 32px; text-align:center; color:${LUMORA_COLORS.white}; }
+  .email-header .brand { margin:0; font-size:24px; font-weight:700; letter-spacing:-0.3px; }
+  .email-header .tagline { margin:6px 0 0; font-size:13px; opacity:0.88; font-weight:400; }
+  .email-body { padding:36px 32px; color:${LUMORA_COLORS.slate}; font-size:15px; line-height:1.65; }
+  .email-body h2 { margin:0 0 16px; font-size:20px; color:${LUMORA_COLORS.navy}; font-weight:700; }
+  .email-body p { margin:0 0 14px; color:${LUMORA_COLORS.slate}; }
+  .email-body ul { margin:0 0 14px; padding-left:20px; color:${LUMORA_COLORS.slate}; }
+  .email-body ul li { margin:6px 0; }
+  .btn { display:inline-block; padding:13px 34px; border-radius:8px; color:${LUMORA_COLORS.white} !important; text-decoration:none; font-weight:600; font-size:15px; }
+  .box { border-radius:10px; padding:18px 20px; margin:18px 0; border-left:4px solid; }
+  .box-label { font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:0.5px; }
+  .otp-code { font-size:36px; font-weight:700; letter-spacing:10px; font-family:'Courier New', monospace; color:${LUMORA_COLORS.purple}; }
+  .email-footer { text-align:center; padding:24px 16px 4px; font-size:12px; color:${LUMORA_COLORS.muted}; }
+  .email-footer a { color:${LUMORA_COLORS.blue}; text-decoration:none; }
+  @media only screen and (max-width:480px) {
+    .email-body, .email-header { padding:26px 20px !important; }
+    .otp-code { font-size:28px; letter-spacing:6px; }
+  }
+`;
+
+// Renders the branded header. variant controls the gradient ('brand' | 'crisis').
+const renderLumoraHeader = (variant, icon, subtitle) => {
+  const gradients = {
+    brand: `linear-gradient(135deg, ${LUMORA_COLORS.navy} 0%, ${LUMORA_COLORS.purple} 100%)`,
+    crisis: `linear-gradient(135deg, ${LUMORA_COLORS.crisisDark} 0%, ${LUMORA_COLORS.crisisBorder} 100%)`,
+  };
+  return `
+    <div class="email-header" style="background:${gradients[variant] || gradients.brand};">
+      <p class="brand">${icon} Lumora</p>
+      <p class="tagline">${subtitle}</p>
+    </div>
+  `;
+};
+
+const renderLumoraFooter = (recipientLine) => `
+  <div class="email-footer">
+    <p>${recipientLine}</p>
+    <p>© ${new Date().getFullYear()} Lumora Mental Health Platform. All rights reserved.</p>
+  </div>
+`;
+
+// variant: 'success' | 'warning' | 'crisis' | 'info' | 'neutral'
+const renderLumoraBox = (variant, label, contentHtml) => {
+  const variants = {
+    success: { bg: LUMORA_COLORS.successBg, border: LUMORA_COLORS.successBorder, text: LUMORA_COLORS.success },
+    warning: { bg: LUMORA_COLORS.warningBg, border: LUMORA_COLORS.warningBorder, text: LUMORA_COLORS.warning },
+    crisis: { bg: LUMORA_COLORS.crisisBg, border: LUMORA_COLORS.crisisBorder, text: LUMORA_COLORS.crisis },
+    info: { bg: '#eef1fb', border: LUMORA_COLORS.purple, text: LUMORA_COLORS.navy },
+    neutral: { bg: LUMORA_COLORS.neutralBg, border: LUMORA_COLORS.neutralBorder, text: LUMORA_COLORS.slate },
+  };
+  const v = variants[variant] || variants.info;
+  return `
+    <div class="box" style="background:${v.bg}; border-left-color:${v.border};">
+      ${label ? `<div class="box-label" style="color:${v.text};">${label}</div>` : ''}
+      <div style="margin-top:${label ? '6px' : '0'}; color:${v.text === LUMORA_COLORS.navy ? LUMORA_COLORS.slate : v.text};">${contentHtml}</div>
+    </div>
+  `;
+};
+
+// rows: [{ label, value }]
+const renderLumoraCredentials = (rows) => `
+  <div class="box" style="background:#eef1fb; border-left-color:${LUMORA_COLORS.purple};">
+    <div class="box-label" style="color:${LUMORA_COLORS.navy};">🔑 Your Login Credentials</div>
+    <div style="margin-top:8px;">
+      ${rows.map(r => `<p style="margin:4px 0; color:${LUMORA_COLORS.slate};"><strong>${r.label}:</strong> <code style="background:#e2e8f0; padding:3px 10px; border-radius:6px; font-family:'Courier New', monospace; font-size:14px; color:${LUMORA_COLORS.navy}; font-weight:600;">${r.value}</code></p>`).join('')}
+    </div>
+  </div>
+`;
+
+const renderLumoraOtpBox = (otp, label) => `
+  <div style="background:#eef1fb; border-radius:12px; padding:26px 20px; text-align:center; margin:20px 0; border:1px solid #dde3f7;">
+    <div style="font-size:13px; color:${LUMORA_COLORS.slateLight}; text-transform:uppercase; letter-spacing:0.6px; margin-bottom:10px; font-weight:600;">${label}</div>
+    <div class="otp-code">${otp}</div>
+  </div>
+`;
+
+// variant: 'primary' | 'crisis'
+const renderLumoraButton = (href, label, variant) => `
+  <div style="text-align:center; margin:24px 0;">
+    <a href="${href}" class="btn" style="background:${variant === 'crisis' ? LUMORA_COLORS.crisisBorder : LUMORA_COLORS.purple};">${label}</a>
+  </div>
+`;
+
+// Wraps a body fragment in the full HTML document shell shared by every email.
+const wrapLumoraEmail = ({ title, headerVariant, headerIcon, headerSubtitle, bodyHtml, footerLine }) => `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${title}</title>
+      <style>${lumoraBaseStyles}</style>
+    </head>
+    <body>
+      <div class="email-wrapper">
+        <div class="email-card">
+          ${renderLumoraHeader(headerVariant || 'brand', headerIcon || '💙', headerSubtitle || 'Mental Health Support Platform')}
+          <div class="email-body">
+            ${bodyHtml}
+          </div>
+        </div>
+        ${renderLumoraFooter(footerLine)}
+      </div>
+    </body>
+    </html>
+  `;
 
 /**
  * Send counsellor approval email
@@ -109,109 +259,72 @@ const sendEmail = async ({ to, subject, html, text }) => {
  */
 const sendCounsellorApprovalEmail = async (email, name, password = null) => {
   const subject = "🎉 Your Counsellor Application Has Been Approved!";
-  
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Application Approved</title>
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8fafc; }
-        .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 32px 30px; text-align: center; border-radius: 12px 12px 0 0; }
-        .header h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
-        .header p { margin: 8px 0 0; opacity: 0.9; font-size: 14px; }
-        .content { background: #ffffff; padding: 32px 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-        .content h2 { font-size: 20px; margin-top: 0; color: #1e293b; }
-        .content p { color: #475569; margin: 12px 0; }
-        .content ul { color: #475569; padding-left: 20px; margin: 12px 0; }
-        .content ul li { margin: 6px 0; }
-        .button { display: inline-block; padding: 12px 32px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; text-decoration: none; border-radius: 30px; font-weight: 600; margin: 16px 0; transition: transform 0.2s; }
-        .button:hover { transform: scale(1.02); }
-        .credentials { background: #eef2ff; padding: 20px 24px; border-radius: 12px; margin: 16px 0; border-left: 4px solid #6366f1; }
-        .credentials strong { color: #1e293b; }
-        .credentials code { background: #e2e8f0; padding: 4px 12px; border-radius: 6px; font-size: 16px; font-family: monospace; color: #1e293b; font-weight: 600; }
-        .warning { background: #fef3c7; padding: 12px 16px; border-radius: 8px; margin: 12px 0; border-left: 4px solid #f59e0b; font-size: 13px; color: #92400e; }
-        .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
-        .footer a { color: #6366f1; text-decoration: none; }
-        .emoji { font-size: 24px; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>✨ Lumora</h1>
-        <p>Mental Health Support Platform</p>
-      </div>
-      <div class="content">
-        <h2>🎉 Welcome to the Counsellor Team!</h2>
-        <p>Dear <strong>${name}</strong>,</p>
-        <p>We are delighted to inform you that your application to become a counsellor on the Lumora platform has been <span style="color: #22c55e; font-weight: 600;">approved</span>!</p>
-        
-        <p>You can now:</p>
-        <ul>
-          <li>✅ Access the counsellor dashboard</li>
-          <li>✅ View and manage your students</li>
-          <li>✅ Schedule appointments</li>
-          <li>✅ Send messages to students</li>
-          <li>✅ Monitor student well-being</li>
-        </ul>
 
-        ${password ? `
-        <div class="credentials">
-          <strong>🔑 Your Login Credentials:</strong><br>
-          <strong>Email:</strong> <code>${email}</code><br>
-          <strong>Password:</strong> <code>${password}</code><br>
-        </div>
-        <div class="warning">
-          ⚠️ <strong>Important:</strong> Please change your password after your first login for security purposes.
-        </div>
-        ` : `
-        <p style="color: #475569;">You can log in using your registered email address.</p>
-        `}
+  const bodyHtml = `
+    <h2>🎉 Welcome to the Counsellor Team!</h2>
+    <p>Dear <strong>${name}</strong>,</p>
+    <p>We are delighted to inform you that your application to become a counsellor on the Lumora platform has been <span style="color:${LUMORA_COLORS.success}; font-weight:600;">approved</span>.</p>
 
-        <div style="text-align: center;">
-          <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}" class="button">🚀 Go to Lumora</a>
-        </div>
+    <p>You now have access to:</p>
+    <ul>
+      <li>✅ The counsellor dashboard</li>
+      <li>✅ Your assigned students' well-being overviews</li>
+      <li>✅ Appointment scheduling</li>
+      <li>✅ Secure messaging with students</li>
+      <li>✅ Real-time well-being monitoring tools</li>
+    </ul>
 
-        <p style="margin-top: 20px; color: #475569; font-size: 14px;">
-          If you have any questions, please contact our support team at <a href="mailto:support@lumora.com" style="color: #6366f1;">support@lumora.com</a>
-        </p>
-        <p style="color: #475569; font-size: 14px; margin-bottom: 0;">
-          Warm regards,<br>
-          <strong style="color: #1e293b;">The Lumora Team 💙</strong>
-        </p>
-      </div>
-      <div class="footer">
-        <p>This email was sent to <a href="mailto:${email}">${email}</a>. If you did not request this, please ignore this email.</p>
-        <p>© ${new Date().getFullYear()} Lumora Mental Health Platform. All rights reserved.</p>
-      </div>
-    </body>
-    </html>
+    ${password ? `
+    ${renderLumoraCredentials([
+      { label: 'Email', value: email },
+      { label: 'Password', value: password },
+    ])}
+    ${renderLumoraBox('warning', '⚠️ Important', 'Please change your password after your first login for security purposes.')}
+    ` : `
+    <p>You can log in using your registered email address.</p>
+    `}
+
+    ${renderLumoraButton(process.env.FRONTEND_URL || 'http://localhost:3000', '🚀 Go to Lumora', 'primary')}
+
+    <p style="font-size:14px;">
+      If you have any questions, please contact our support team at <a href="mailto:support@lumora.com" style="color:${LUMORA_COLORS.purple};">support@lumora.com</a>.
+    </p>
+    <p style="font-size:14px; margin-bottom:0;">
+      Warm regards,<br>
+      <strong style="color:${LUMORA_COLORS.navy};">The Lumora Team 💙</strong>
+    </p>
   `;
+
+  const html = wrapLumoraEmail({
+    title: 'Application Approved',
+    headerVariant: 'brand',
+    headerIcon: '✨',
+    bodyHtml,
+    footerLine: `This email was sent to <a href="mailto:${email}">${email}</a>. If you did not request this, please ignore this email.`,
+  });
 
   const text = `
     Lumora - Counsellor Application Approved!
-    
+
     Dear ${name},
-    
+
     We are delighted to inform you that your application to become a counsellor on the Lumora platform has been approved!
-    
-    You can now:
-    - Access the counsellor dashboard
-    - View and manage your students
-    - Schedule appointments
-    - Send messages to students
-    - Monitor student well-being
-    
+
+    You now have access to:
+    - The counsellor dashboard
+    - Your assigned students' well-being overviews
+    - Appointment scheduling
+    - Secure messaging with students
+    - Real-time well-being monitoring tools
+
     ${password ? `Your Login Credentials:
     Email: ${email}
     Password: ${password}
-    
-    IMPORTANT: Please change your password after your first login.` : ''}
-    
+
+    IMPORTANT: Please change your password after your first login.` : 'You can log in using your registered email address.'}
+
     Go to Lumora: ${process.env.FRONTEND_URL || 'http://localhost:3000'}
-    
+
     Warm regards,
     The Lumora Team 💙
   `;
@@ -228,79 +341,45 @@ const sendCounsellorApprovalEmail = async (email, name, password = null) => {
  */
 const sendCounsellorRejectionEmail = async (email, name, reason = null) => {
   const subject = "📋 Update on Your Counsellor Application";
-  
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Application Update</title>
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8fafc; }
-        .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 32px 30px; text-align: center; border-radius: 12px 12px 0 0; }
-        .header h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
-        .header p { margin: 8px 0 0; opacity: 0.9; font-size: 14px; }
-        .content { background: #ffffff; padding: 32px 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-        .content h2 { font-size: 20px; margin-top: 0; color: #1e293b; }
-        .content p { color: #475569; margin: 12px 0; }
-        .reason-box { background: #fef2f2; padding: 16px 20px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #ef4444; }
-        .reason-box strong { color: #ef4444; }
-        .reason-box p { margin: 4px 0 0; color: #dc2626; }
-        .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
-        .footer a { color: #6366f1; text-decoration: none; }
-        .button { display: inline-block; padding: 10px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 30px; font-weight: 600; margin: 8px 0; }
-        .button:hover { background: #4f46e5; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>✨ Lumora</h1>
-        <p>Mental Health Support Platform</p>
-      </div>
-      <div class="content">
-        <h2>📋 Application Update</h2>
-        <p>Dear <strong>${name}</strong>,</p>
-        <p>Thank you for your interest in becoming a counsellor on the Lumora platform.</p>
-        
-        <p>After careful review, we regret to inform you that your application has been <span style="color: #ef4444; font-weight: 600;">rejected</span> at this time.</p>
 
-        ${reason ? `
-        <div class="reason-box">
-          <strong>📝 Reason provided by admin:</strong>
-          <p>${reason}</p>
-        </div>
-        ` : ''}
+  const bodyHtml = `
+    <h2>📋 Application Update</h2>
+    <p>Dear <strong>${name}</strong>,</p>
+    <p>Thank you for your interest in becoming a counsellor on the Lumora platform.</p>
+    <p>After careful review, we regret to inform you that your application has not been approved at this time.</p>
 
-        <p style="color: #475569; font-size: 14px;">
-          We encourage you to reapply in the future. If you have any questions, please contact our support team at <a href="mailto:support@lumora.com" style="color: #6366f1;">support@lumora.com</a>
-        </p>
-        <p style="color: #475569; font-size: 14px; margin-bottom: 0;">
-          Warm regards,<br>
-          <strong style="color: #1e293b;">The Lumora Team 💙</strong>
-        </p>
-      </div>
-      <div class="footer">
-        <p>This email was sent to <a href="mailto:${email}">${email}</a>.</p>
-        <p>© ${new Date().getFullYear()} Lumora Mental Health Platform. All rights reserved.</p>
-      </div>
-    </body>
-    </html>
+    ${reason ? renderLumoraBox('neutral', '📝 Reason Provided by Admin', reason) : ''}
+
+    <p style="font-size:14px;">
+      We encourage you to reapply in the future. If you have any questions, please contact our support team at <a href="mailto:support@lumora.com" style="color:${LUMORA_COLORS.purple};">support@lumora.com</a>.
+    </p>
+    <p style="font-size:14px; margin-bottom:0;">
+      Warm regards,<br>
+      <strong style="color:${LUMORA_COLORS.navy};">The Lumora Team 💙</strong>
+    </p>
   `;
+
+  const html = wrapLumoraEmail({
+    title: 'Application Update',
+    headerVariant: 'brand',
+    headerIcon: '✨',
+    bodyHtml,
+    footerLine: `This email was sent to <a href="mailto:${email}">${email}</a>.`,
+  });
 
   const text = `
     Lumora - Application Update
-    
+
     Dear ${name},
-    
+
     Thank you for your interest in becoming a counsellor on the Lumora platform.
-    
-    After careful review, we regret to inform you that your application has been rejected at this time.
-    
+
+    After careful review, we regret to inform you that your application has not been approved at this time.
+
     ${reason ? `Reason: ${reason}` : ''}
-    
+
     We encourage you to reapply in the future.
-    
+
     Warm regards,
     The Lumora Team 💙
   `;
@@ -317,63 +396,40 @@ const sendCounsellorRejectionEmail = async (email, name, reason = null) => {
  */
 const sendAccountApprovalEmail = async (email, name, accountType = 'student') => {
   const subject = "🎉 Your Lumora Account Has Been Approved!";
-  
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Account Approved</title>
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8fafc; }
-        .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 32px 30px; text-align: center; border-radius: 12px 12px 0 0; }
-        .header h1 { margin: 0; font-size: 28px; font-weight: 700; }
-        .content { background: #ffffff; padding: 32px 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none; }
-        .button { display: inline-block; padding: 12px 32px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; text-decoration: none; border-radius: 30px; font-weight: 600; margin: 16px 0; }
-        .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>✨ Lumora</h1>
-        <p>Mental Health Support Platform</p>
-      </div>
-      <div class="content">
-        <h2>🎉 Welcome to Lumora!</h2>
-        <p>Dear <strong>${name}</strong>,</p>
-        <p>We are excited to inform you that your ${accountType} account has been <span style="color: #22c55e; font-weight: 600;">approved</span>!</p>
-        
-        <p>You can now log in and start using the platform.</p>
 
-        <div style="text-align: center;">
-          <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}" class="button">🚀 Login to Lumora</a>
-        </div>
+  const bodyHtml = `
+    <h2>🎉 Welcome to Lumora!</h2>
+    <p>Dear <strong>${name}</strong>,</p>
+    <p>We are pleased to let you know that your ${accountType} account has been <span style="color:${LUMORA_COLORS.success}; font-weight:600;">approved</span>.</p>
+    <p>You can now log in and start using the platform.</p>
 
-        <p style="color: #475569; font-size: 14px; margin-bottom: 0;">
-          Warm regards,<br>
-          <strong style="color: #1e293b;">The Lumora Team 💙</strong>
-        </p>
-      </div>
-      <div class="footer">
-        <p>This email was sent to ${email}.</p>
-        <p>© ${new Date().getFullYear()} Lumora Mental Health Platform. All rights reserved.</p>
-      </div>
-    </body>
-    </html>
+    ${renderLumoraButton(process.env.FRONTEND_URL || 'http://localhost:3000', '🚀 Login to Lumora', 'primary')}
+
+    <p style="font-size:14px; margin-bottom:0;">
+      Warm regards,<br>
+      <strong style="color:${LUMORA_COLORS.navy};">The Lumora Team 💙</strong>
+    </p>
   `;
+
+  const html = wrapLumoraEmail({
+    title: 'Account Approved',
+    headerVariant: 'brand',
+    headerIcon: '✨',
+    bodyHtml,
+    footerLine: `This email was sent to ${email}.`,
+  });
 
   const text = `
     Lumora - Account Approved!
-    
+
     Dear ${name},
-    
-    We are excited to inform you that your ${accountType} account has been approved!
-    
+
+    We are pleased to let you know that your ${accountType} account has been approved!
+
     You can now log in and start using the platform.
-    
+
     Login: ${process.env.FRONTEND_URL || 'http://localhost:3000'}
-    
+
     Warm regards,
     The Lumora Team 💙
   `;
@@ -392,71 +448,36 @@ const sendParentInvitationEmail = async (parentEmail, studentName) => {
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
   const loginLink = `${frontendUrl}`;
 
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Parent Invitation</title>
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8fafc; }
-        .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 32px 30px; text-align: center; border-radius: 12px 12px 0 0; }
-        .header h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
-        .header p { margin: 8px 0 0; opacity: 0.9; font-size: 14px; }
-        .content { background: #ffffff; padding: 32px 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-        .content h2 { font-size: 20px; margin-top: 0; color: #1e293b; }
-        .content p { color: #475569; margin: 12px 0; }
-        .credentials { background: #eef2ff; padding: 20px 24px; border-radius: 12px; margin: 16px 0; border-left: 4px solid #6366f1; }
-        .credentials strong { color: #1e293b; }
-        .credentials code { background: #e2e8f0; padding: 4px 12px; border-radius: 6px; font-size: 16px; font-family: monospace; color: #1e293b; font-weight: 600; }
-        .warning { background: #fef3c7; padding: 12px 16px; border-radius: 8px; margin: 12px 0; border-left: 4px solid #f59e0b; font-size: 13px; color: #92400e; }
-        .button { display: inline-block; padding: 12px 32px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; text-decoration: none; border-radius: 30px; font-weight: 600; margin: 16px 0; transition: transform 0.2s; }
-        .button:hover { transform: scale(1.02); }
-        .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
-        .footer a { color: #6366f1; text-decoration: none; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>✨ Lumora</h1>
-        <p>Mental Health Support Platform</p>
-      </div>
-      <div class="content">
-        <h2>You've Been Invited! 👋</h2>
-        <p>Dear Parent,</p>
-        <p><strong>${studentName}</strong> has invited you to view their mental health and well-being summary on Lumora.</p>
-        <p>This is a secure, read-only view that helps you stay informed and support your child's mental health journey.</p>
-        
-        <div class="credentials">
-          <strong>🔑 Your Login Credentials:</strong><br>
-          <strong>Email:</strong> <code>${parentEmail}</code><br>
-          <strong>Password:</strong> <code>password123</code>
-        </div>
-        
-        <div class="warning">
-          ⚠️ <strong>Important:</strong> Please change your password after your first login for security purposes.
-        </div>
+  const bodyHtml = `
+    <h2>You've Been Invited! 👋</h2>
+    <p>Dear Parent,</p>
+    <p><strong>${studentName}</strong> has invited you to view their mental health and well-being summary on Lumora.</p>
+    <p>This is a secure, read-only view that helps you stay informed and support your child's mental health journey.</p>
 
-        <div style="text-align: center;">
-          <a href="${loginLink}" class="button">🚀 Go to Lumora</a>
-        </div>
+    ${renderLumoraCredentials([
+      { label: 'Email', value: parentEmail },
+      { label: 'Password', value: 'password123' },
+    ])}
+    ${renderLumoraBox('warning', '⚠️ Important', 'Please change your password after your first login for security purposes.')}
 
-        <p style="color: #475569; font-size: 14px; margin-top: 20px;">
-          If you did not expect this invitation, you can safely ignore this email.
-        </p>
-        <p style="color: #475569; font-size: 14px; margin-bottom: 0;">
-          Warm regards,<br>
-          <strong style="color: #1e293b;">The Lumora Team 💙</strong>
-        </p>
-      </div>
-      <div class="footer">
-        <p>This email was sent to <a href="mailto:${parentEmail}">${parentEmail}</a>.</p>
-        <p>© ${new Date().getFullYear()} Lumora Mental Health Platform. All rights reserved.</p>
-      </div>
-    </body>
-    </html>
+    ${renderLumoraButton(loginLink, '🚀 Go to Lumora', 'primary')}
+
+    <p style="font-size:14px;">
+      If you did not expect this invitation, you can safely ignore this email.
+    </p>
+    <p style="font-size:14px; margin-bottom:0;">
+      Warm regards,<br>
+      <strong style="color:${LUMORA_COLORS.navy};">The Lumora Team 💙</strong>
+    </p>
   `;
+
+  const html = wrapLumoraEmail({
+    title: 'Parent Invitation',
+    headerVariant: 'brand',
+    headerIcon: '✨',
+    bodyHtml,
+    footerLine: `This email was sent to <a href="mailto:${parentEmail}">${parentEmail}</a>.`,
+  });
 
   const text = `
     ${studentName} has invited you to view their well-being on Lumora.
@@ -493,77 +514,50 @@ const sendParentInvitationEmail = async (parentEmail, studentName) => {
 const sendCrisisAlertEmail = async (counsellorEmail, counsellorName, studentName, studentNickname, alertMessage, alertType, studentId, source) => {
   const subject = `🚨 CRISIS ALERT: ${studentName} Needs Immediate Attention`;
 
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Crisis Alert</title>
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8fafc; }
-        .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 32px 30px; text-align: center; border-radius: 12px 12px 0 0; }
-        .header h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
-        .header p { margin: 8px 0 0; opacity: 0.9; font-size: 14px; }
-        .content { background: #ffffff; padding: 32px 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-        .alert-box { background: #fef2f2; padding: 20px; border-radius: 12px; border-left: 4px solid #ef4444; margin: 16px 0; }
-        .alert-box strong { color: #dc2626; }
-        .alert-box p { margin: 8px 0 0; color: #475569; }
-        .button { display: inline-block; padding: 12px 32px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; text-decoration: none; border-radius: 30px; font-weight: 600; margin: 16px 0; transition: transform 0.2s; }
-        .button:hover { transform: scale(1.02); }
-        .crisis-resources { background: #fef3c7; padding: 16px 20px; border-radius: 12px; margin: 16px 0; border-left: 4px solid #f59e0b; }
-        .crisis-resources strong { color: #92400e; }
-        .crisis-resources ul { margin: 8px 0 0; padding-left: 20px; color: #92400e; }
-        .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
-        .footer a { color: #6366f1; text-decoration: none; }
-        .emoji { font-size: 24px; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>🚨 Lumora</h1>
-        <p>Crisis Alert System</p>
-      </div>
-      <div class="content">
-        <h2 style="color: #dc2626;">⚠️ Immediate Action Required</h2>
-        <p>Dear <strong>${counsellorName}</strong>,</p>
-        <p>A student has triggered a crisis alert in the Lumora system. Please review and respond as soon as possible.</p>
+  const sourceLabel = source === 'journal' ? '📓 Journal Entry' : source === 'chat' ? '💬 AI Chat' : source === 'post' ? '📢 Peer Support Post' : '⚠️ Unknown';
 
-        <div class="alert-box">
-          <strong>📋 Alert Details:</strong>
-          <p><strong>Student:</strong> ${studentName} ${studentNickname ? `(@${studentNickname})` : ''}</p>
-          <p><strong>Alert Type:</strong> ${alertType || 'Crisis Alert'}</p>
-          <p><strong>Source:</strong> ${source === 'journal' ? '📓 Journal Entry' : source === 'chat' ? '💬 AI Chat' : source === 'post' ? '📢 Peer Support Post' : '⚠️ Unknown'}</p>
-          <p><strong>Message:</strong> ${alertMessage || 'No additional message provided.'}</p>
-        </div>
-
-        <div class="crisis-resources">
-          <strong>📞 Crisis Resources:</strong>
-          <ul>
-            <li>Talian Kasih: 15999 (24/7)</li>
-            <li>Befrienders KL: 03-7627 2929 (24/7)</li>
-            <li>Talian HEAL: 15555 (8.30 am – 11.59 pm)</li>
-          </ul>
-        </div>
-
-        <div style="text-align: center;">
-          <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/counsellor/alerts" class="button">🛡️ View Alerts Dashboard</a>
-        </div>
-
-        <p style="color: #475569; font-size: 14px; margin-top: 16px;">
-          Please log in to the counsellor dashboard to view full details and take appropriate action.
-        </p>
-        <p style="color: #475569; font-size: 14px; margin-bottom: 0;">
-          Warm regards,<br>
-          <strong style="color: #1e293b;">The Lumora Team 💙</strong>
-        </p>
-      </div>
-      <div class="footer">
-        <p>This email was sent to <a href="mailto:${counsellorEmail}">${counsellorEmail}</a> because you are a registered counsellor in the Lumora system.</p>
-        <p>© ${new Date().getFullYear()} Lumora Mental Health Platform. All rights reserved.</p>
-      </div>
-    </html>
+  const alertDetailsHtml = `
+    <p style="margin:4px 0;"><strong>Student:</strong> ${studentName} ${studentNickname ? `(@${studentNickname})` : ''}</p>
+    <p style="margin:4px 0;"><strong>Alert Type:</strong> ${alertType || 'Crisis Alert'}</p>
+    <p style="margin:4px 0;"><strong>Source:</strong> ${sourceLabel}</p>
+    <p style="margin:4px 0;"><strong>Message:</strong> ${alertMessage || 'No additional message provided.'}</p>
   `;
+
+  const crisisResourcesHtml = `
+    <ul style="margin:8px 0 0; padding-left:20px;">
+      <li>Talian Kasih: 15999 (24/7)</li>
+      <li>Befrienders KL: 03-7627 2929 (24/7)</li>
+      <li>Talian HEAL: 15555 (8.30 am – 11.59 pm)</li>
+    </ul>
+  `;
+
+  const bodyHtml = `
+    <h2 style="color:${LUMORA_COLORS.crisis};">⚠️ Immediate Action Required</h2>
+    <p>Dear <strong>${counsellorName}</strong>,</p>
+    <p>A student has triggered a crisis alert in the Lumora system. Please review and respond as soon as possible.</p>
+
+    ${renderLumoraBox('crisis', '📋 Alert Details', alertDetailsHtml)}
+    ${renderLumoraBox('warning', '📞 Crisis Resources', crisisResourcesHtml)}
+
+    ${renderLumoraButton(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/counsellor/alerts`, '🛡️ View Alerts Dashboard', 'crisis')}
+
+    <p style="font-size:14px;">
+      Please log in to the counsellor dashboard to view full details and take appropriate action.
+    </p>
+    <p style="font-size:14px; margin-bottom:0;">
+      Warm regards,<br>
+      <strong style="color:${LUMORA_COLORS.navy};">The Lumora Team 💙</strong>
+    </p>
+  `;
+
+  const html = wrapLumoraEmail({
+    title: 'Crisis Alert',
+    headerVariant: 'crisis',
+    headerIcon: '🚨',
+    headerSubtitle: 'Crisis Alert System',
+    bodyHtml,
+    footerLine: `This email was sent to <a href="mailto:${counsellorEmail}">${counsellorEmail}</a> because you are a registered counsellor in the Lumora system.`,
+  });
 
   const text = `
     🚨 CRISIS ALERT: ${studentName} Needs Immediate Attention
@@ -575,7 +569,7 @@ const sendCrisisAlertEmail = async (counsellorEmail, counsellorName, studentName
     Alert Details:
     Student: ${studentName} ${studentNickname ? `(@${studentNickname})` : ''}
     Alert Type: ${alertType || 'Crisis Alert'}
-    Source: ${source === 'journal' ? '📓 Journal Entry' : source === 'chat' ? '💬 AI Chat' : source === 'post' ? '📢 Peer Support Post' : '⚠️ Unknown'}
+    Source: ${sourceLabel}
     Message: ${alertMessage || 'No additional message provided.'}
 
     Crisis Resources:
@@ -596,61 +590,35 @@ const sendCrisisAlertEmail = async (counsellorEmail, counsellorName, studentName
  * Send email verification OTP
  */
 const sendVerificationEmail = async (email, name, otp) => {
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-    const subject = "Verify Your Email Address - Lumora";
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+  const subject = "Verify Your Email Address - Lumora";
 
-    const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Verify Your Email</title>
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8fafc; }
-        .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 32px 30px; text-align: center; border-radius: 12px 12px 0 0; }
-        .header h1 { margin: 0; font-size: 28px; font-weight: 700; }
-        .header p { margin: 8px 0 0; opacity: 0.9; font-size: 14px; }
-        .content { background: #ffffff; padding: 32px 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none; }
-        .otp-box { background: #eef2ff; padding: 20px; border-radius: 12px; text-align: center; margin: 16px 0; border-left: 4px solid #6366f1; }
-        .otp-code { font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #4f46e5; font-family: monospace; }
-        .warning { background: #fef3c7; padding: 12px 16px; border-radius: 8px; margin: 12px 0; border-left: 4px solid #f59e0b; font-size: 13px; color: #92400e; }
-        .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
-        .button { display: inline-block; padding: 10px 24px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; text-decoration: none; border-radius: 30px; font-weight: 600; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>✨ Lumora</h1>
-        <p>Mental Health Support Platform</p>
-      </div>
-      <div class="content">
-        <h2>Verify Your Email Address</h2>
-        <p>Hi <strong>${name}</strong>,</p>
-        <p>Thank you for registering with Lumora. Please use the verification code below to confirm your email address.</p>
-        <div class="otp-box">
-          <div style="font-size: 14px; color: #475569; margin-bottom: 8px;">Your Verification Code</div>
-          <div class="otp-code">${otp}</div>
-        </div>
-        <p>This code will expire in <strong>10 minutes</strong>.</p>
-        <div class="warning">
-          ⚠️ <strong>Do not share this code with anyone.</strong> Lumora will never ask for your verification code outside of the official platform.
-        </div>
-        <p style="margin-top: 16px;">If you did not create an account on Lumora, please ignore this email.</p>
-        <p style="margin-top: 16px; color: #475569;">
-          Warm regards,<br>
-          <strong>The Lumora Team 💙</strong>
-        </p>
-      </div>
-      <div class="footer">
-        <p>This email was sent to ${email}. If you did not request this, please ignore it.</p>
-        <p>© ${new Date().getFullYear()} Lumora Mental Health Platform. All rights reserved.</p>
-      </div>
-    </body>
-    </html>
-    `;
+  const bodyHtml = `
+    <h2>Verify Your Email Address</h2>
+    <p>Hi <strong>${name}</strong>,</p>
+    <p>Thank you for registering with Lumora. Please use the verification code below to confirm your email address.</p>
 
-    const text = `
+    ${renderLumoraOtpBox(otp, '✉️ Your Verification Code')}
+
+    <p>This code will expire in <strong>10 minutes</strong>.</p>
+    ${renderLumoraBox('warning', '⚠️ Security Notice', 'Do not share this code with anyone. Lumora will never ask for your verification code outside of the official platform.')}
+
+    <p>If you did not create an account on Lumora, please ignore this email.</p>
+    <p style="margin-bottom:0;">
+      Warm regards,<br>
+      <strong style="color:${LUMORA_COLORS.navy};">The Lumora Team 💙</strong>
+    </p>
+  `;
+
+  const html = wrapLumoraEmail({
+    title: 'Verify Your Email',
+    headerVariant: 'brand',
+    headerIcon: '✨',
+    bodyHtml,
+    footerLine: `This email was sent to ${email}. If you did not request this, please ignore it.`,
+  });
+
+  const text = `
     Lumora - Verify Your Email Address
 
     Hi ${name},
@@ -667,68 +635,43 @@ const sendVerificationEmail = async (email, name, otp) => {
 
     Warm regards,
     The Lumora Team 💙
-    `;
+  `;
 
-    return await sendEmail({ to: email, subject, html, text });
+  return await sendEmail({ to: email, subject, html, text });
 };
 
 /**
  * Send password reset OTP
  */
 const sendPasswordResetEmail = async (email, name, otp) => {
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-    const subject = "Password Reset Request - Lumora";
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+  const subject = "Password Reset Request - Lumora";
 
-    const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Password Reset</title>
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8fafc; }
-        .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 32px 30px; text-align: center; border-radius: 12px 12px 0 0; }
-        .header h1 { margin: 0; font-size: 28px; font-weight: 700; }
-        .header p { margin: 8px 0 0; opacity: 0.9; font-size: 14px; }
-        .content { background: #ffffff; padding: 32px 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none; }
-        .otp-box { background: #eef2ff; padding: 20px; border-radius: 12px; text-align: center; margin: 16px 0; border-left: 4px solid #6366f1; }
-        .otp-code { font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #4f46e5; font-family: monospace; }
-        .warning { background: #fef3c7; padding: 12px 16px; border-radius: 8px; margin: 12px 0; border-left: 4px solid #f59e0b; font-size: 13px; color: #92400e; }
-        .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>✨ Lumora</h1>
-        <p>Mental Health Support Platform</p>
-      </div>
-      <div class="content">
-        <h2>Password Reset Request</h2>
-        <p>Hi <strong>${name}</strong>,</p>
-        <p>We received a request to reset your password. Use the verification code below to proceed.</p>
-        <div class="otp-box">
-          <div style="font-size: 14px; color: #475569; margin-bottom: 8px;">Your Password Reset Code</div>
-          <div class="otp-code">${otp}</div>
-        </div>
-        <p>This code will expire in <strong>10 minutes</strong>.</p>
-        <div class="warning">
-          ⚠️ <strong>Do not share this code with anyone.</strong> If you did not request a password reset, please ignore this email.
-        </div>
-        <p style="margin-top: 16px; color: #475569;">
-          Warm regards,<br>
-          <strong>The Lumora Team 💙</strong>
-        </p>
-      </div>
-      <div class="footer">
-        <p>This email was sent to ${email}. If you did not request this, please ignore it.</p>
-        <p>© ${new Date().getFullYear()} Lumora Mental Health Platform. All rights reserved.</p>
-      </div>
-    </body>
-    </html>
-    `;
+  const bodyHtml = `
+    <h2>Password Reset Request</h2>
+    <p>Hi <strong>${name}</strong>,</p>
+    <p>We received a request to reset your password. Use the verification code below to proceed.</p>
 
-    const text = `
+    ${renderLumoraOtpBox(otp, '🔄 Your Password Reset Code')}
+
+    <p>This code will expire in <strong>10 minutes</strong>.</p>
+    ${renderLumoraBox('warning', '⚠️ Security Notice', 'Do not share this code with anyone. If you did not request a password reset, please ignore this email.')}
+
+    <p style="margin-bottom:0;">
+      Warm regards,<br>
+      <strong style="color:${LUMORA_COLORS.navy};">The Lumora Team 💙</strong>
+    </p>
+  `;
+
+  const html = wrapLumoraEmail({
+    title: 'Password Reset',
+    headerVariant: 'brand',
+    headerIcon: '✨',
+    bodyHtml,
+    footerLine: `This email was sent to ${email}. If you did not request this, please ignore it.`,
+  });
+
+  const text = `
     Lumora - Password Reset Request
 
     Hi ${name},
@@ -743,19 +686,19 @@ const sendPasswordResetEmail = async (email, name, otp) => {
 
     Warm regards,
     The Lumora Team 💙
-    `;
+  `;
 
-    return await sendEmail({ to: email, subject, html, text });
+  return await sendEmail({ to: email, subject, html, text });
 };
 
 // Make sure to export the new functions
 module.exports = {
-    sendEmail,
-    sendCounsellorApprovalEmail,
-    sendCounsellorRejectionEmail,
-    sendAccountApprovalEmail,
-    sendParentInvitationEmail,
-    sendCrisisAlertEmail,
-    sendVerificationEmail,      // NEW
-    sendPasswordResetEmail      // NEW
+  sendEmail,
+  sendCounsellorApprovalEmail,
+  sendCounsellorRejectionEmail,
+  sendAccountApprovalEmail,
+  sendParentInvitationEmail,
+  sendCrisisAlertEmail,
+  sendVerificationEmail,      // NEW
+  sendPasswordResetEmail      // NEW
 };

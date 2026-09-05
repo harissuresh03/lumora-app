@@ -4,7 +4,11 @@ const router = express.Router();
 const db = require("../db");
 const verifyToken = require("../middleware/authmiddleware");
 
-// Get mood triggers and patterns
+// ============================================
+// GET /patterns/:user_id - Mood Patterns
+// Used by frontend PatternInsights.js
+// ============================================
+
 router.get("/patterns/:user_id", verifyToken, (req, res) => {
   const userId = parseInt(req.params.user_id);
   
@@ -154,71 +158,6 @@ router.get("/patterns/:user_id", verifyToken, (req, res) => {
           });
         }
       );
-    }
-  );
-});
-
-// Log an activity (for tracking triggers)
-router.post("/activity", verifyToken, (req, res) => {
-  const { user_id, activity_type, intensity, notes } = req.body;
-  
-  if (req.user.id !== user_id) {
-    return res.status(403).json({ msg: "Unauthorized" });
-  }
-  
-  db.query(
-    "INSERT INTO activity_log (user_id, activity_type, intensity, notes, logged_at) VALUES (?, ?, ?, ?, CURDATE())",
-    [user_id, activity_type, intensity || 1, notes || null],
-    (err, result) => {
-      if (err) {
-        console.error("Log activity error:", err);
-        return res.status(500).json({ msg: "Failed to log activity" });
-      }
-      res.json({ msg: "Activity logged successfully" });
-    }
-  );
-});
-
-// Get activity suggestions based on mood
-router.get("/suggestions/:user_id", verifyToken, (req, res) => {
-  const userId = parseInt(req.params.user_id);
-  
-  if (req.user.id !== userId) {
-    return res.status(403).json({ msg: "Unauthorized" });
-  }
-  
-  // Get today's mood
-  db.query(
-    "SELECT mood FROM moods WHERE user_id = ? AND DATE(created_at) = CURDATE() ORDER BY created_at DESC LIMIT 1",
-    [userId],
-    (err, moodResult) => {
-      if (err) return res.status(500).json(err);
-      
-      const currentMood = moodResult[0]?.mood || 3;
-      let suggestions = [];
-      
-      if (currentMood <= 2) {
-        suggestions = [
-          { activity: "Take a 5-minute break", why: "Rest can help reset your mind" },
-          { activity: "Message a friend", why: "Social connection can lift your mood" },
-          { activity: "Listen to uplifting music", why: "Music can improve emotional state" },
-          { activity: "Try deep breathing", why: "Calms the nervous system" }
-        ];
-      } else if (currentMood === 3) {
-        suggestions = [
-          { activity: "Go for a short walk", why: "Movement boosts endorphins" },
-          { activity: "Write in your journal", why: "Processing thoughts can bring clarity" },
-          { activity: "Do something kind for someone", why: "Acts of kindness increase happiness" }
-        ];
-      } else {
-        suggestions = [
-          { activity: "Share what made you happy", why: "Gratitude multiplies positive feelings" },
-          { activity: "Help someone else", why: "Supporting others feels rewarding" },
-          { activity: "Plan something to look forward to", why: "Anticipation boosts mood" }
-        ];
-      }
-      
-      res.json({ currentMood, suggestions });
     }
   );
 });

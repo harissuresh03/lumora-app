@@ -316,7 +316,7 @@ router.get("/students", verifyToken, async (req, res) => {
 });
 
 // ============================================
-// PARENT: Get Student Summary
+// PARENT: Get Student Summary (Extended)
 // ============================================
 
 router.get("/student/:student_id/summary", verifyToken, async (req, res) => {
@@ -346,7 +346,6 @@ router.get("/student/:student_id/summary", verifyToken, async (req, res) => {
       return res.status(404).json({ msg: "Student not found" });
     }
 
-    // If consent_granted = 1, show ALL data
     const result = {
       student: student[0],
       consent: {
@@ -354,7 +353,7 @@ router.get("/student/:student_id/summary", verifyToken, async (req, res) => {
       }
     };
 
-    // Mood data
+    // Mood data (last 7 days)
     const [moodData] = await db.promise().query(
       `SELECT 
         DATE(created_at) as date,
@@ -374,7 +373,7 @@ router.get("/student/:student_id/summary", verifyToken, async (req, res) => {
     );
     result.average_mood = avgMood[0]?.avg_mood ? parseFloat(avgMood[0].avg_mood).toFixed(1) : null;
 
-    // Sleep data
+    // Sleep data (last 7 days)
     const [sleepData] = await db.promise().query(
       `SELECT 
         DATE(created_at) as date,
@@ -394,7 +393,7 @@ router.get("/student/:student_id/summary", verifyToken, async (req, res) => {
     );
     result.average_sleep = avgSleep[0]?.avg_quality ? parseFloat(avgSleep[0].avg_quality).toFixed(1) : null;
 
-    // Stress data
+    // Stress data (latest forecast)
     const [stress] = await db.promise().query(
       `SELECT 
          JSON_EXTRACT(forecast_data, '$[0].score') as current_score,
@@ -406,6 +405,23 @@ router.get("/student/:student_id/summary", verifyToken, async (req, res) => {
       [studentId]
     );
     result.current_stress = stress[0] || null;
+
+    // ✅ Full stress forecast
+    const [stressForecast] = await db.promise().query(
+      `SELECT forecast_data, peak_stress_day, tip, summary_sentence, created_at
+       FROM stress_forecast 
+       WHERE user_id = ? 
+       ORDER BY created_at DESC 
+       LIMIT 1`,
+      [studentId]
+    );
+    result.stress_forecast = stressForecast.length > 0 ? {
+      forecast: JSON.parse(stressForecast[0].forecast_data),
+      peak_stress_day: JSON.parse(stressForecast[0].peak_stress_day),
+      tip: JSON.parse(stressForecast[0].tip),
+      summary_sentence: stressForecast[0].summary_sentence,
+      created_at: stressForecast[0].created_at
+    } : null;
 
     // Assessment data
     const [assessments] = await db.promise().query(
@@ -448,10 +464,57 @@ router.get("/student/:student_id/summary", verifyToken, async (req, res) => {
     );
     result.latest_pss = pss[0] || null;
 
+    // Upcoming deadlines
+    const [deadlines] = await db.promise().query(
+      `SELECT id, title, subject, type, due_date, difficulty
+       FROM deadlines 
+       WHERE user_id = ? AND is_complete = 0
+       ORDER BY due_date ASC
+       LIMIT 5`,
+      [studentId]
+    );
+    result.upcoming_deadlines = deadlines;
+
     res.json(result);
   } catch (error) {
     console.error("Student summary error:", error);
     res.status(500).json({ msg: "Failed to fetch student summary" });
+  }
+});
+
+// ============================================
+// PARENT: Download PDF Report
+// ============================================
+
+router.get("/report/:student_id/pdf", verifyToken, async (req, res) => {
+  const parentId = req.user.id;
+  const studentId = parseInt(req.params.student_id);
+
+  if (req.user.role !== "parent") {
+    return res.status(403).json({ msg: "Access denied. Parent only." });
+  }
+
+  try {
+    // Check consent
+    const [link] = await db.promise().query(
+      "SELECT * FROM parent_student_links WHERE parent_id = ? AND student_id = ? AND consent_granted = 1",
+      [parentId, studentId]
+    );
+    if (!link.length) {
+      return res.status(403).json({ msg: "No consent to view this student's data" });
+    }
+
+    const { generateParentReportPDF } = require("../services/wellnessReportService");
+    const { doc, filename } = await generateParentReportPDF(studentId);
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    doc.pipe(res);
+    doc.end();
+
+  } catch (error) {
+    console.error("Parent report PDF error:", error);
+    res.status(500).json({ msg: "Failed to generate report" });
   }
 });
 

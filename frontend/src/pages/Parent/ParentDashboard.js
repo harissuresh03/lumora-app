@@ -5,27 +5,43 @@ import { motion } from "framer-motion";
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
   ReferenceLine
 } from 'recharts';
 import api from "../../utils/api";
 import Layout from "../components/Layout";
-import {  showErrorToast } from "../components/ToastNotification";
+import { showSuccessToast, showErrorToast } from "../components/ToastNotification";
 import { 
-  LayoutDashboard, Settings, User, Eye, Smile, Moon, Activity
+  LayoutDashboard, 
+  Settings, 
+  User, 
+  Eye, 
+  Smile, 
+  Moon, 
+  Activity,
+  Calendar,
+  FileText,
+  Download,
+  TrendingUp,
+  Award,
+  BookOpen
 } from "lucide-react";
 
 function ParentDashboard() {
   const navigate = useNavigate();
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [studentData, setStudentData] = useState(null);
-  const [viewingStudent, setViewingStudent] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const parentId = localStorage.getItem("user_id");
 
   // Parent menu items
@@ -48,7 +64,11 @@ function ParentDashboard() {
     setLoading(true);
     try {
       const res = await api.get("/parent/students");
-      setStudents(res.data || []);
+      const studentsData = res.data || [];
+      setStudents(studentsData);
+      if (studentsData.length > 0 && !selectedStudentId) {
+        setSelectedStudentId(studentsData[0].id);
+      }
     } catch (err) {
       console.error("Fetch students error:", err);
       showErrorToast("Failed to fetch students");
@@ -57,31 +77,67 @@ function ParentDashboard() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchParentProfile();
-    fetchStudents();
-  }, [fetchParentProfile, fetchStudents]);
-
-  const viewStudent = async (studentId, e) => {
-    if (e) e.stopPropagation();
-    setViewingStudent(true);
-    setStudentData(null);
+  const fetchStudentSummary = useCallback(async (studentId) => {
+    if (!studentId) return;
     setLoadingSummary(true);
+    setStudentData(null);
     try {
       const res = await api.get(`/parent/student/${studentId}/summary`);
       setStudentData(res.data);
     } catch (err) {
       console.error("Fetch student summary error:", err);
       showErrorToast(err.response?.data?.msg || "Failed to fetch student data");
-      setViewingStudent(false);
     } finally {
       setLoadingSummary(false);
     }
+  }, []);
+
+  useEffect(() => {
+    fetchParentProfile();
+    fetchStudents();
+  }, [fetchParentProfile, fetchStudents]);
+
+  useEffect(() => {
+    if (selectedStudentId) {
+      fetchStudentSummary(selectedStudentId);
+    }
+  }, [selectedStudentId, fetchStudentSummary]);
+
+  const handleStudentSelect = (studentId) => {
+    setSelectedStudentId(studentId);
   };
 
-  const closeSummary = () => {
-    setViewingStudent(false);
-    setStudentData(null);
+  const downloadReport = async () => {
+    if (!selectedStudentId) return;
+    setDownloading(true);
+    try {
+      const response = await api.get(`/parent/report/${selectedStudentId}/pdf`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const student = students.find(s => s.id === selectedStudentId);
+      link.download = `parent_report_${student?.name || 'student'}_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      showSuccessToast("Report downloaded successfully!");
+    } catch (err) {
+      console.error("Download report error:", err);
+      showErrorToast("Failed to download report");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const getMoodColor = (mood) => {
+    if (!mood) return "#9ca3af";
+    const rounded = Math.round(mood);
+    const colors = { 1: "#ef4444", 2: "#f97316", 3: "#eab308", 4: "#22c55e", 5: "#16a34a" };
+    return colors[rounded] || "#9ca3af";
   };
 
   const getStressColor = (score) => {
@@ -98,25 +154,14 @@ function ParentDashboard() {
     return "Low";
   };
 
-  const getMoodEmoji = (mood) => {
-    if (!mood) return "❓";
-    const rounded = Math.round(mood);
-    const emojis = { 1: "😢", 2: "😔", 3: "😐", 4: "🙂", 5: "😄" };
-    return emojis[rounded] || "❓";
+  const formatDate = (dateStr) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const getMoodColor = (mood) => {
-    if (!mood) return "#9ca3af";
-    const rounded = Math.round(mood);
-    const colors = { 1: "#ef4444", 2: "#f97316", 3: "#eab308", 4: "#22c55e", 5: "#16a34a" };
-    return colors[rounded] || "#9ca3af";
-  };
-
-  const getSleepEmoji = (quality) => {
-    if (!quality) return "❓";
-    const rounded = Math.round(quality);
-    const emojis = { 1: "😴", 2: "😴", 3: "😌", 4: "😊", 5: "🌟" };
-    return emojis[rounded] || "❓";
+  const formatDateFull = (dateStr) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   if (loading) {
@@ -130,9 +175,9 @@ function ParentDashboard() {
     );
   }
 
-  return (
-    <Layout customMenuItems={parentMenuItems}>
-      {students.length === 0 ? (
+  if (students.length === 0) {
+    return (
+      <Layout customMenuItems={parentMenuItems}>
         <div style={{ maxWidth: '600px', margin: '60px auto', textAlign: 'center', padding: '40px', background: 'var(--card-bg-glass)', borderRadius: '20px', border: '1px solid var(--border-glass)' }}>
           <User size={64} style={{ marginBottom: '16px', opacity: 0.3 }} />
           <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>No Students Linked</h2>
@@ -142,208 +187,367 @@ function ParentDashboard() {
             Go to Settings
           </button>
         </div>
-      ) : (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-            {students.map((student) => (
-              <motion.div
-                key={student.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                whileHover={{ y: -4 }}
-                style={{ background: 'var(--card-bg-glass)', backdropFilter: 'var(--glass-blur)', borderRadius: '16px', padding: '20px', border: '1px solid var(--border-glass)', cursor: 'pointer', transition: 'all 0.2s' }}
-                onClick={() => viewStudent(student.id)}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <h4 style={{ margin: 0, fontSize: '18px' }}>{student.name}</h4>
-                    {student.nickname && <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>@{student.nickname}</p>}
-                  </div>
-                  <div style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '11px', background: student.consent_granted ? '#22c55e' : '#f59e0b', color: 'white' }}>
-                    {student.consent_granted ? '✅ Active' : '⏳ Pending'}
-                  </div>
-                </div>
+      </Layout>
+    );
+  }
 
-                <div style={{ display: 'flex', gap: '20px', marginTop: '16px', justifyContent: 'space-around' }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '28px' }}>{getMoodEmoji(student.avg_mood)}</div>
-                    <div style={{ fontSize: '14px', fontWeight: 600, color: getMoodColor(student.avg_mood) }}>
-                      {student.avg_mood ? `${parseFloat(student.avg_mood).toFixed(1)}/5` : 'N/A'}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Avg Mood</div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '28px' }}>{getSleepEmoji(student.avg_sleep)}</div>
-                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#10b981' }}>
-                      {student.avg_sleep ? `${parseFloat(student.avg_sleep).toFixed(1)}/5` : 'N/A'}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Avg Sleep</div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '20px', fontWeight: 700, color: getStressColor(student.current_stress) }}>
-                      {student.current_stress ? `${student.current_stress}/100` : 'N/A'}
-                    </div>
-                    <div style={{ fontSize: '11px', color: getStressColor(student.current_stress) }}>
-                      {getStressLabel(student.current_stress)}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Stress</div>
-                  </div>
-                </div>
+  const selectedStudent = students.find(s => s.id === selectedStudentId);
 
-                <button
-                  onClick={(e) => viewStudent(student.id, e)}
-                  style={{
-                    marginTop: '14px',
-                    width: '100%',
-                    padding: '10px',
-                    background: 'var(--accent-gradient)',
-                    border: 'none',
-                    borderRadius: '10px',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-                  onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-                >
-                  <Eye size={16} /> View Full Summary
-                </button>
-              </motion.div>
-            ))}
+  return (
+    <Layout customMenuItems={parentMenuItems}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
+          <div>
+            <h1 style={{ fontSize: '28px', fontWeight: 700, margin: 0 }}>My Child's Wellness</h1>
+            <p style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>Monitor your child's mental health journey</p>
           </div>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <select
+              value={selectedStudentId || ''}
+              onChange={(e) => handleStudentSelect(parseInt(e.target.value))}
+              style={{ padding: '10px 16px', borderRadius: '12px', border: '1px solid var(--border-light)', background: 'var(--card-bg-glass)', fontSize: '14px', minWidth: '180px' }}
+            >
+              {students.map(student => (
+                <option key={student.id} value={student.id}>
+                  {student.name} {student.nickname ? `(@${student.nickname})` : ''}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={downloadReport}
+              disabled={downloading || !studentData}
+              style={{
+                padding: '10px 20px',
+                background: 'var(--accent-gradient)',
+                border: 'none',
+                borderRadius: '12px',
+                color: 'white',
+                cursor: downloading ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+                fontWeight: 500,
+                opacity: downloading ? 0.6 : 1
+              }}
+            >
+              {downloading ? 'Generating...' : <><Download size={16} /> Download Report (PDF)</>}
+            </button>
+          </div>
+        </div>
 
-          {viewingStudent && loadingSummary && (
-            <div style={{ textAlign: 'center', padding: '40px', background: 'var(--card-bg-glass)', borderRadius: '20px', border: '1px solid var(--border-glass)' }}>
-              <div className="spinner" style={{ width: '30px', height: '30px', margin: '0 auto' }}></div>
-              <p style={{ marginTop: '12px', color: 'var(--text-muted)' }}>Loading student summary...</p>
+        {/* Student Quick Stats */}
+        {selectedStudent && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+            <div style={{ background: 'var(--card-bg-glass)', borderRadius: '16px', padding: '16px', textAlign: 'center', border: '1px solid var(--border-glass)' }}>
+              <Smile size={24} style={{ marginBottom: '8px', color: getMoodColor(selectedStudent.avg_mood) }} />
+              <div style={{ fontSize: '28px', fontWeight: 700, color: getMoodColor(selectedStudent.avg_mood) }}>
+                {selectedStudent.avg_mood ? `${parseFloat(selectedStudent.avg_mood).toFixed(1)}/5` : 'N/A'}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Average Mood (7 days)</div>
             </div>
-          )}
+            <div style={{ background: 'var(--card-bg-glass)', borderRadius: '16px', padding: '16px', textAlign: 'center', border: '1px solid var(--border-glass)' }}>
+              <Moon size={24} style={{ marginBottom: '8px', color: '#10b981' }} />
+              <div style={{ fontSize: '28px', fontWeight: 700, color: '#10b981' }}>
+                {selectedStudent.avg_sleep ? `${parseFloat(selectedStudent.avg_sleep).toFixed(1)}/5` : 'N/A'}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Average Sleep Quality (7 days)</div>
+            </div>
+            <div style={{ background: 'var(--card-bg-glass)', borderRadius: '16px', padding: '16px', textAlign: 'center', border: '1px solid var(--border-glass)' }}>
+              <Activity size={24} style={{ marginBottom: '8px', color: getStressColor(selectedStudent.current_stress?.current_score) }} />
+              <div style={{ fontSize: '28px', fontWeight: 700, color: getStressColor(selectedStudent.current_stress?.current_score) }}>
+                {selectedStudent.current_stress?.current_score || 'N/A'}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Current Stress</div>
+            </div>
+          </div>
+        )}
 
-          {viewingStudent && !loadingSummary && studentData && (
+        {/* Full Student Data */}
+        {loadingSummary ? (
+          <div style={{ textAlign: 'center', padding: '40px', background: 'var(--card-bg-glass)', borderRadius: '20px', border: '1px solid var(--border-glass)' }}>
+            <div className="spinner" style={{ width: '30px', height: '30px', margin: '0 auto' }}></div>
+            <p style={{ marginTop: '12px', color: 'var(--text-muted)' }}>Loading student data...</p>
+          </div>
+        ) : studentData ? (
+          <div>
+            {/* Mood Trend Chart */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              style={{ background: 'var(--card-bg-glass)', backdropFilter: 'var(--glass-blur)', borderRadius: '20px', padding: '24px', border: '1px solid var(--border-glass)', marginTop: '24px' }}
+              transition={{ delay: 0.1 }}
+              style={{
+                background: 'var(--card-bg-glass)',
+                backdropFilter: 'var(--glass-blur)',
+                borderRadius: '20px',
+                padding: '24px',
+                border: '1px solid var(--border-glass)',
+                marginBottom: '24px'
+              }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <div>
-                  <h2 style={{ fontSize: '22px', margin: 0 }}>
-                    {studentData.student.name}'s Well-being Summary
-                    {studentData.student.nickname && <span style={{ fontSize: '14px', color: 'var(--text-muted)', marginLeft: '8px' }}>@{studentData.student.nickname}</span>}
-                  </h2>
-                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>📊 Read-only summary • Updated daily</p>
+              <h3 style={{ fontSize: '18px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <TrendingUp size={20} color="var(--accent-primary)" />
+                Mood Trend (Last 7 Days)
+              </h3>
+              {studentData.mood_trend && studentData.mood_trend.length > 0 ? (
+                <div style={{ height: '250px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={studentData.mood_trend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                      <XAxis 
+                        dataKey="date" 
+                        stroke="var(--text-muted)" 
+                        fontSize={11}
+                        tickFormatter={(value) => formatDate(value)}
+                      />
+                      <YAxis 
+                        domain={[0, 5]} 
+                        stroke="var(--text-muted)" 
+                        fontSize={11}
+                        ticks={[1, 2, 3, 4, 5]}
+                      />
+                      <Tooltip 
+                        contentStyle={{ background: 'var(--card-bg-glass)', border: '1px solid var(--border-glass)', borderRadius: '8px' }}
+                        formatter={(value) => [`${value}/5`, 'Mood']}
+                        labelFormatter={(label) => formatDateFull(label)}
+                      />
+                      <ReferenceLine y={3} stroke="var(--text-muted)" strokeDasharray="3 3" strokeWidth={1} label={{ value: 'Neutral', position: 'right', fill: 'var(--text-muted)', fontSize: 9 }} />
+                      <Line
+                        type="monotone"
+                        dataKey="avg_mood"
+                        stroke="var(--accent-primary)"
+                        strokeWidth={3}
+                        dot={{ r: 5, fill: 'var(--accent-primary)' }}
+                        activeDot={{ r: 7 }}
+                        name="Mood"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
-                <button
-                  onClick={closeSummary}
-                  style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '20px' }}>
-                <div style={{ padding: '16px', background: 'var(--bg-secondary)', borderRadius: '12px', textAlign: 'center' }}>
-                  <Smile size={24} style={{ marginBottom: '8px', color: getMoodColor(studentData.average_mood) }} />
-                  <div style={{ fontSize: '24px', fontWeight: 700, color: getMoodColor(studentData.average_mood) }}>
-                    {studentData.average_mood || 'N/A'}
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Avg Mood (7 days)</div>
-                </div>
-                <div style={{ padding: '16px', background: 'var(--bg-secondary)', borderRadius: '12px', textAlign: 'center' }}>
-                  <Moon size={24} style={{ marginBottom: '8px', color: '#10b981' }} />
-                  <div style={{ fontSize: '24px', fontWeight: 700, color: '#10b981' }}>
-                    {studentData.average_sleep || 'N/A'}
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Avg Sleep Quality</div>
-                </div>
-                <div style={{ padding: '16px', background: 'var(--bg-secondary)', borderRadius: '12px', textAlign: 'center' }}>
-                  <Activity size={24} style={{ marginBottom: '8px', color: getStressColor(studentData.current_stress?.current_score) }} />
-                  <div style={{ fontSize: '24px', fontWeight: 700, color: getStressColor(studentData.current_stress?.current_score) }}>
-                    {studentData.current_stress?.current_score || 'N/A'}
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Current Stress</div>
-                </div>
-              </div>
-
-              {studentData.mood_trend && studentData.mood_trend.length > 0 && (
-                <div style={{ marginBottom: '20px' }}>
-                  <h4 style={{ fontSize: '14px', marginBottom: '12px' }}>📈 Mood Trend (Last 7 Days)</h4>
-                  <div style={{ height: '200px', width: '100%' }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={studentData.mood_trend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-                        <XAxis 
-                          dataKey="date" 
-                          stroke="var(--text-muted)" 
-                          fontSize={11}
-                          tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { weekday: 'short' })}
-                        />
-                        <YAxis 
-                          domain={[0, 5]} 
-                          stroke="var(--text-muted)" 
-                          fontSize={11}
-                          ticks={[1, 2, 3, 4, 5]}
-                        />
-                        <Tooltip 
-                          contentStyle={{ background: 'var(--card-bg-glass)', border: '1px solid var(--border-glass)', borderRadius: '8px' }}
-                          formatter={(value) => [`${value}/5`, 'Mood']}
-                          labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                        />
-                        <ReferenceLine y={3} stroke="var(--text-muted)" strokeDasharray="3 3" strokeWidth={1} label={{ value: 'Neutral', position: 'right', fill: 'var(--text-muted)', fontSize: 9 }} />
-                        <Line
-                          type="monotone"
-                          dataKey="avg_mood"
-                          stroke="var(--accent-primary)"
-                          strokeWidth={3}
-                          dot={{ r: 5, fill: 'var(--accent-primary)' }}
-                          activeDot={{ r: 7 }}
-                          name="Mood"
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
+              ) : (
+                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No mood data available for the last 7 days.</p>
               )}
-
-              {studentData.recent_assessments && studentData.recent_assessments.length > 0 && (
-                <div style={{ marginBottom: '16px' }}>
-                  <h4 style={{ fontSize: '14px', marginBottom: '10px' }}>📋 Recent Assessments</h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {studentData.latest_phq9 && (
-                      <div style={{ padding: '10px 16px', background: 'var(--bg-secondary)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                        <span>PHQ-9</span>
-                        <span><strong>{studentData.latest_phq9.score}/27</strong> - {studentData.latest_phq9.severity}</span>
-                      </div>
-                    )}
-                    {studentData.latest_gad7 && (
-                      <div style={{ padding: '10px 16px', background: 'var(--bg-secondary)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                        <span>GAD-7</span>
-                        <span><strong>{studentData.latest_gad7.score}/21</strong> - {studentData.latest_gad7.severity}</span>
-                      </div>
-                    )}
-                    {studentData.latest_pss && (
-                      <div style={{ padding: '10px 16px', background: 'var(--bg-secondary)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                        <span>PSS-10</span>
-                        <span><strong>{studentData.latest_pss.score}/40</strong> - {studentData.latest_pss.severity}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div style={{ padding: '12px 16px', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '8px', fontSize: '13px', color: 'var(--text-muted)' }}>
-                💙 This is a read-only summary. Individual logs and journal entries are not shared for privacy.
-              </div>
             </motion.div>
-          )}
-        </>
-      )}
+
+            {/* Sleep Trend Chart */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              style={{
+                background: 'var(--card-bg-glass)',
+                backdropFilter: 'var(--glass-blur)',
+                borderRadius: '20px',
+                padding: '24px',
+                border: '1px solid var(--border-glass)',
+                marginBottom: '24px'
+              }}
+            >
+              <h3 style={{ fontSize: '18px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Moon size={20} color="#10b981" />
+                Sleep Quality Trend (Last 7 Days)
+              </h3>
+              {studentData.sleep_trend && studentData.sleep_trend.length > 0 ? (
+                <div style={{ height: '250px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={studentData.sleep_trend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                      <XAxis 
+                        dataKey="date" 
+                        stroke="var(--text-muted)" 
+                        fontSize={11}
+                        tickFormatter={(value) => formatDate(value)}
+                      />
+                      <YAxis 
+                        domain={[0, 5]} 
+                        stroke="var(--text-muted)" 
+                        fontSize={11}
+                        ticks={[1, 2, 3, 4, 5]}
+                      />
+                      <Tooltip 
+                        contentStyle={{ background: 'var(--card-bg-glass)', border: '1px solid var(--border-glass)', borderRadius: '8px' }}
+                        formatter={(value) => [`${value}/5`, 'Sleep Quality']}
+                        labelFormatter={(label) => formatDateFull(label)}
+                      />
+                      <ReferenceLine y={3} stroke="var(--text-muted)" strokeDasharray="3 3" strokeWidth={1} label={{ value: 'Neutral', position: 'right', fill: 'var(--text-muted)', fontSize: 9 }} />
+                      <Line
+                        type="monotone"
+                        dataKey="avg_quality"
+                        stroke="#10b981"
+                        strokeWidth={3}
+                        dot={{ r: 5, fill: '#10b981' }}
+                        activeDot={{ r: 7 }}
+                        name="Sleep Quality"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No sleep data available for the last 7 days.</p>
+              )}
+            </motion.div>
+
+            {/* Stress Forecast Chart */}
+            {studentData.stress_forecast && studentData.stress_forecast.forecast && studentData.stress_forecast.forecast.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                style={{
+                  background: 'var(--card-bg-glass)',
+                  backdropFilter: 'var(--glass-blur)',
+                  borderRadius: '20px',
+                  padding: '24px',
+                  border: '1px solid var(--border-glass)',
+                  marginBottom: '24px'
+                }}
+              >
+                <h3 style={{ fontSize: '18px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Activity size={20} color="#ef4444" />
+                  Stress Forecast (7 Days)
+                </h3>
+                {studentData.stress_forecast.summary_sentence && (
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                    {studentData.stress_forecast.summary_sentence}
+                  </p>
+                )}
+                <div style={{ height: '250px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={studentData.stress_forecast.forecast} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                      <XAxis 
+                        dataKey="date" 
+                        stroke="var(--text-muted)" 
+                        fontSize={11}
+                        tickFormatter={(value) => formatDate(value)}
+                      />
+                      <YAxis 
+                        domain={[0, 100]} 
+                        stroke="var(--text-muted)" 
+                        fontSize={11}
+                        ticks={[0, 25, 50, 75, 100]}
+                      />
+                      <Tooltip 
+                        contentStyle={{ background: 'var(--card-bg-glass)', border: '1px solid var(--border-glass)', borderRadius: '8px' }}
+                        formatter={(value) => [`${value}/100`, 'Stress']}
+                        labelFormatter={(label) => formatDateFull(label)}
+                      />
+                      <ReferenceLine y={30} stroke="#22c55e" strokeDasharray="3 3" strokeWidth={1} label={{ value: 'Low', position: 'right', fill: '#22c55e', fontSize: 9 }} />
+                      <ReferenceLine y={60} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1} label={{ value: 'High', position: 'right', fill: '#ef4444', fontSize: 9 }} />
+                      <Line
+                        type="monotone"
+                        dataKey="score"
+                        stroke="#ef4444"
+                        strokeWidth={3}
+                        dot={(props) => {
+                          const { cx, cy, payload } = props;
+                          const isActual = payload.is_actual;
+                          const color = getStressColor(payload.score);
+                          return (
+                            <circle
+                              cx={cx}
+                              cy={cy}
+                              r={isActual ? 7 : 5}
+                              fill={color}
+                              stroke="white"
+                              strokeWidth={2}
+                            />
+                          );
+                        }}
+                        activeDot={{ r: 8 }}
+                        name="Stress Score"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {studentData.stress_forecast.tip && (
+                  <div style={{ marginTop: '16px', padding: '12px 16px', background: 'rgba(245, 158, 11, 0.08)', borderRadius: '12px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                    <strong style={{ color: '#f59e0b' }}>💡 Tip: </strong>
+                    <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{studentData.stress_forecast.tip.headline}</span>
+                    <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>{studentData.stress_forecast.tip.body}</p>
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* Assessments & Deadlines */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px', marginBottom: '24px' }}>
+              {/* Assessments */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                style={{
+                  background: 'var(--card-bg-glass)',
+                  backdropFilter: 'var(--glass-blur)',
+                  borderRadius: '20px',
+                  padding: '24px',
+                  border: '1px solid var(--border-glass)'
+                }}
+              >
+                <h3 style={{ fontSize: '18px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Award size={20} color="var(--accent-primary)" />
+                  Recent Assessments
+                </h3>
+                {studentData.recent_assessments && studentData.recent_assessments.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {studentData.recent_assessments.map((a, idx) => (
+                      <div key={idx} style={{ padding: '12px', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ fontWeight: 600 }}>{a.type.toUpperCase()}</span>
+                          <span style={{ fontWeight: 700 }}>{a.score}</span>
+                        </div>
+                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                          {a.severity} • {formatDateFull(a.taken_at)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No assessments taken yet.</p>
+                )}
+              </motion.div>
+
+              {/* Deadlines */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                style={{
+                  background: 'var(--card-bg-glass)',
+                  backdropFilter: 'var(--glass-blur)',
+                  borderRadius: '20px',
+                  padding: '24px',
+                  border: '1px solid var(--border-glass)'
+                }}
+              >
+                <h3 style={{ fontSize: '18px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Calendar size={20} color="#f59e0b" />
+                  Upcoming Deadlines
+                </h3>
+                {studentData.upcoming_deadlines && studentData.upcoming_deadlines.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {studentData.upcoming_deadlines.map((d, idx) => (
+                      <div key={idx} style={{ padding: '10px 12px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ fontWeight: 500 }}>{d.title}</span>
+                          <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{formatDateFull(d.due_date)}</span>
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                          {d.subject || 'General'} • Difficulty: {d.difficulty || 'Medium'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No upcoming deadlines.</p>
+                )}
+              </motion.div>
+            </div>
+          </div>
+        ) : null}
+      </div>
     </Layout>
   );
 }

@@ -5,6 +5,7 @@ const db = require("../db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { createVerification, verifyOTP } = require("../services/verificationService");
+const { sendAccountApprovalEmail } = require("../services/emailService");
 
 const JWT_SECRET = process.env.JWT_SECRET || "lumora_secret_key";
 
@@ -72,6 +73,21 @@ router.post("/verify-email", async (req, res) => {
             "UPDATE users SET is_verified = TRUE WHERE id = ?",
             [userId]
         );
+
+        // ✅ Send welcome/approval email (non-blocking)
+        try {
+            const [user] = await db.promise().query(
+                "SELECT name, email FROM users WHERE id = ?",
+                [userId]
+            );
+            if (user.length > 0) {
+                await sendAccountApprovalEmail(user[0].email, user[0].name, 'student');
+                console.log(`✅ Welcome email sent to ${user[0].email}`);
+            }
+        } catch (emailError) {
+            console.error("❌ Failed to send welcome email:", emailError);
+            // Do NOT block verification if email fails
+        }
 
         res.json({
             msg: "Email verified successfully. You can now log in."
