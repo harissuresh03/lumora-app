@@ -1,6 +1,5 @@
 // frontend/src/pages/components/CounsellorStressForecast.js
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import api from "../../utils/api";
 import { showErrorToast } from "./ToastNotification";
 import {
@@ -117,7 +116,7 @@ function CounsellorStressForecast({ studentId, counsellorId }) {
             </div>
           )}
           <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            {data.is_actual ? '📊 Actual Data' : '🔮 Predicted'}
+            {data.is_actual ? ' Actual Data' : ' Predicted'}
           </div>
         </div>
       );

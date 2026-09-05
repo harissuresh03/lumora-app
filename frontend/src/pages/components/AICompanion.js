@@ -34,7 +34,6 @@ function AICompanion({ onClose, onJournalSaved }) {
         autoSaveMood: autoSaveMood
       });
 
-      // Check if AI service returned an error
       if (!response.data.success) {
         setMessages(prev => [...prev, { 
           role: "ai", 
@@ -44,7 +43,6 @@ function AICompanion({ onClose, onJournalSaved }) {
         return;
       }
 
-      // ✅ SHOW CRISIS RESOURCES IF DETECTED
       if (response.data.crisisDetected && response.data.crisisResources) {
         const confidenceText = response.data.crisisConfidence ? 
           ` (${response.data.crisisConfidence}% confidence)` : '';
@@ -60,12 +58,10 @@ function AICompanion({ onClose, onJournalSaved }) {
           role: "ai", 
           content: crisisMessage
         }]);
-        
         setIsLoading(false);
         return;
       }
 
-      // Update conversation history
       const newHistory = [
         ...conversationHistory,
         { role: "user", content: userMessage },
@@ -73,10 +69,8 @@ function AICompanion({ onClose, onJournalSaved }) {
       ];
       setConversationHistory(newHistory);
 
-      // Add AI response to chat
       setMessages(prev => [...prev, { role: "ai", content: response.data.response }]);
       
-      // Update mood analysis
       if (response.data.moodAnalysis) {
         setMoodAnalysis(response.data.moodAnalysis);
       }
@@ -86,7 +80,6 @@ function AICompanion({ onClose, onJournalSaved }) {
       
       let errorMessage = "I'm having trouble connecting. Please try again.";
       
-      // Check for specific error types
       if (error.response?.status === 503) {
         errorMessage = error.response?.data?.response || "AI service is currently unavailable. Please try again later. 🌙";
       } else if (error.response?.status === 403) {
@@ -288,7 +281,7 @@ const styles = {
     padding: "20px",
   },
   modal: {
-    background: "white",
+    background: "var(--card-bg-solid)",
     borderRadius: "24px",
     maxWidth: "550px",
     width: "100%",
@@ -303,7 +296,7 @@ const styles = {
     justifyContent: "space-between",
     alignItems: "center",
     padding: "16px 20px",
-    background: "linear-gradient(135deg, #667eea, #764ba2)",
+    background: "var(--accent-gradient)",
     color: "white",
   },
   headerLeft: {
@@ -334,8 +327,8 @@ const styles = {
     justifyContent: "space-between",
     alignItems: "center",
     padding: "10px 16px",
-    background: "#f9fafb",
-    borderBottom: "1px solid #e5e7eb",
+    background: "var(--bg-secondary)",
+    borderBottom: "1px solid var(--border-light)",
     fontSize: "12px",
   },
   moodTag: {
@@ -360,8 +353,8 @@ const styles = {
   },
   confidence: {
     fontSize: "10px",
-    color: "#6b7280",
-    background: "#f3f4f6",
+    color: "var(--text-muted)",
+    background: "var(--bg-secondary)",
     padding: "2px 6px",
     borderRadius: "10px",
   },
@@ -372,11 +365,12 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     gap: "12px",
+    background: "var(--bg-primary)",
   },
   welcomeMessage: {
     textAlign: "center",
     padding: "30px 20px",
-    color: "#9ca3af",
+    color: "var(--text-muted)",
   },
   waveEmoji: { fontSize: "40px", display: "block", marginBottom: "12px" },
   userMessage: {
@@ -392,7 +386,7 @@ const styles = {
     width: "32px",
     height: "32px",
     borderRadius: "50%",
-    background: "#f3f4f6",
+    background: "var(--bg-secondary)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -403,13 +397,14 @@ const styles = {
     maxWidth: "70%",
     padding: "10px 14px",
     borderRadius: "18px",
-    background: "#f3f4f6",
+    background: "var(--bg-secondary)",
     fontSize: "14px",
     lineHeight: "1.5",
+    color: "var(--text-primary)",
   },
   typingIndicator: {
     padding: "10px 14px",
-    background: "#f3f4f6",
+    background: "var(--bg-secondary)",
     borderRadius: "18px",
     fontSize: "14px",
     display: "flex",
@@ -417,15 +412,15 @@ const styles = {
   },
   inputContainer: {
     padding: "16px",
-    borderTop: "1px solid #e5e7eb",
-    background: "white",
+    borderTop: "1px solid var(--border-light)",
+    background: "var(--card-bg-solid)",
   },
   toggleSection: {
     marginBottom: "10px",
   },
   toggleLabel: {
     fontSize: "12px",
-    color: "#6b7280",
+    color: "var(--text-muted)",
     display: "flex",
     alignItems: "center",
     gap: "6px",
@@ -439,14 +434,16 @@ const styles = {
   input: {
     flex: 1,
     padding: "12px",
-    border: "1px solid #e5e7eb",
+    border: "1px solid var(--border-light)",
     borderRadius: "24px",
     fontSize: "14px",
     outline: "none",
+    background: "var(--bg-secondary)",
+    color: "var(--text-primary)",
   },
   sendBtn: {
     padding: "10px 20px",
-    background: "linear-gradient(135deg, #667eea, #764ba2)",
+    background: "var(--accent-gradient)",
     color: "white",
     border: "none",
     borderRadius: "24px",
@@ -454,32 +451,18 @@ const styles = {
     fontWeight: "500",
     cursor: "pointer",
     transition: "all 0.2s",
-    ":hover": {
-      transform: "scale(1.02)",
-    },
-    ":disabled": {
-      opacity: 0.6,
-      cursor: "not-allowed",
-    },
   },
   saveBtn: {
     width: "100%",
     padding: "10px",
-    background: "#f3f4f6",
-    border: "1px solid #e5e7eb",
+    background: "var(--bg-secondary)",
+    border: "1px solid var(--border-light)",
     borderRadius: "24px",
     fontSize: "14px",
     fontWeight: "500",
     cursor: "pointer",
-    color: "#374151",
+    color: "var(--text-primary)",
     transition: "all 0.2s",
-    ":hover": {
-      background: "#e5e7eb",
-    },
-    ":disabled": {
-      opacity: 0.5,
-      cursor: "not-allowed",
-    },
   },
 };
 

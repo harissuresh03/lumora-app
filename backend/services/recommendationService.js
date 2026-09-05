@@ -184,7 +184,7 @@ async function analyzePeerContent(userId) {
     const combinedThemes = { ...postThemes, ...commentThemes };
     const primaryEmotion = getPrimaryEmotion(combinedThemes);
     
-    console.log(`📊 Peer Content Analysis for user ${userId}:`);
+    console.log(` Peer Content Analysis for user ${userId}:`);
     console.log(`   Posts: ${postTexts.length}, Post Emotion: ${postEmotion}`);
     console.log(`   Comments: ${commentTexts.length}, Comment Emotion: ${commentEmotion}`);
     console.log(`   Combined Emotion: ${primaryEmotion}`);
@@ -323,9 +323,9 @@ async function getUserProfile(userId) {
        ORDER BY taken_at DESC`,
       [userId]
     );
-    console.log(`📊 Assessment query for user ${userId}: found ${assessmentQuery[0].length} records`);
+    console.log(` Assessment query for user ${userId}: found ${assessmentQuery[0].length} records`);
     if (assessmentQuery[0].length > 0) {
-      console.log(`📊 Latest assessment: ${assessmentQuery[0][0].type} (${assessmentQuery[0][0].score})`);
+      console.log(` Latest assessment: ${assessmentQuery[0][0].type} (${assessmentQuery[0][0].score})`);
     }
     profile.assessmentHistory = assessmentQuery[0];
     profile.assessmentCount = assessmentQuery[0].length;
@@ -345,7 +345,7 @@ async function getUserProfile(userId) {
       profile.peerThemes = peerAnalysis.combinedThemes || {};
       profile.peerEmotion = peerAnalysis.primaryEmotion || 'neutral';
       profile.isSociallyInactive = profile.peerActivity.posts === 0 && profile.peerActivity.comments === 0;
-      console.log(`📊 Peer content analysis complete for user ${userId}:`);
+      console.log(` Peer content analysis complete for user ${userId}:`);
       console.log(`   Peer Emotion: ${profile.peerEmotion}`);
       console.log(`   Peer Themes:`, profile.peerThemes);
     } catch (error) {
@@ -356,7 +356,7 @@ async function getUserProfile(userId) {
     profile.isSociallyInactive = true;
   }
 
-  console.log(`📊 Final profile for user ${userId}:`, {
+  console.log(` Final profile for user ${userId}:`, {
     moodCount: profile.moodCount,
     sleepCount: profile.sleepCount,
     journalCount: profile.journalCount,
@@ -399,7 +399,7 @@ async function detectCrisis(userId) {
 
 async function generateRecommendations(profile, articles) {
   // 🔍 EXTRA LOGGING: Show what was received
-  console.log('📊 generateRecommendations received profile:', {
+  console.log(' generateRecommendations received profile:', {
     moodCount: profile.moodCount,
     sleepCount: profile.sleepCount,
     journalCount: profile.journalCount,
@@ -426,7 +426,7 @@ async function generateRecommendations(profile, articles) {
                         profile.journalCount > 0 ||
                         profile.assessmentCount > 0;
   
-  console.log(`📊 Has enough data: ${hasEnoughData} (mood:${profile.moodCount}, sleep:${profile.sleepCount}, journal:${profile.journalCount}, assessment:${profile.assessmentCount})`);
+  console.log(` Has enough data: ${hasEnoughData} (mood:${profile.moodCount}, sleep:${profile.sleepCount}, journal:${profile.journalCount}, assessment:${profile.assessmentCount})`);
   
   if (!hasEnoughData) {
     return {
@@ -450,7 +450,7 @@ async function generateRecommendations(profile, articles) {
   
   recommendations.sort((a, b) => b.score - a.score);
   
-  console.log(`📊 Generated ${recommendations.length} recommendations`);
+  console.log(` Generated ${recommendations.length} recommendations`);
   
   return {
     hasEnoughData: true,

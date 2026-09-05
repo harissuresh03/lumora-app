@@ -347,12 +347,18 @@ if (typeof document !== "undefined" && !document.getElementById(styleSheetId)) {
     }
 
     .lumora-login__logo {
-      width: 96px;
-      height: 96px;
+      width: 140px;
+      height: 140px;
       object-fit: contain;
-      margin: 0 auto 18px;
+      margin: 0 auto 20px;
       display: block;
       animation: lumoraLogoIn 280ms ease-out;
+      filter: drop-shadow(0 8px 24px rgba(79, 70, 229, 0.14));
+      transition: transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .lumora-login__logo:hover {
+      transform: scale(1.04);
     }
 
     .lumora-login__heading {
@@ -621,8 +627,8 @@ if (typeof document !== "undefined" && !document.getElementById(styleSheetId)) {
       }
 
       .lumora-login__logo {
-        width: 84px;
-        height: 84px;
+        width: 120px;
+        height: 120px;
       }
 
       .lumora-login__heading {

@@ -7,23 +7,16 @@ import { showSuccessToast, showErrorToast } from "../components/ToastNotificatio
 import { useTheme } from "../components/ThemeProvider";
 import {
   User,
-  LogOut,
   ArrowLeft,
   Moon,
   Sun,
   Contrast,
   Eye,
-  Activity,
   Trash2,
   AlertTriangle,
-  Shield,
   Save,
   EyeOff,
-  Lock,
-  Bell,
-  Globe,
-  Building,
-  Mail
+  Lock
 } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 
@@ -56,17 +49,9 @@ function CounsellorSettings() {
   const [universities, setUniversities] = useState([]);
   const [loadingUniversities, setLoadingUniversities] = useState(true);
 
-  // Notification Settings
-  const [notificationSettings, setNotificationSettings] = useState({
-    reportNotifications: true,
-    userActivityAlerts: true,
-    systemUpdateAlerts: true
-  });
-
   useEffect(() => {
     fetchUserProfile();
     fetchUniversities();
-    fetchNotificationSettings();
   }, []);
 
   const fetchUserProfile = async () => {
@@ -97,21 +82,6 @@ function CounsellorSettings() {
       console.error("Fetch universities error:", err);
     } finally {
       setLoadingUniversities(false);
-    }
-  };
-
-  const fetchNotificationSettings = async () => {
-    try {
-      const res = await api.get("/admin/notification-settings");
-      if (res.data) {
-        setNotificationSettings({
-          reportNotifications: res.data.reportNotifications !== undefined ? res.data.reportNotifications : true,
-          userActivityAlerts: res.data.userActivityAlerts !== undefined ? res.data.userActivityAlerts : true,
-          systemUpdateAlerts: res.data.systemUpdateAlerts !== undefined ? res.data.systemUpdateAlerts : true
-        });
-      }
-    } catch (err) {
-      console.error("Fetch notification settings error:", err);
     }
   };
 
@@ -148,15 +118,6 @@ function CounsellorSettings() {
       showErrorToast(err.response?.data?.msg || "Failed to update profile");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleNotificationSettingsUpdate = async () => {
-    try {
-      await api.put("/admin/notification-settings", notificationSettings);
-      showSuccessToast("Notification settings updated");
-    } catch (err) {
-      showErrorToast("Failed to update notification settings");
     }
   };
 
@@ -446,112 +407,6 @@ function CounsellorSettings() {
             {loading ? "Saving..." : "Save Changes"}
           </button>
         </form>
-      </motion.div>
-
-      {/* Notification Settings */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        style={{
-          background: 'var(--card-bg-glass)',
-          backdropFilter: 'var(--glass-blur)',
-          borderRadius: '20px',
-          padding: '28px',
-          marginBottom: '24px',
-          border: '1px solid var(--border-glass)'
-        }}
-      >
-        <h2 style={{ fontSize: '20px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Bell size={22} /> Notification Settings
-        </h2>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-            <span>Report Notifications</span>
-            <button
-              onClick={() => setNotificationSettings({ ...notificationSettings, reportNotifications: !notificationSettings.reportNotifications })}
-              style={{
-                width: '50px',
-                height: '26px',
-                borderRadius: '13px',
-                background: notificationSettings.reportNotifications ? '#22c55e' : 'var(--border-light)',
-                border: 'none',
-                cursor: 'pointer',
-                position: 'relative'
-              }}
-            >
-              <span style={{
-                position: 'absolute',
-                width: '22px',
-                height: '22px',
-                borderRadius: '11px',
-                background: 'white',
-                top: '2px',
-                left: notificationSettings.reportNotifications ? '26px' : '2px',
-                transition: 'left 0.2s'
-              }} />
-            </button>
-          </label>
-          
-          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-            <span>User Activity Alerts</span>
-            <button
-              onClick={() => setNotificationSettings({ ...notificationSettings, userActivityAlerts: !notificationSettings.userActivityAlerts })}
-              style={{
-                width: '50px',
-                height: '26px',
-                borderRadius: '13px',
-                background: notificationSettings.userActivityAlerts ? '#22c55e' : 'var(--border-light)',
-                border: 'none',
-                cursor: 'pointer',
-                position: 'relative'
-              }}
-            >
-              <span style={{
-                position: 'absolute',
-                width: '22px',
-                height: '22px',
-                borderRadius: '11px',
-                background: 'white',
-                top: '2px',
-                left: notificationSettings.userActivityAlerts ? '26px' : '2px',
-                transition: 'left 0.2s'
-              }} />
-            </button>
-          </label>
-          
-          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-            <span>System Update Alerts</span>
-            <button
-              onClick={() => setNotificationSettings({ ...notificationSettings, systemUpdateAlerts: !notificationSettings.systemUpdateAlerts })}
-              style={{
-                width: '50px',
-                height: '26px',
-                borderRadius: '13px',
-                background: notificationSettings.systemUpdateAlerts ? '#22c55e' : 'var(--border-light)',
-                border: 'none',
-                cursor: 'pointer',
-                position: 'relative'
-              }}
-            >
-              <span style={{
-                position: 'absolute',
-                width: '22px',
-                height: '22px',
-                borderRadius: '11px',
-                background: 'white',
-                top: '2px',
-                left: notificationSettings.systemUpdateAlerts ? '26px' : '2px',
-                transition: 'left 0.2s'
-              }} />
-            </button>
-          </label>
-        </div>
-        
-        <button onClick={handleNotificationSettingsUpdate} className="primary-btn" style={{ width: 'auto', padding: '10px 24px', marginTop: '16px' }}>
-          <Save size={14} style={{ marginRight: '6px' }} /> Save Notification Settings
-        </button>
       </motion.div>
 
       {/* Danger Zone */}

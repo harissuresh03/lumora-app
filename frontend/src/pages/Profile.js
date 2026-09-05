@@ -12,7 +12,49 @@ import {
   Shield,
   Award,
   Star,
+  // Badge icons (matching SQL update)
+  Sun,
+  Moon,
+  Brain,
+  MessageCircle,
+  Flame,
+  Leaf,
+  Rocket,
+  Sprout,
+  Trophy,
+  Smile,
+  // Level icons
+  Flower2,
+  TreePine,
+  Rainbow,
+  Dumbbell,
+  Scale,
 } from "lucide-react";
+
+// ICON MAP for badges
+const ICON_MAP = {
+  Sun,
+  Moon,
+  BookOpen,
+  Brain,
+  ShieldCheck: Shield,
+  MessageCircle,
+  Flame,
+  Leaf,
+  Rocket,
+  Sprout,
+  Award,
+  Heart,
+  Trophy,
+  Star,
+  Smile,
+};
+
+// Helper to render badge icon
+const renderBadgeIcon = (iconName, size = 20, props = {}) => {
+  const IconComponent = ICON_MAP[iconName] || Star;
+  return <IconComponent size={size} {...props} />;
+};
 
 function Profile() {
   const navigate = useNavigate();
@@ -94,13 +136,9 @@ function Profile() {
   const consentStatus = getConsentStatus();
   const parentStatus = getParentStatus();
 
-  const levelTitle = gamificationStats?.points?.level 
-    ? getLevelTitle(gamificationStats.points.level) 
-    : "Well-being Starter 🌱";
-
-  function getLevelTitle(level) {
+  const getLevelTitle = (level) => {
     const titles = {
-      1: "Well-being Starter 🌱",
+      1: "Well-being Starter",
       2: "Mindful Beginner",
       3: "Self-Care Explorer",
       4: "Wellness Adventurer",
@@ -109,10 +147,30 @@ function Profile() {
       7: "Balance Seeker",
       8: "Growth Achiever",
       9: "Mental Health Advocate",
-      10: "Lumora Champion 🌟"
+      10: "Lumora Champion"
     };
     return titles[level] || `Level ${level}`;
-  }
+  };
+
+  const getLevelIcon = (level) => {
+    const icons = {
+      1: Sprout,
+      2: Leaf,
+      3: Flower2,
+      4: TreePine,
+      5: Rainbow,
+      6: Dumbbell,
+      7: Scale,
+      8: Rocket,
+      9: Shield,
+      10: Trophy
+    };
+    return icons[level] || Star;
+  };
+
+  const level = gamificationStats?.points?.level || 1;
+  const LevelIcon = getLevelIcon(level);
+  const levelTitle = getLevelTitle(level);
 
   return (
     <Layout>
@@ -157,15 +215,19 @@ function Profile() {
                   gap: '6px'
                 }}>
                   <Star size={14} />
-                  Level {gamificationStats.points?.level || 1} • {gamificationStats.points?.total_points || 0} pts
+                  Level {level} • {gamificationStats.points?.total_points || 0} pts
                 </span>
                 <span style={{
                   padding: '4px 12px',
                   background: 'var(--accent-soft)',
                   borderRadius: '20px',
                   fontSize: '12px',
-                  color: 'var(--text-secondary)'
+                  color: 'var(--text-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
                 }}>
+                  <LevelIcon size={14} strokeWidth={1.75} />
                   {levelTitle}
                 </span>
                 {gamificationStats.equipped_badge && (
@@ -179,7 +241,9 @@ function Profile() {
                     fontSize: '13px',
                     border: '1px solid rgba(245, 158, 11, 0.3)'
                   }}>
-                    🏅 {gamificationStats.equipped_badge.icon} {gamificationStats.equipped_badge.name}
+                    🏅 
+                    {renderBadgeIcon(gamificationStats.equipped_badge.icon, 16)}
+                    <span>{gamificationStats.equipped_badge.name}</span>
                   </span>
                 )}
                 <span style={{
@@ -301,6 +365,9 @@ function Profile() {
                 marginTop: "8px",
                 fontStyle: "italic"
               }}>
+                {parentData.consent_granted 
+                  ? "Your parent/guardian has granted access to your well-being information." 
+                  : "Your parent/guardian has not granted access to your well-being information."}
               </div>
             )}
           </div>

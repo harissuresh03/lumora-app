@@ -27,7 +27,6 @@ function StressForecast({ userId }) {
   const fetchForecast = async () => {
     setLoading(true);
     try {
-      // Get latest forecast
       const res = await api.get(`/stress-forecast/latest/${userId}`);
       if (res.data.hasData) {
         setForecast(res.data);
@@ -37,7 +36,6 @@ function StressForecast({ userId }) {
       }
     } catch (err) {
       console.error("Fetch forecast error:", err);
-      // If no forecast, try to generate
       await generateForecast();
     } finally {
       setLoading(false);
@@ -206,37 +204,37 @@ function StressForecast({ userId }) {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
+          {/* Manage Deadlines Button */}
           <button
             onClick={() => setShowDeadlineModal(true)}
+            className="primary-btn"
             style={{
               padding: '8px 16px',
-              background: 'var(--bg-secondary)',
-              border: '1px solid var(--border-light)',
               borderRadius: '30px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '13px'
-            }}
-          >
-            <Calendar size={16} /> Manage Deadlines
-          </button>
-          <button
-            onClick={generateForecast}
-            disabled={refreshing}
-            style={{
-              padding: '8px 16px',
-              background: 'var(--accent-gradient)',
-              border: 'none',
-              borderRadius: '30px',
-              color: 'white',
-              cursor: refreshing ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
               fontSize: '13px',
-              opacity: refreshing ? 0.6 : 1
+              width: 'auto'
+            }}
+          >
+            <Calendar size={16} /> Manage Deadlines
+          </button>
+          {/* Refresh Forecast Button – now uses same primary-btn class */}
+          <button
+            onClick={generateForecast}
+            disabled={refreshing}
+            className="primary-btn"
+            style={{
+              padding: '8px 16px',
+              borderRadius: '30px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '13px',
+              width: 'auto',
+              opacity: refreshing ? 0.6 : 1,
+              cursor: refreshing ? 'not-allowed' : 'pointer'
             }}
           >
             <RefreshCw size={16} className={refreshing ? 'spinning' : ''} />
@@ -255,23 +253,21 @@ function StressForecast({ userId }) {
           border: '1px solid var(--border-glass)'
         }}>
           <Calendar size={48} style={{ marginBottom: '16px', opacity: 0.3 }} />
-          <h4>No academicstress forecast available</h4>
+          <h4>No academic stress forecast available</h4>
           <p style={{ color: 'var(--text-secondary)' }}>
             Add your academic deadlines to generate a personalized 7-day academic stress forecast.
           </p>
           <button
             onClick={() => setShowDeadlineModal(true)}
+            className="primary-btn"
             style={{
               marginTop: '16px',
               padding: '10px 24px',
-              background: 'var(--accent-gradient)',
-              border: 'none',
               borderRadius: '30px',
-              color: 'white',
-              cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '8px'
+              gap: '8px',
+              width: 'auto'
             }}
           >
             <Plus size={16} /> Add Deadlines
@@ -279,7 +275,7 @@ function StressForecast({ userId }) {
         </div>
       ) : (
         <>
-          {/* Summary Card */}
+          {/* Overdue Warning */}
           {forecast.overdue_warning && (
             <div style={{
               padding: '12px 16px',
@@ -424,7 +420,6 @@ function StressForecast({ userId }) {
           userId={userId}
           onClose={() => setShowDeadlineModal(false)}
           onUpdate={() => {
-            // Refresh forecast after deadline update
             setTimeout(generateForecast, 500);
           }}
         />

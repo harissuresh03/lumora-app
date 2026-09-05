@@ -2,10 +2,20 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../utils/api";
-import { 
-  Star, 
-  Award, 
-  ChevronRight
+import {
+  Star,
+  Award,
+  ChevronRight,
+  Sprout,
+  Leaf,
+  Flower2,
+  TreePine,
+  Rainbow,
+  Dumbbell,
+  Scale,
+  Rocket,
+  ShieldCheck,
+  Trophy,
 } from "lucide-react";
 
 function GamificationMini({ userId }) {
@@ -46,20 +56,20 @@ function GamificationMini({ userId }) {
     return titles[level] || `Level ${level}`;
   };
 
-  const getLevelEmoji = (level) => {
-    const emojis = {
-      1: "🌱",
-      2: "🌿",
-      3: "🌱",
-      4: "🌿",
-      5: "🌈",
-      6: "💪",
-      7: "⚖️",
-      8: "🚀",
-      9: "🛡️",
-      10: "🌟"
+  const getLevelIcon = (level) => {
+    const icons = {
+      1: Sprout,
+      2: Leaf,
+      3: Flower2,
+      4: TreePine,
+      5: Rainbow,
+      6: Dumbbell,
+      7: Scale,
+      8: Rocket,
+      9: ShieldCheck,
+      10: Trophy
     };
-    return emojis[level] || "⭐";
+    return icons[level] || Star;
   };
 
   if (loading) {
@@ -77,6 +87,7 @@ function GamificationMini({ userId }) {
   const equippedBadge = stats.equipped_badge;
   const nextLevelPoints = level * 250;
   const progressToNextLevel = Math.min((points / nextLevelPoints) * 100, 100);
+  const LevelIcon = getLevelIcon(level);
 
   return (
     <div 
@@ -102,14 +113,16 @@ function GamificationMini({ userId }) {
         e.currentTarget.style.transform = 'scale(1)';
       }}
     >
-      {/* Level & Emoji */}
+      {/* Level & Icon */}
       <div style={{
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         minWidth: '50px'
       }}>
-        <span style={{ fontSize: '24px' }}>{getLevelEmoji(level)}</span>
+        <span style={{ color: 'white' }}>
+          <LevelIcon size={24} strokeWidth={1.75} />
+        </span>
         <span style={{ 
           fontSize: '10px', 
           fontWeight: 700, 

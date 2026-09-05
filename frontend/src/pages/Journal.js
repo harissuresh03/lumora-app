@@ -12,15 +12,9 @@ import {
   Trash2,
   Sparkles,
   ArrowLeft,
-  LogOut,
-  User,
   Clock,
   Brain,
-  Heart,
-  Activity,
-  TrendingUp,
   Calendar,
-  ChevronRight,
   FileText
 } from "lucide-react";
 
@@ -39,7 +33,7 @@ function Journal() {
   const [selectedAiAnalysis, setSelectedAiAnalysis] = useState(null);
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
 
-  // ✅ Filter state
+  // Filter state
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [availableYears, setAvailableYears] = useState([]);
@@ -74,7 +68,7 @@ function Journal() {
     fetchJournalStats();
   }, []);
 
-  // ✅ Filter entries when month/year changes or entries update
+  // Filter entries when month/year changes or entries update
   useEffect(() => {
     filterEntries();
   }, [entries, filterMonth, filterYear]);
@@ -93,7 +87,7 @@ function Journal() {
     }).catch((err) => console.log(err));
   };
 
-  // ✅ Filter entries by month and year
+  // Filter entries by month and year
   const filterEntries = () => {
     if (!entries.length) {
       setFilteredEntries([]);
@@ -110,7 +104,7 @@ function Journal() {
     setFilteredEntries(filtered);
   };
 
-  // ✅ Get month name
+  // Get month name
   const getMonthName = (month) => {
     return new Date(2024, month - 1).toLocaleString('default', { month: 'long' });
   };
@@ -174,37 +168,35 @@ function Journal() {
   };
 
   const addEntry = async () => {
-  if (!text.trim()) return;
-  
-  try {
-    setLoading(true);
-    const response = await api.post("/journal", { 
-      user_id: parseInt(user_id), 
-      content: text 
-    });
+    if (!text.trim()) return;
     
-    setText("");
-    fetchEntries();
-    showSuccessToast("Journal entry saved! ✨");
-    
-    // ✅ SHOW CRISIS MESSAGE IF DETECTED
-    if (response.data.crisisDetected) {
-      showWarningToast("We're here for you. 💙 Support is available.");
-      // Optionally open crisis modal
-      // setShowCrisisModal(true);
+    try {
+      setLoading(true);
+      const response = await api.post("/journal", { 
+        user_id: parseInt(user_id), 
+        content: text 
+      });
+      
+      setText("");
+      fetchEntries();
+      showSuccessToast("Journal entry saved! ✨");
+      
+      // Show crisis message if detected
+      if (response.data.crisisDetected) {
+        showWarningToast("We're here for you. 💙 Support is available.");
+      }
+      
+      if (weeklyPrompt) {
+        const weekNumber = Math.floor(new Date().getTime() / (7 * 24 * 60 * 60 * 1000));
+        localStorage.setItem(`prompt_used_${weekNumber}`, 'true');
+      }
+    } catch (err) {
+      console.log(err);
+      showErrorToast("Failed to save journal entry");
+    } finally {
+      setLoading(false);
     }
-    
-    if (weeklyPrompt) {
-      const weekNumber = Math.floor(new Date().getTime() / (7 * 24 * 60 * 60 * 1000));
-      localStorage.setItem(`prompt_used_${weekNumber}`, 'true');
-    }
-  } catch (err) {
-    console.log(err);
-    showErrorToast("Failed to save journal entry");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const deleteEntry = async (id) => {
     if (window.confirm("Are you sure you want to delete this entry?")) {
@@ -292,7 +284,7 @@ function Journal() {
           <p className="page-subtitle">A space for your thoughts and reflections</p>
         </div>
         
-        {/* ✅ Filter and Export Section */}
+        {/* Filter and Export Section */}
         <div style={{ 
           display: 'flex', 
           gap: '10px', 
@@ -342,6 +334,7 @@ function Journal() {
             </select>
           </div>
           
+          {/* ✅ Export PDF Button - Now matches "Export CSV" style (primary variant) */}
           <ExportButton 
             type="journal" 
             userId={parseInt(user_id)} 
@@ -349,7 +342,7 @@ function Journal() {
             month={filterMonth}
             year={filterYear}
             icon={<FileText size={16} />}
-            variant="secondary"
+            variant="primary"
           />
         </div>
       </div>

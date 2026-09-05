@@ -1,16 +1,54 @@
 // frontend/src/pages/components/GamificationDisplay.js
 import React, { useState, useEffect } from "react";
 import api from "../../utils/api";
-import { 
-  Star, 
-  Flame, 
-  Award, 
+import {
+  Star,
+  Flame,
+  Award,
   MessageCircle,
   BookOpen,
   Moon,
-  Smile
+  Smile,
+  Sprout,
+  Leaf,
+  Flower2,
+  TreePine,
+  Rainbow,
+  Dumbbell,
+  Scale,
+  Rocket,
+  ShieldCheck,
+  Trophy,
+  Lock,
+  CheckCircle2,
+  Check,
+  X,
+  // New icons for badges (matching the SQL updates)
+  Sun,
+  Brain,
+  Heart,
 } from "lucide-react";
 import { showSuccessToast } from "./ToastNotification";
+
+// Icon name → component mapping (for dynamic rendering)
+const ICON_MAP = {
+  Sun,
+  Moon,
+  BookOpen,
+  Brain,
+  ShieldCheck,
+  MessageCircle,
+  Flame,
+  Leaf,
+  Rocket,
+  Sprout,
+  Award,
+  Heart,
+  Trophy,
+  Star,
+  Smile,
+  // Add any other icons you might use
+};
 
 function GamificationDisplay({ userId }) {
   const [stats, setStats] = useState(null);
@@ -45,7 +83,7 @@ function GamificationDisplay({ userId }) {
   const handleEquipBadge = async (badgeId) => {
     try {
       await api.post("/gamification/badges/equip", { badge_id: badgeId });
-      showSuccessToast("Badge equipped! 🎉");
+      showSuccessToast("Badge equipped!");
       fetchGamificationData();
     } catch (err) {
       console.error("Equip badge error:", err);
@@ -60,6 +98,12 @@ function GamificationDisplay({ userId }) {
     } catch (err) {
       console.error("Unequip badge error:", err);
     }
+  };
+
+  // Helper to render a Lucide icon from the stored name
+  const renderBadgeIcon = (iconName, size = 32, props = {}) => {
+    const IconComponent = ICON_MAP[iconName] || Star; // fallback
+    return <IconComponent size={size} {...props} />;
   };
 
   const getLevelTitle = (level) => {
@@ -78,27 +122,27 @@ function GamificationDisplay({ userId }) {
     return titles[level] || `Level ${level}`;
   };
 
-  const getLevelEmoji = (level) => {
-    const emojis = {
-      1: "🌱",
-      2: "🌿",
-      3: "🌱",
-      4: "🌿",
-      5: "🌈",
-      6: "💪",
-      7: "⚖️",
-      8: "🚀",
-      9: "🛡️",
-      10: "🌟"
+  const getLevelIcon = (level) => {
+    const icons = {
+      1: Sprout,
+      2: Leaf,
+      3: Flower2,
+      4: TreePine,
+      5: Rainbow,
+      6: Dumbbell,
+      7: Scale,
+      8: Rocket,
+      9: ShieldCheck,
+      10: Trophy
     };
-    return emojis[level] || "⭐";
+    return icons[level] || Star;
   };
 
-  const getStreakEmoji = (streak) => {
-    if (streak >= 30) return "🔥";
-    if (streak >= 14) return "💪";
-    if (streak >= 7) return "🌟";
-    return "🌱";
+  const getStreakLengthIcon = (streak) => {
+    if (streak >= 30) return Flame;
+    if (streak >= 14) return Dumbbell;
+    if (streak >= 7) return Star;
+    return Sprout;
   };
 
   const getStreakLabel = (type) => {
@@ -107,8 +151,9 @@ function GamificationDisplay({ userId }) {
   };
 
   const getStreakIcon = (type) => {
-    const icons = { mood: <Smile size={14} />, sleep: <Moon size={14} />, journal: <BookOpen size={14} />, chat: <MessageCircle size={14} /> };
-    return icons[type] || <Star size={14} />;
+    const icons = { mood: Smile, sleep: Moon, journal: BookOpen, chat: MessageCircle };
+    const Icon = icons[type] || Star;
+    return <Icon size={14} />;
   };
 
   if (loading) {
@@ -129,6 +174,7 @@ function GamificationDisplay({ userId }) {
   const streakData = stats.streaks || {};
   const earnedBadges = badges.filter(b => b.is_earned);
   const lockedBadges = badges.filter(b => !b.is_earned);
+  const LevelIcon = getLevelIcon(level);
 
   return (
     <div style={{
@@ -145,7 +191,9 @@ function GamificationDisplay({ userId }) {
         marginBottom: '24px',
         textAlign: 'center'
       }}>
-        <div style={{ fontSize: '48px', marginBottom: '8px' }}>{getLevelEmoji(level)}</div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px', color: 'var(--accent-primary)' }}>
+          <LevelIcon size={48} strokeWidth={1.75} />
+        </div>
         <h2 style={{ fontSize: '28px', fontWeight: 700, margin: 0 }}>
           {getLevelTitle(level)}
         </h2>
@@ -194,20 +242,22 @@ function GamificationDisplay({ userId }) {
             borderRadius: '20px',
             fontSize: '14px'
           }}>
-            <span style={{ fontSize: '20px' }}>{equippedBadge.icon}</span>
+            {renderBadgeIcon(equippedBadge.icon, 20)}
             <span>Equipped: {equippedBadge.name}</span>
             <button
               onClick={handleUnequipBadge}
               style={{
+                display: 'inline-flex',
+                alignItems: 'center',
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
                 color: 'var(--text-muted)',
-                fontSize: '14px',
                 padding: '0 4px'
               }}
+              aria-label="Unequip badge"
             >
-              ✕
+              <X size={14} strokeWidth={2} />
             </button>
           </div>
         )}
@@ -255,6 +305,7 @@ function GamificationDisplay({ userId }) {
         }}>
           {Object.entries(streakData).map(([type, data]) => {
             if (type === 'all_activity') return null;
+            const StreakIcon = getStreakLengthIcon(data.current);
             return (
               <div
                 key={type}
@@ -267,7 +318,9 @@ function GamificationDisplay({ userId }) {
                   borderRadius: '12px'
                 }}
               >
-                <div style={{ fontSize: '24px' }}>{getStreakEmoji(data.current)}</div>
+                <div style={{ color: '#f59e0b' }}>
+                  <StreakIcon size={24} strokeWidth={1.75} />
+                </div>
                 <div>
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{getStreakLabel(type)}</div>
                   <div style={{ fontSize: '18px', fontWeight: 700 }}>{data.current} days</div>
@@ -312,7 +365,8 @@ function GamificationDisplay({ userId }) {
                 background: activeTab === 'badges' ? 'var(--accent-soft)' : 'transparent',
                 cursor: 'pointer',
                 fontSize: '12px',
-                fontWeight: activeTab === 'badges' ? 600 : 400
+                fontWeight: activeTab === 'badges' ? 600 : 400,
+                color: activeTab === 'badges' ? 'var(--accent-primary)' : 'var(--text-secondary)'
               }}
             >
               All Badges
@@ -326,7 +380,8 @@ function GamificationDisplay({ userId }) {
                 background: activeTab === 'locked' ? 'var(--accent-soft)' : 'transparent',
                 cursor: 'pointer',
                 fontSize: '12px',
-                fontWeight: activeTab === 'locked' ? 600 : 400
+                fontWeight: activeTab === 'locked' ? 600 : 400,
+                color: activeTab === 'locked' ? 'var(--accent-primary)' : 'var(--text-secondary)'
               }}
             >
               Locked
@@ -344,14 +399,15 @@ function GamificationDisplay({ userId }) {
               key={badge.id}
               style={{
                 padding: '16px',
-                background: badge.is_earned ? 'var(--accent-soft)' : 'var(--bg-secondary)',
+                background: badge.is_earned ? 'var(--accent-soft)' : 'var(--card-bg-solid)',
                 borderRadius: '12px',
                 textAlign: 'center',
-                opacity: badge.is_earned ? 1 : 0.5,
-                border: badge.is_equipped ? '2px solid var(--accent-primary)' : '1px solid transparent',
+                opacity: badge.is_earned ? 1 : 0.6,
+                border: badge.is_equipped ? '2px solid var(--accent-primary)' : '1px solid var(--border-light)',
                 cursor: badge.is_earned && !badge.is_equipped ? 'pointer' : 'default',
                 transition: 'all 0.2s',
-                position: 'relative'
+                position: 'relative',
+                filter: badge.is_earned ? 'none' : 'grayscale(0.4)',
               }}
               onClick={() => {
                 if (badge.is_earned && !badge.is_equipped) {
@@ -359,24 +415,47 @@ function GamificationDisplay({ userId }) {
                 }
               }}
             >
-              <div style={{ fontSize: '32px' }}>{badge.icon}</div>
+              {/* Render Lucide icon based on database icon name */}
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '4px' }}>
+                {renderBadgeIcon(badge.icon, 32)}
+              </div>
               <div style={{ fontSize: '12px', fontWeight: 600, marginTop: '6px' }}>
                 {badge.name}
               </div>
-              <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                {badge.is_earned 
-                  ? (badge.is_equipped ? '✅ Equipped' : 'Tap to equip') 
-                  : '🔒 Locked'}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                fontSize: '9px',
+                color: 'var(--text-muted)',
+                marginTop: '2px'
+              }}>
+                {badge.is_earned ? (
+                  badge.is_equipped ? (
+                    <>
+                      <CheckCircle2 size={11} />
+                      Equipped
+                    </>
+                  ) : (
+                    'Tap to equip'
+                  )
+                ) : (
+                  <>
+                    <Lock size={11} />
+                    Locked
+                  </>
+                )}
               </div>
               {badge.is_earned && (
                 <div style={{
                   position: 'absolute',
                   top: '4px',
                   right: '4px',
-                  fontSize: '12px',
-                  color: '#22c55e'
+                  color: '#22c55e',
+                  display: 'flex'
                 }}>
-                  ✓
+                  <Check size={14} strokeWidth={3} />
                 </div>
               )}
             </div>
@@ -385,13 +464,13 @@ function GamificationDisplay({ userId }) {
 
         {activeTab === 'badges' && badges.length === 0 && (
           <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>
-            No badges earned yet. Keep using Lumora to unlock achievements! 🏆
+            No badges earned yet. Keep using Lumora to unlock achievements!
           </p>
         )}
 
         {activeTab === 'locked' && lockedBadges.length === 0 && (
           <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>
-            You've unlocked all badges! 🎉
+            You've unlocked all badges!
           </p>
         )}
       </div>

@@ -31,9 +31,55 @@ import {
   MoreHorizontal,
   ThumbsUp,
   Trash2,
-  Award
+  Award,
+  // Badge icons (matching SQL update)
+  Sun,
+  Moon,
+  BookOpen,
+  Brain,
+  ShieldCheck,
+  Flame,
+  Leaf,
+  Rocket,
+  Sprout,
+  Trophy,
+  Star,
+  Smile,
+  // Level icons
+  Flower2,
+  TreePine,
+  Rainbow,
+  Dumbbell,
+  Scale,
 } from "lucide-react";
 import { showSuccessToast, showErrorToast, showWarningToast } from "./components/ToastNotification";
+
+// ============================================
+// ICON MAPPING (for badges)
+// ============================================
+const ICON_MAP = {
+  Sun,
+  Moon,
+  BookOpen,
+  Brain,
+  ShieldCheck,
+  MessageCircle,
+  Flame,
+  Leaf,
+  Rocket,
+  Sprout,
+  Award,
+  Heart,
+  Trophy,
+  Star,
+  Smile,
+};
+
+// Helper to render a Lucide badge icon
+const renderBadgeIcon = (iconName, size = 20, props = {}) => {
+  const IconComponent = ICON_MAP[iconName] || Star;
+  return <IconComponent size={size} {...props} />;
+};
 
 // ============================================
 // MODERATION FUNCTION (Calls Backend API)
@@ -575,21 +621,21 @@ function PeerSupport() {
     return titles[level] || `Level ${level}`;
   };
 
-  // ✅ Get level emoji
-  const getLevelEmoji = (level) => {
-    const emojis = {
-      1: "🌱",
-      2: "🌿",
-      3: "🌱",
-      4: "🌿",
-      5: "🌈",
-      6: "💪",
-      7: "⚖️",
-      8: "🚀",
-      9: "🛡️",
-      10: "🌟"
+  // ✅ Get level icon component (matching GamificationDisplay)
+  const getLevelIcon = (level) => {
+    const icons = {
+      1: Sprout,
+      2: Leaf,
+      3: Flower2,
+      4: TreePine,
+      5: Rainbow,
+      6: Dumbbell,
+      7: Scale,
+      8: Rocket,
+      9: ShieldCheck,
+      10: Trophy
     };
-    return emojis[level] || "⭐";
+    return icons[level] || Star;
   };
 
   if (loading) return <Layout><div className="loading-container"><div className="spinner"></div><p className="loading-text">Loading community...</p></div></Layout>;
@@ -615,9 +661,12 @@ function PeerSupport() {
         <p className="page-subtitle" style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>Connect, share, and grow together in a safe, supportive community</p>
       </div>
 
-      {/* Warning Banner */}
+      {/* Warning Banner - Now uses CSS class */}
       {warningCount > 0 && warningCount < 3 && (
-        <div className="warning-banner"><AlertTriangle size={14} /><span>Warning: {warningCount}/3. Please follow community guidelines.</span></div>
+        <div className="warning-banner">
+          <AlertTriangle size={14} />
+          <span>Warning: {warningCount}/3. Please follow community guidelines.</span>
+        </div>
       )}
 
       {/* Crisis Alert Modal */}
@@ -701,61 +750,64 @@ function PeerSupport() {
                     </div>
 
                     {/* ✅ Hover Tooltip - Show Level and Badge */}
-                    {hoveredUser === post.user_id && hoveredUserData && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: 'calc(100% + 8px)',
-                          left: '0',
-                          background: 'var(--card-bg-glass)',
-                          backdropFilter: 'var(--glass-blur-lg)',
-                          borderRadius: '12px',
-                          padding: '12px 16px',
-                          border: '1px solid var(--border-glass)',
-                          boxShadow: 'var(--shadow-lg)',
-                          zIndex: 1000,
-                          minWidth: '180px',
-                          animation: 'fadeIn 0.2s ease'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                          <span style={{ fontSize: '24px' }}>{getLevelEmoji(hoveredUserData.level)}</span>
-                          <div>
-                            <div style={{ fontSize: '13px', fontWeight: 600 }}>
-                              Level {hoveredUserData.level}
-                            </div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                              {getLevelTitle(hoveredUserData.level)}
+                    {hoveredUser === post.user_id && hoveredUserData && (() => {
+                      const LevelIcon = getLevelIcon(hoveredUserData.level);
+                      return (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 'calc(100% + 8px)',
+                            left: '0',
+                            background: 'var(--card-bg-glass)',
+                            backdropFilter: 'var(--glass-blur-lg)',
+                            borderRadius: '12px',
+                            padding: '12px 16px',
+                            border: '1px solid var(--border-glass)',
+                            boxShadow: 'var(--shadow-lg)',
+                            zIndex: 1000,
+                            minWidth: '180px',
+                            animation: 'fadeIn 0.2s ease'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                            <LevelIcon size={24} strokeWidth={1.75} style={{ color: 'var(--accent-primary)' }} />
+                            <div>
+                              <div style={{ fontSize: '13px', fontWeight: 600 }}>
+                                Level {hoveredUserData.level}
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                {getLevelTitle(hoveredUserData.level)}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        {hoveredUserData.equippedBadge && (
+                          {hoveredUserData.equippedBadge && (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '4px 10px',
+                              background: 'var(--accent-soft)',
+                              borderRadius: '12px',
+                              fontSize: '12px'
+                            }}>
+                              {renderBadgeIcon(hoveredUserData.equippedBadge.icon, 16)}
+                              <span>{hoveredUserData.equippedBadge.name}</span>
+                            </div>
+                          )}
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '6px',
-                            padding: '4px 10px',
-                            background: 'var(--accent-soft)',
-                            borderRadius: '12px',
-                            fontSize: '12px'
+                            gap: '4px',
+                            fontSize: '11px',
+                            color: 'var(--text-muted)',
+                            marginTop: '6px'
                           }}>
-                            <span>{hoveredUserData.equippedBadge.icon}</span>
-                            <span>{hoveredUserData.equippedBadge.name}</span>
+                            <Award size={12} />
+                            <span>{hoveredUserData.totalBadges} badges • {hoveredUserData.points} pts</span>
                           </div>
-                        )}
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '11px',
-                          color: 'var(--text-muted)',
-                          marginTop: '6px'
-                        }}>
-                          <Award size={12} />
-                          <span>{hoveredUserData.totalBadges} badges • {hoveredUserData.points} pts</span>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
 
                   <div className="dropdown-container">
@@ -847,61 +899,64 @@ function PeerSupport() {
                           </div>
 
                           {/* ✅ Hover Tooltip for Comments */}
-                          {hoveredUser === comment.user_id && hoveredUserData && (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                top: 'calc(100% + 8px)',
-                                left: '0',
-                                background: 'var(--card-bg-glass)',
-                                backdropFilter: 'var(--glass-blur-lg)',
-                                borderRadius: '12px',
-                                padding: '12px 16px',
-                                border: '1px solid var(--border-glass)',
-                                boxShadow: 'var(--shadow-lg)',
-                                zIndex: 1000,
-                                minWidth: '180px',
-                                animation: 'fadeIn 0.2s ease'
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                                <span style={{ fontSize: '24px' }}>{getLevelEmoji(hoveredUserData.level)}</span>
-                                <div>
-                                  <div style={{ fontSize: '13px', fontWeight: 600 }}>
-                                    Level {hoveredUserData.level}
-                                  </div>
-                                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                    {getLevelTitle(hoveredUserData.level)}
+                          {hoveredUser === comment.user_id && hoveredUserData && (() => {
+                            const LevelIcon = getLevelIcon(hoveredUserData.level);
+                            return (
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  top: 'calc(100% + 8px)',
+                                  left: '0',
+                                  background: 'var(--card-bg-glass)',
+                                  backdropFilter: 'var(--glass-blur-lg)',
+                                  borderRadius: '12px',
+                                  padding: '12px 16px',
+                                  border: '1px solid var(--border-glass)',
+                                  boxShadow: 'var(--shadow-lg)',
+                                  zIndex: 1000,
+                                  minWidth: '180px',
+                                  animation: 'fadeIn 0.2s ease'
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                                  <LevelIcon size={24} strokeWidth={1.75} style={{ color: 'var(--accent-primary)' }} />
+                                  <div>
+                                    <div style={{ fontSize: '13px', fontWeight: 600 }}>
+                                      Level {hoveredUserData.level}
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                      {getLevelTitle(hoveredUserData.level)}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                              {hoveredUserData.equippedBadge && (
+                                {hoveredUserData.equippedBadge && (
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    padding: '4px 10px',
+                                    background: 'var(--accent-soft)',
+                                    borderRadius: '12px',
+                                    fontSize: '12px'
+                                  }}>
+                                    {renderBadgeIcon(hoveredUserData.equippedBadge.icon, 16)}
+                                    <span>{hoveredUserData.equippedBadge.name}</span>
+                                  </div>
+                                )}
                                 <div style={{
                                   display: 'flex',
                                   alignItems: 'center',
-                                  gap: '6px',
-                                  padding: '4px 10px',
-                                  background: 'var(--accent-soft)',
-                                  borderRadius: '12px',
-                                  fontSize: '12px'
+                                  gap: '4px',
+                                  fontSize: '11px',
+                                  color: 'var(--text-muted)',
+                                  marginTop: '6px'
                                 }}>
-                                  <span>{hoveredUserData.equippedBadge.icon}</span>
-                                  <span>{hoveredUserData.equippedBadge.name}</span>
+                                  <Award size={12} />
+                                  <span>{hoveredUserData.totalBadges} badges • {hoveredUserData.points} pts</span>
                                 </div>
-                              )}
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                fontSize: '11px',
-                                color: 'var(--text-muted)',
-                                marginTop: '6px'
-                              }}>
-                                <Award size={12} />
-                                <span>{hoveredUserData.totalBadges} badges • {hoveredUserData.points} pts</span>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
                         </div>
                       );
                     })}

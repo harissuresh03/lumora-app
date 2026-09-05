@@ -62,7 +62,6 @@ function CounsellorStudentProfile() {
         responseType: 'blob'
       });
       
-      // Create download link
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -162,10 +161,11 @@ function CounsellorStudentProfile() {
           <ArrowLeft size={18} /> Back to Students
         </button>
         
-        {/* ✅ Generate PDF Report Button */}
+        {/* ✅ Generate PDF Report Button - Now uses primary-btn class */}
         <button
           onClick={generateWellnessReport}
           disabled={generating}
+          className="primary-btn"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -174,24 +174,9 @@ function CounsellorStudentProfile() {
             borderRadius: '30px',
             fontSize: '13px',
             fontWeight: 500,
-            background: '#7c3aed',
-            color: 'white',
-            border: 'none',
-            cursor: generating ? 'not-allowed' : 'pointer',
+            width: 'auto',
             opacity: generating ? 0.6 : 1,
-            transition: 'all 0.25s ease'
-          }}
-          onMouseEnter={(e) => {
-            if (!generating) {
-              e.currentTarget.style.background = '#8b5cf6';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!generating) {
-              e.currentTarget.style.background = '#7c3aed';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }
+            cursor: generating ? 'not-allowed' : 'pointer',
           }}
         >
           <FileText size={16} />
@@ -393,8 +378,6 @@ function CounsellorStudentProfile() {
           )}
         </div>
       </div>
-
-      {/* ❌ REMOVED: Journal Entries Section - Confidential */}
 
       {/* Crisis Alerts */}
       <div style={{ background: 'var(--card-bg-glass)', borderRadius: '16px', padding: '20px', border: '1px solid var(--border-glass)', marginBottom: '24px' }}>

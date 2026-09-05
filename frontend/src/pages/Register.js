@@ -4,6 +4,15 @@ import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import { showSuccessToast } from "./components/ToastNotification";
 
+// ─── PAGE LAYOUT ────────────────────────────────────────────────────
+const pageStyles = {
+  // Ensure the card is wide and centered
+  shell: {
+    width: "min(1200px, calc(100% - 48px))",
+    margin: "0 auto",
+  },
+};
+
 function Register() {
   const navigate = useNavigate();
   const [universities, setUniversities] = useState([]);
@@ -109,7 +118,6 @@ function Register() {
     } else {
       setErrors(prev => ({ ...prev, password: "" }));
     }
-    // Also re-check confirm password if it has a value
     if (form.confirmPassword) {
       validateConfirmPassword(form.confirmPassword, password);
     }
@@ -127,7 +135,6 @@ function Register() {
     }
   };
 
-  // Check if email already exists (on blur)
   const checkEmailExists = async () => {
     if (!form.email || errors.email) return;
     try {
@@ -146,7 +153,6 @@ function Register() {
     e.preventDefault();
     setError("");
 
-    // Validate all fields before submit
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!form.email || !emailRegex.test(form.email)) {
       setError("Please enter a valid email address.");
@@ -162,17 +168,7 @@ function Register() {
     }
 
     if (!form.name || !form.dob || !form.gender || !form.email || !form.password) {
-      setError("Please fill in all required fields 🌙");
-      return;
-    }
-
-    if (form.password !== form.confirmPassword) {
-      setError("Passwords do not match ⚠️");
-      return;
-    }
-
-    if (form.password.length < 6) {
-      setError("Password must be at least 6 characters");
+      setError("Please fill in all required fields.");
       return;
     }
 
@@ -201,8 +197,8 @@ function Register() {
         if (response.data.user_id) {
           navigate(`/verify-email?email=${encodeURIComponent(form.email)}&userId=${response.data.user_id}`);
           const msg = response.data.parent_invited 
-            ? "Registration successful! Please check your email for the verification code. A parent invitation has also been sent. 🌿" 
-            : "Registration successful! Please check your email for the verification code. 🌿";
+            ? "Registration successful! Please check your email for the verification code. A parent invitation has also been sent." 
+            : "Registration successful! Please check your email for the verification code.";
           showSuccessToast(msg);
         }
         setLoading(false);
@@ -231,46 +227,39 @@ function Register() {
       }
     } catch (err) {
       console.error("Registration error:", err);
-      console.error("Error details:", err.response?.data);
-      setError(err.response?.data?.msg || "Something went wrong 🌙");
+      setError(err.response?.data?.msg || "Something went wrong.");
       setLoading(false);
     }
   };
 
+  // ─── COUNSELLOR SUCCESS VIEW ──────────────────────────────────────
   if (requestSubmitted) {
     return (
-      <div style={styles.container}>
-        <div style={styles.contentWrapper}>
-          <div style={styles.card}>
-            <div style={styles.logoSection}>
-              <div style={styles.logoIcon}>✨</div>
-              <h1 style={styles.logo}>Lumora</h1>
-            </div>
-            <div style={{ textAlign: "center", padding: "20px 0" }}>
-              <div style={{ fontSize: "48px", marginBottom: "16px" }}>📋</div>
-              <h2 style={{ marginBottom: "12px" }}>Application Submitted!</h2>
-              <p style={{ color: "#6b7280", marginBottom: "8px" }}>
-                Your counsellor registration request has been submitted.
-              </p>
-              <p style={{ color: "#6b7280", fontSize: "14px" }}>
-                You will be notified once an admin reviews your application.
-              </p>
-              <button
-                onClick={() => navigate("/")}
-                style={{
-                  marginTop: "24px",
-                  padding: "12px 32px",
-                  borderRadius: "12px",
-                  border: "none",
-                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                  color: "white",
-                  fontSize: "15px",
-                  fontWeight: "600",
-                  cursor: "pointer"
-                }}
-              >
-                Go to Login
-              </button>
+      <div className="lumora-login">
+        <div className="lumora-login__ambient" aria-hidden="true" />
+        <div className="lumora-login__shell" style={pageStyles.shell}>
+          <div className="lumora-login__card-wrap">
+            <div className="lumora-login__card">
+              <div className="lumora-login__logo-block">
+                <img src="/logo.png" alt="Lumora" className="lumora-login__logo" />
+                <h1 className="lumora-login__heading">Lumora</h1>
+              </div>
+              <div className="lumora-register__success">
+                <h2 className="lumora-register__success-heading">Application Submitted!</h2>
+                <p className="lumora-register__success-text">
+                  Your counsellor registration request has been submitted.
+                </p>
+                <p className="lumora-register__success-text" style={{ fontSize: "14px" }}>
+                  You will be notified once an admin reviews your application.
+                </p>
+                <button
+                  onClick={() => navigate("/")}
+                  className="lumora-login__submit"
+                  style={{ marginTop: "24px" }}
+                >
+                  Go to Login
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -278,730 +267,643 @@ function Register() {
     );
   }
 
+  // ─── MAIN REGISTRATION FORM ──────────────────────────────────────
   return (
-    <div style={styles.container}>
-      <div style={styles.bgDecoration}>
-        <div style={styles.blob1}></div>
-        <div style={styles.blob2}></div>
-        <div style={styles.blob3}></div>
-      </div>
+    <div className="lumora-login">
+      <div className="lumora-login__ambient" aria-hidden="true" />
 
-      <div style={styles.contentWrapper}>
-        <div style={styles.card}>
-          <button onClick={() => navigate("/")} style={styles.backBtn}>
-            ← Back to Login
-          </button>
-
-          <div style={styles.logoSection}>
-            <div style={styles.logoIcon}>✨</div>
-            <h1 style={styles.logo}>Lumora</h1>
-          </div>
-          <p style={styles.subtitle}>Begin your calm journey 🌿</p>
-
-          <div style={styles.roleSelector}>
-            <button
-              type="button"
-              onClick={() => setRegisterAs("student")}
-              style={{
-                flex: 1,
-                padding: "12px",
-                borderRadius: "10px",
-                border: registerAs === "student" ? "2px solid #667eea" : "1px solid #e5e7eb",
-                background: registerAs === "student" ? "rgba(102, 126, 234, 0.1)" : "transparent",
-                cursor: "pointer",
-                fontWeight: registerAs === "student" ? "600" : "400"
-              }}
-            >
-              👤 Student
-            </button>
-            <button
-              type="button"
-              onClick={() => setRegisterAs("counsellor")}
-              style={{
-                flex: 1,
-                padding: "12px",
-                borderRadius: "10px",
-                border: registerAs === "counsellor" ? "2px solid #667eea" : "1px solid #e5e7eb",
-                background: registerAs === "counsellor" ? "rgba(102, 126, 234, 0.1)" : "transparent",
-                cursor: "pointer",
-                fontWeight: registerAs === "counsellor" ? "600" : "400"
-              }}
-            >
-              🧑‍🏫 Counsellor
-            </button>
-          </div>
-
-          {registerAs === "counsellor" && (
-            <div style={{ padding: "12px", background: "rgba(102, 126, 234, 0.08)", borderRadius: "10px", marginBottom: "16px", fontSize: "13px", color: "#6b7280" }}>
-              <strong>Note:</strong> Counsellor registration requires admin approval. You will be notified once approved.
-            </div>
-          )}
-
-          <form onSubmit={handleRegister} style={styles.form}>
-            <div style={styles.sectionTitle}>
-              <span>👤 Personal Information</span>
-            </div>
-
-            <div style={styles.row}>
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Full Name *</label>
-                <input
-                  name="name"
-                  placeholder="e.g., Haris Khan"
-                  value={form.name}
-                  onChange={handleChange}
-                  style={styles.input}
-                  disabled={loading}
-                  required
-                />
-              </div>
-
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Username (Do not use real name)</label>
-                <input
-                  name="nickname"
-                  placeholder="e.g., Haris, Harry"
-                  value={form.nickname}
-                  onChange={handleChange}
-                  style={styles.input}
-                  disabled={loading}
-                />
-              </div>
-            </div>
-
-            <div style={styles.row}>
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Date of Birth *</label>
-                <input
-                  type="date"
-                  name="dob"
-                  value={form.dob}
-                  onChange={handleChange}
-                  style={styles.input}
-                  disabled={loading}
-                  required
-                />
-              </div>
-
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Gender *</label>
-                <select
-                  name="gender"
-                  value={form.gender}
-                  onChange={handleChange}
-                  style={styles.select}
-                  disabled={loading}
-                  required
-                >
-                  <option value="" disabled hidden>Select gender</option>
-                  <option value="Female">Female</option>
-                  <option value="Male">Male</option>
-                  <option value="Non-binary">Non-binary</option>
-                  <option value="Prefer to self-describe">Self-describe</option>
-                  <option value="Prefer not to say">Prefer not to say</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={styles.sectionTitle}>
-              <span>🎓 Academic Information</span>
-            </div>
-
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>University</label>
-              {loadingUniversities ? (
-                <div style={styles.loadingText}>Loading universities...</div>
-              ) : (
-                <select
-                  name="university_id"
-                  value={form.university_id}
-                  onChange={handleChange}
-                  style={styles.select}
-                  disabled={loading}
-                >
-                  <option value="">Select your university</option>
-                  {universities.map((uni) => (
-                    <option key={uni.id} value={uni.id}>
-                      {uni.name} ({uni.short_name})
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            {showOtherUniversity && (
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Please specify your university</label>
-                <input
-                  name="university_other"
-                  placeholder="Enter your university name"
-                  value={form.university_other}
-                  onChange={handleChange}
-                  style={styles.input}
-                  disabled={loading}
-                />
-              </div>
-            )}
-
-            <div style={styles.row}>
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Matric Number (optional)</label>
-                <input
-                  name="matric_number"
-                  placeholder="e.g., B012310101"
-                  value={form.matric_number}
-                  onChange={handleChange}
-                  style={styles.input}
-                  disabled={loading}
-                />
-              </div>
-            </div>
-
-            <div style={styles.row}>
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Faculty (optional)</label>
-                <input
-                  name="faculty"
-                  placeholder="e.g., Faculty of Computer Science"
-                  value={form.faculty}
-                  onChange={handleChange}
-                  style={styles.input}
-                  disabled={loading}
-                />
-              </div>
-
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Department (optional)</label>
-                <input
-                  name="department"
-                  placeholder="e.g., Software Engineering"
-                  value={form.department}
-                  onChange={handleChange}
-                  style={styles.input}
-                  disabled={loading}
-                />
-              </div>
-            </div>
-
-            <div style={styles.sectionTitle}>
-              <span>👨‍👩‍👦 Parent/Guardian (Optional)</span>
-              <p style={styles.sectionHint}>Add a parent or guardian to view your well-being summary</p>
-            </div>
-
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>Parent/Guardian Email</label>
-              <input
-                name="parent_email"
-                placeholder="parent@example.com"
-                value={form.parent_email}
-                onChange={handleChange}
-                style={styles.input}
+      <div className="lumora-login__shell" style={pageStyles.shell}>
+        <div className="lumora-login__card-wrap">
+          <div className="lumora-login__card">
+            {/* BACK BUTTON – with inline styles + hover via state */}
+            <div style={{ marginBottom: "20px", textAlign: "left" }}>
+              <button
+                type="button"
+                className="lumora-back-btn"
+                onClick={() => navigate("/")}
                 disabled={loading}
-              />
-              <p style={{ fontSize: "11px", color: "#9ca3af", marginTop: "4px" }}>
-                They will receive login credentials and can view your well-being summary.
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <line x1="19" y1="12" x2="5" y2="12" />
+                  <polyline points="12 19 5 12 12 5" />
+                </svg>
+                <span className="lumora-back-btn__label">Back to Login</span>
+              </button>
+            </div>
+
+            <div className="lumora-login__logo-block">
+              <img src="/logo.png" alt="Lumora" className="lumora-login__logo" />
+              <h1 className="lumora-login__heading">Create your account</h1>
+              <p className="lumora-login__subhead">
+                Begin your journey toward better wellbeing.
               </p>
             </div>
 
-            {registerAs === "student" && (
-              <div style={styles.consentSection}>
-                <div style={styles.consentHeader}>
-                  <span>🔐 Data Sharing Consent</span>
+            <div className="lumora-register__tabs">
+              <button
+                type="button"
+                className={`lumora-register__tab ${registerAs === "student" ? "is-active" : ""}`}
+                onClick={() => setRegisterAs("student")}
+              >
+                Student
+              </button>
+              <button
+                type="button"
+                className={`lumora-register__tab ${registerAs === "counsellor" ? "is-active" : ""}`}
+                onClick={() => setRegisterAs("counsellor")}
+              >
+                Counsellor
+              </button>
+            </div>
+
+            {registerAs === "counsellor" && (
+              <div className="lumora-register__note">
+                <strong>Note:</strong> Counsellor registration requires admin approval. You will be notified once approved.
+              </div>
+            )}
+
+            <form onSubmit={handleRegister} className="lumora-login__form" noValidate>
+              
+              <div className="lumora-register__section">
+                <span className="lumora-register__section-title">Personal Information</span>
+              </div>
+
+              <div className="lumora-register__row">
+                <div className="lumora-login__field">
+                  <label className="lumora-login__label">Full Name *</label>
+                  <div className={`lumora-login__control ${loading ? "is-disabled" : ""}`}>
+                    <input
+                      name="name"
+                      placeholder="e.g., Maria Khan"
+                      value={form.name}
+                      onChange={handleChange}
+                      disabled={loading}
+                      required
+                    />
+                  </div>
                 </div>
-                <div style={styles.consentBox}>
-                  <label style={styles.consentLabel}>
+
+                <div className="lumora-login__field">
+                  <label className="lumora-login__label">Username (Do not use real name)</label>
+                  <div className={`lumora-login__control ${loading ? "is-disabled" : ""}`}>
+                    <input
+                      name="nickname"
+                      placeholder="e.g., Maria, Harry"
+                      value={form.nickname}
+                      onChange={handleChange}
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="lumora-register__row">
+                <div className="lumora-login__field">
+                  <label className="lumora-login__label">Date of Birth *</label>
+                  <div className={`lumora-login__control ${loading ? "is-disabled" : ""}`}>
+                    <input
+                      type="date"
+                      name="dob"
+                      value={form.dob}
+                      onChange={handleChange}
+                      disabled={loading}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="lumora-login__field">
+                  <label className="lumora-login__label">Gender *</label>
+                  <div className={`lumora-login__control ${loading ? "is-disabled" : ""}`} style={{ padding: 0 }}>
+                    <select
+                      name="gender"
+                      value={form.gender}
+                      onChange={handleChange}
+                      disabled={loading}
+                      required
+                      style={{
+                        width: '100%', border: 0, outline: 'none', background: 'transparent',
+                        fontSize: '15px', color: '#1E293B', fontFamily: 'inherit',
+                        padding: '0 14px', appearance: 'none', cursor: 'pointer'
+                      }}
+                    >
+                      <option value="" disabled hidden>Select gender</option>
+                      <option value="Female">Female</option>
+                      <option value="Male">Male</option>
+                      <option value="Non-binary">Non-binary</option>
+                      <option value="Prefer to self-describe">Self-describe</option>
+                      <option value="Prefer not to say">Prefer not to say</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="lumora-register__section">
+                <span className="lumora-register__section-title">Academic Information</span>
+              </div>
+
+              <div className="lumora-login__field">
+                <label className="lumora-login__label">University</label>
+                <div className={`lumora-login__control ${loading || loadingUniversities ? "is-disabled" : ""}`} style={{ padding: 0 }}>
+                  {loadingUniversities ? (
+                    <div style={{ padding: '0 14px', color: '#6B7280', fontSize: '15px', display: 'flex', alignItems: 'center' }}>Loading universities...</div>
+                  ) : (
+                    <select
+                      name="university_id"
+                      value={form.university_id}
+                      onChange={handleChange}
+                      disabled={loading}
+                      style={{
+                        width: '100%', border: 0, outline: 'none', background: 'transparent',
+                        fontSize: '15px', color: '#1E293B', fontFamily: 'inherit',
+                        padding: '0 14px', appearance: 'none', cursor: 'pointer', height: '100%'
+                      }}
+                    >
+                      <option value="">Select your university</option>
+                      {universities.map((uni) => (
+                        <option key={uni.id} value={uni.id}>
+                          {uni.name} ({uni.short_name})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+
+              {showOtherUniversity && (
+                <div className="lumora-login__field">
+                  <label className="lumora-login__label">Please specify your university</label>
+                  <div className={`lumora-login__control ${loading ? "is-disabled" : ""}`}>
+                    <input
+                      name="university_other"
+                      placeholder="Enter your university name"
+                      value={form.university_other}
+                      onChange={handleChange}
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="lumora-register__row">
+                <div className="lumora-login__field">
+                  <label className="lumora-login__label">Matric Number (optional)</label>
+                  <div className={`lumora-login__control ${loading ? "is-disabled" : ""}`}>
+                    <input
+                      name="matric_number"
+                      placeholder="e.g., B012310101"
+                      value={form.matric_number}
+                      onChange={handleChange}
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="lumora-register__row">
+                <div className="lumora-login__field">
+                  <label className="lumora-login__label">Faculty (optional)</label>
+                  <div className={`lumora-login__control ${loading ? "is-disabled" : ""}`}>
+                    <input
+                      name="faculty"
+                      placeholder="e.g., Faculty of Computer Science"
+                      value={form.faculty}
+                      onChange={handleChange}
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+
+                <div className="lumora-login__field">
+                  <label className="lumora-login__label">Department (optional)</label>
+                  <div className={`lumora-login__control ${loading ? "is-disabled" : ""}`}>
+                    <input
+                      name="department"
+                      placeholder="e.g., Software Engineering"
+                      value={form.department}
+                      onChange={handleChange}
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="lumora-register__section">
+                <span className="lumora-register__section-title">Parent/Guardian (Optional)</span>
+                <span className="lumora-register__section-hint"> - Add a parent or guardian to view your well-being summary</span>
+              </div>
+
+              <div className="lumora-login__field">
+                <label className="lumora-login__label">Parent/Guardian Email</label>
+                <div className={`lumora-login__control ${loading ? "is-disabled" : ""}`}>
+                  <input
+                    name="parent_email"
+                    placeholder="parent@example.com"
+                    value={form.parent_email}
+                    onChange={handleChange}
+                    disabled={loading}
+                  />
+                </div>
+                <p style={{ fontSize: "12px", color: "#6B7280", marginTop: "6px" }}>
+                  They will receive login credentials and can view your well-being summary.
+                </p>
+              </div>
+
+              {registerAs === "student" && (
+                <div className="lumora-register__consent">
+                  <label className="lumora-register__consent-label">
                     <input
                       type="checkbox"
                       name="counsellor_consent"
                       checked={form.counsellor_consent}
                       onChange={handleChange}
-                      style={styles.consentCheckbox}
+                      className="lumora-register__consent-checkbox"
                     />
-                    <span style={styles.consentText}>
-                      I consent to share my data with my university counsellor for the purpose of receiving mental health support. 
-                      <span style={styles.consentNote}> (You can change this anytime in your profile settings)</span>
+                    <span>
+                      I consent to share my data with my university counsellor for the purpose of receiving mental health support.
+                      <span className="lumora-register__consent-note"> (You can change this anytime in your profile settings)</span>
                     </span>
                   </label>
                 </div>
-              </div>
-            )}
+              )}
 
-            <div style={styles.sectionTitle}>
-              <span>🆘 Emergency / Support Contact</span>
-              <p style={styles.sectionHint}>Someone you trust who can support you</p>
-            </div>
-
-            <div style={styles.row}>
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Contact Name (optional)</label>
-                <input
-                  name="emergency_contact_name"
-                  placeholder="e.g., Ahmad Bin Abdullah"
-                  value={form.emergency_contact_name}
-                  onChange={handleChange}
-                  style={styles.input}
-                  disabled={loading}
-                />
+              <div className="lumora-register__section">
+                <span className="lumora-register__section-title">Emergency / Support Contact</span>
+                <span className="lumora-register__section-hint"> - Someone you trust who can support you</span>
               </div>
 
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Phone Number (optional)</label>
-                <input
-                  name="emergency_contact_phone"
-                  placeholder="e.g., 012-3456789"
-                  value={form.emergency_contact_phone}
-                  onChange={handleChange}
-                  style={styles.input}
-                  disabled={loading}
-                />
-              </div>
-            </div>
-
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>Relationship (optional)</label>
-              <input
-                name="emergency_contact_relationship"
-                placeholder="e.g., Parent, Sibling, Close Friend"
-                value={form.emergency_contact_relationship}
-                onChange={handleChange}
-                style={styles.input}
-                disabled={loading}
-              />
-            </div>
-
-            {registerAs === "counsellor" && (
-              <>
-                <div style={styles.sectionTitle}>
-                  <span>🧑‍🏫 Counsellor Information</span>
+              <div className="lumora-register__row">
+                <div className="lumora-login__field">
+                  <label className="lumora-login__label">Contact Name (optional)</label>
+                  <div className={`lumora-login__control ${loading ? "is-disabled" : ""}`}>
+                    <input
+                      name="emergency_contact_name"
+                      placeholder="e.g., Ahmad Bin Abdullah"
+                      value={form.emergency_contact_name}
+                      onChange={handleChange}
+                      disabled={loading}
+                    />
+                  </div>
                 </div>
 
-                <div style={styles.inputGroup}>
-                  <label style={styles.label}>Qualification</label>
+                <div className="lumora-login__field">
+                  <label className="lumora-login__label">Phone Number (optional)</label>
+                  <div className={`lumora-login__control ${loading ? "is-disabled" : ""}`}>
+                    <input
+                      name="emergency_contact_phone"
+                      placeholder="e.g., 012-3456789"
+                      value={form.emergency_contact_phone}
+                      onChange={handleChange}
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="lumora-login__field">
+                <label className="lumora-login__label">Relationship (optional)</label>
+                <div className={`lumora-login__control ${loading ? "is-disabled" : ""}`}>
                   <input
-                    name="qualification"
-                    placeholder="e.g., Master's in Counselling Psychology, Licensed Professional Counsellor"
-                    value={form.qualification}
+                    name="emergency_contact_relationship"
+                    placeholder="e.g., Parent, Sibling, Close Friend"
+                    value={form.emergency_contact_relationship}
                     onChange={handleChange}
-                    style={styles.input}
                     disabled={loading}
                   />
                 </div>
+              </div>
 
-                <div style={styles.inputGroup}>
-                  <label style={styles.label}>Experience</label>
+              {registerAs === "counsellor" && (
+                <>
+                  <div className="lumora-register__section">
+                    <span className="lumora-register__section-title">Counsellor Information</span>
+                  </div>
+
+                  <div className="lumora-login__field">
+                    <label className="lumora-login__label">Qualification</label>
+                    <div className={`lumora-login__control ${loading ? "is-disabled" : ""}`}>
+                      <input
+                        name="qualification"
+                        placeholder="e.g., Master's in Counselling Psychology"
+                        value={form.qualification}
+                        onChange={handleChange}
+                        disabled={loading}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="lumora-login__field">
+                    <label className="lumora-login__label">Experience</label>
+                    <div className={`lumora-login__control ${loading ? "is-disabled" : ""}`}>
+                      <input
+                        name="experience"
+                        placeholder="e.g., 5 years of experience..."
+                        value={form.experience}
+                        onChange={handleChange}
+                        disabled={loading}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="lumora-register__section">
+                <span className="lumora-register__section-title">Account Information</span>
+              </div>
+
+              <div className="lumora-login__field">
+                <label className="lumora-login__label">Email Address *</label>
+                <div className={`lumora-login__control ${errors.email ? "is-error" : ""} ${loading ? "is-disabled" : ""}`}>
                   <input
-                    name="experience"
-                    placeholder="e.g., 5 years of experience in university counselling, worked with students on anxiety and stress management"
-                    value={form.experience}
+                    type="email"
+                    name="email"
+                    placeholder="you@example.com"
+                    value={form.email}
                     onChange={handleChange}
-                    style={styles.input}
-                    disabled={loading}
-                  />
-                </div>
-              </>
-            )}
-
-            <div style={styles.sectionTitle}>
-              <span>🔐 Account Information</span>
-            </div>
-
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>Email Address *</label>
-              <input
-                type="email"
-                name="email"
-                placeholder="you@example.com"
-                value={form.email}
-                onChange={handleChange}
-                onBlur={checkEmailExists}
-                style={styles.input}
-                disabled={loading}
-                required
-              />
-              {errors.email && <div style={styles.errorText}>{errors.email}</div>}
-            </div>
-
-            {registerAs === "student" && (
-              <div style={styles.row}>
-                <div style={styles.inputGroup}>
-                  <label style={styles.label}>Password *</label>
-                  <input
-                    type="password"
-                    name="password"
-                    placeholder="Create a password (min. 6 characters)"
-                    value={form.password}
-                    onChange={handleChange}
-                    style={styles.input}
+                    onBlur={checkEmailExists}
                     disabled={loading}
                     required
                   />
-                  {errors.password && <div style={styles.errorText}>{errors.password}</div>}
                 </div>
+                {errors.email && <div className="lumora-login__error" style={{ marginTop: '8px' }}>{errors.email}</div>}
+              </div>
 
-                <div style={styles.inputGroup}>
-                  <label style={styles.label}>Confirm Password *</label>
-                  <input
-                    type="password"
-                    name="confirmPassword"
-                    placeholder="Confirm your password"
-                    value={form.confirmPassword}
-                    onChange={handleChange}
-                    style={styles.input}
-                    disabled={loading}
-                    required
-                  />
-                  {errors.confirmPassword && <div style={styles.errorText}>{errors.confirmPassword}</div>}
+              {registerAs === "student" && (
+                <div className="lumora-register__row">
+                  <div className="lumora-login__field">
+                    <label className="lumora-login__label">Password *</label>
+                    <div className={`lumora-login__control ${errors.password ? "is-error" : ""} ${loading ? "is-disabled" : ""}`}>
+                      <input
+                        type="password"
+                        name="password"
+                        placeholder="Min. 6 characters"
+                        value={form.password}
+                        onChange={handleChange}
+                        disabled={loading}
+                        required
+                      />
+                    </div>
+                    {errors.password && <div className="lumora-login__error" style={{ marginTop: '8px' }}>{errors.password}</div>}
+                  </div>
+
+                  <div className="lumora-login__field">
+                    <label className="lumora-login__label">Confirm Password *</label>
+                    <div className={`lumora-login__control ${errors.confirmPassword ? "is-error" : ""} ${loading ? "is-disabled" : ""}`}>
+                      <input
+                        type="password"
+                        name="confirmPassword"
+                        placeholder="Confirm password"
+                        value={form.confirmPassword}
+                        onChange={handleChange}
+                        disabled={loading}
+                        required
+                      />
+                    </div>
+                    {errors.confirmPassword && <div className="lumora-login__error" style={{ marginTop: '8px' }}>{errors.confirmPassword}</div>}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {registerAs === "counsellor" && (
-              <div style={{
-                padding: "12px 16px",
-                background: "rgba(102, 126, 234, 0.08)",
-                borderRadius: "10px",
-                fontSize: "13px",
-                color: "#6b7280",
-                marginBottom: "16px"
-              }}>
-                <span>🔑 You will receive login credentials via email upon approval.</span>
-              </div>
-            )}
+              {registerAs === "counsellor" && (
+                <div className="lumora-register__note" style={{ marginBottom: 0 }}>
+                  You will receive login credentials via email upon approval.
+                </div>
+              )}
 
-            {error && <div style={styles.error}>{error}</div>}
+              {error && (
+                <div className="lumora-login__error" role="alert">
+                  {error}
+                </div>
+              )}
 
-            <button type="submit" style={styles.button} disabled={loading}>
-              {loading ? "Creating account..." : registerAs === "counsellor" ? "Submit Application" : "Create Account"}
-            </button>
-          </form>
+              <button type="submit" className="lumora-login__submit" disabled={loading} style={{ marginTop: '16px' }}>
+                {loading ? (
+                  <span className="lumora-login__submit-inner">
+                    <span className="lumora-login__spinner" aria-hidden="true" />
+                    Processing…
+                  </span>
+                ) : registerAs === "counsellor" ? (
+                  "Submit Application"
+                ) : (
+                  "Create Account"
+                )}
+              </button>
+            </form>
 
-          <p style={styles.footer}>
-            Already have an account?{" "}
-            <span onClick={() => navigate("/")} style={styles.link}>
-              Sign in
-            </span>
-          </p>
+            <p className="lumora-login__footer">
+              Already have an account?{" "}
+              <button
+                type="button"
+                className="lumora-login__text-link lumora-login__text-link--strong"
+                onClick={() => navigate("/")}
+                disabled={loading}
+              >
+                Sign in
+              </button>
+            </p>
+
+            <p className="lumora-login__trust" style={{ marginTop: '32px' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="5" y="11" width="14" height="9.5" rx="2.2" stroke="currentColor" strokeWidth="1.7" />
+                <path d="M8 11V8.4a4 4 0 0 1 8 0V11" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+              </svg>
+              Your information is kept private and secure.
+            </p>
+          </div>
         </div>
       </div>
-
-      <FloatingEmojis />
     </div>
   );
 }
 
-function FloatingEmojis() {
-  const emojis = ["😊", "😌", "💙", "✨", "🌙", "🫶", "🌸", "🌟", "🌿", "🕯️"];
+// ─── STYLE TAG ─────────────────────────────────────────────────────
+const styleSheetId = "lumora-register-styles";
+if (typeof document !== "undefined" && !document.getElementById(styleSheetId)) {
+  const styleSheet = document.createElement("style");
+  styleSheet.id = styleSheetId;
+  styleSheet.textContent = `
+    /* ---- REGISTER PAGE SPECIFIC STYLES (override theme) ---- */
+    .lumora-register__shell {
+      width: min(760px, calc(100% - 40px)) !important;
+      margin: 0 auto !important;
+    }
+    
+    .lumora-register__tabs {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    
+    .lumora-register__tab {
+      flex: 1;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(79, 70, 229, 0.12);
+      background: transparent;
+      color: #6B7280;
+      font-weight: 500;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .lumora-register__tab.is-active {
+      border-color: #4F46E5;
+      background: rgba(79, 70, 229, 0.04);
+      color: #312E81;
+      font-weight: 600;
+    }
+    
+    .lumora-register__section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 32px 0 16px;
+      color: #312E81 !important;
+      font-weight: 600;
+      font-size: 15px;
+    }
+    
+    .lumora-register__section::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(79, 70, 229, 0.12);
+    }
 
-  return (
-    <div style={styles.emojiLayer}>
-      {Array.from({ length: 25 }).map((_, i) => {
-        const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-        return (
-          <span
-            key={i}
-            style={{
-              ...styles.emoji,
-              left: `${Math.random() * 100}%`,
-              animationDuration: `${10 + Math.random() * 8}s`,
-              animationDelay: `${Math.random() * 5}s`,
-              fontSize: `${18 + Math.random() * 22}px`,
-              opacity: 0.4 + Math.random() * 0.3,
-            }}
-          >
-            {emoji}
-          </span>
-        );
-      })}
-    </div>
-  );
+    /* Bare <span> tags are directly targeted by a global reset in index.css
+       (h1..h6, p, span, div, label { color: var(--text-primary); }), which
+       overrides the *inherited* color from .lumora-register__section since a
+       rule matching the element itself always wins over inheritance. Target
+       the span's own class directly so it wins on specificity instead. */
+    .lumora-register__section-title {
+      color: #312E81 !important;
+      opacity: 1;
+    }
+    
+    .lumora-register__section-hint {
+      font-size: 12px;
+      color: #6B7280 !important;
+      font-weight: 400;
+      margin-left: -4px;
+    }
+
+    .lumora-register__row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 600px) {
+      .lumora-register__row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .lumora-register__consent {
+      background: rgba(79, 70, 229, 0.04);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid rgba(79, 70, 229, 0.12);
+      margin-bottom: 16px;
+    }
+
+    .lumora-register__consent-label {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      font-size: 13px;
+      color: #1E293B !important;
+      cursor: pointer;
+    }
+
+    .lumora-register__consent-checkbox {
+      margin-top: 2px;
+      width: 16px;
+      height: 16px;
+      accent-color: #4F46E5;
+      cursor: pointer;
+    }
+
+    .lumora-register__consent-note {
+      color: #6B7280 !important;
+      font-size: 12px;
+    }
+
+    .lumora-register__note {
+      padding: 12px 16px;
+      background: rgba(79, 70, 229, 0.04);
+      border-radius: 10px;
+      font-size: 13px;
+      color: #6B7280 !important;
+      margin-bottom: 16px;
+      border: 1px solid rgba(79, 70, 229, 0.12);
+    }
+
+    .lumora-register__success {
+      text-align: center;
+      padding: 24px 0;
+    }
+
+    .lumora-register__success-heading {
+      margin-bottom: 12px;
+      font-size: 24px;
+      font-weight: 600;
+      color: #312E81 !important;
+    }
+
+    .lumora-register__success-text {
+      color: #6B7280 !important;
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+
+    /* Force all labels and inputs to use fixed colors */
+    .lumora-login__label {
+      color: #374151 !important;
+    }
+    .lumora-login__subhead {
+      color: #6B7280 !important;
+    }
+    .lumora-login__heading {
+      color: #312E81 !important;
+    }
+    .lumora-login__footer {
+      color: #6B7280 !important;
+    }
+    .lumora-login__trust {
+      color: #9CA3AF !important;
+    }
+    .lumora-login__text-link {
+      color: #4F46E5 !important;
+    }
+    .lumora-login__text-link--strong {
+      font-weight: 600;
+    }
+    .lumora-login__control input,
+    .lumora-login__control select {
+      color: #1E293B !important;
+    }
+    .lumora-login__control input::placeholder {
+      color: #9CA3AF !important;
+    }
+    .lumora-login__error {
+      color: #B91C1C !important;
+      background: #FEF2F2 !important;
+      border-color: #FECACA !important;
+    }
+  `;
+  document.head.appendChild(styleSheet);
 }
-
-const styles = {
-  container: {
-    width: "100%",
-    minHeight: "100vh",
-    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    position: "relative",
-    overflow: "auto",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "40px 20px",
-  },
-  bgDecoration: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 0,
-    pointerEvents: "none",
-    overflow: "hidden",
-  },
-  blob1: {
-    position: "absolute",
-    top: "-20%",
-    right: "-10%",
-    width: "600px",
-    height: "600px",
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(255,255,255,0.15), rgba(255,255,255,0.05))",
-    filter: "blur(80px)",
-  },
-  blob2: {
-    position: "absolute",
-    bottom: "-20%",
-    left: "-10%",
-    width: "500px",
-    height: "500px",
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(255,255,255,0.1), rgba(255,255,255,0.03))",
-    filter: "blur(70px)",
-  },
-  blob3: {
-    position: "absolute",
-    top: "40%",
-    left: "30%",
-    width: "400px",
-    height: "400px",
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(255,255,255,0.08), rgba(255,255,255,0.02))",
-    filter: "blur(60px)",
-  },
-  contentWrapper: {
-    position: "relative",
-    zIndex: 2,
-    width: "100%",
-    maxWidth: "850px",
-  },
-  card: {
-    margin: "0 auto",
-    padding: "40px",
-    borderRadius: "28px",
-    background: "rgba(255,255,255,0.98)",
-    backdropFilter: "blur(20px)",
-    boxShadow: "0 25px 50px rgba(0,0,0,0.2)",
-    position: "relative",
-  },
-  backBtn: {
-    position: "absolute",
-    top: "20px",
-    left: "24px",
-    background: "none",
-    border: "none",
-    color: "#667eea",
-    fontSize: "13px",
-    cursor: "pointer",
-    fontWeight: "500",
-  },
-  logoSection: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-    marginBottom: "12px",
-    marginTop: "8px",
-  },
-  logoIcon: { fontSize: "36px" },
-  logo: {
-    fontSize: "32px",
-    fontWeight: "700",
-    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-    backgroundClip: "text",
-    margin: 0,
-  },
-  subtitle: {
-    fontSize: "14px",
-    color: "#6b7280",
-    marginBottom: "32px",
-    textAlign: "center",
-  },
-  roleSelector: {
-    display: "flex",
-    gap: "12px",
-    marginBottom: "24px",
-  },
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "18px",
-  },
-  sectionTitle: {
-    fontSize: "16px",
-    fontWeight: "600",
-    color: "#1f2937",
-    marginTop: "16px",
-    marginBottom: "4px",
-    paddingBottom: "8px",
-    borderBottom: "2px solid #e5e7eb",
-  },
-  sectionHint: {
-    fontSize: "11px",
-    fontWeight: "normal",
-    color: "#9ca3af",
-    marginTop: "4px",
-  },
-  row: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "16px",
-  },
-  inputGroup: {
-    textAlign: "left",
-  },
-  label: {
-    display: "block",
-    fontSize: "13px",
-    fontWeight: "500",
-    color: "#374151",
-    marginBottom: "8px",
-  },
-  input: {
-    width: "100%",
-    padding: "12px 14px",
-    borderRadius: "12px",
-    border: "1.5px solid #e5e7eb",
-    fontSize: "14px",
-    transition: "all 0.2s",
-    outline: "none",
-    fontFamily: "inherit",
-    boxSizing: "border-box",
-    background: "white",
-  },
-  select: {
-    width: "100%",
-    padding: "12px 14px",
-    borderRadius: "12px",
-    border: "1.5px solid #e5e7eb",
-    fontSize: "14px",
-    transition: "all 0.2s",
-    outline: "none",
-    fontFamily: "inherit",
-    backgroundColor: "white",
-    cursor: "pointer",
-  },
-  errorText: {
-    color: "#ef4444",
-    fontSize: "12px",
-    marginTop: "4px",
-    fontWeight: "400",
-  },
-  consentSection: {
-    marginTop: "8px",
-  },
-  consentHeader: {
-    fontSize: "16px",
-    fontWeight: "600",
-    color: "#1f2937",
-    marginBottom: "12px",
-    paddingBottom: "8px",
-    borderBottom: "2px solid #e5e7eb",
-  },
-  consentBox: {
-    padding: "16px",
-    background: "rgba(102, 126, 234, 0.05)",
-    borderRadius: "12px",
-    border: "1px solid rgba(102, 126, 234, 0.2)",
-  },
-  consentLabel: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "12px",
-    cursor: "pointer",
-  },
-  consentCheckbox: {
-    marginTop: "3px",
-    width: "18px",
-    height: "18px",
-    cursor: "pointer",
-    flexShrink: 0,
-  },
-  consentText: {
-    fontSize: "14px",
-    color: "#374151",
-    lineHeight: "1.5",
-  },
-  consentNote: {
-    display: "block",
-    fontSize: "12px",
-    color: "#9ca3af",
-    marginTop: "4px",
-    fontStyle: "italic",
-  },
-  button: {
-    marginTop: "12px",
-    padding: "14px",
-    borderRadius: "12px",
-    border: "none",
-    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    color: "white",
-    fontSize: "15px",
-    fontWeight: "600",
-    cursor: "pointer",
-    transition: "all 0.2s",
-  },
-  error: {
-    color: "#ef4444",
-    fontSize: "13px",
-    padding: "8px 12px",
-    backgroundColor: "#fef2f2",
-    borderRadius: "10px",
-  },
-  footer: {
-    marginTop: "24px",
-    fontSize: "13px",
-    color: "#6b7280",
-    textAlign: "center",
-  },
-  link: {
-    color: "#667eea",
-    cursor: "pointer",
-    fontWeight: "600",
-  },
-  emojiLayer: {
-    position: "fixed",
-    width: "100%",
-    height: "100%",
-    top: 0,
-    left: 0,
-    pointerEvents: "none",
-    zIndex: 1,
-    overflow: "hidden",
-  },
-  emoji: {
-    position: "absolute",
-    bottom: "-50px",
-    animation: "floatUp linear infinite",
-  },
-  loadingText: {
-    fontSize: "13px",
-    color: "#6b7280",
-    padding: "12px",
-    textAlign: "center",
-  },
-};
-
-const styleSheet = document.createElement("style");
-styleSheet.textContent = `
-  @keyframes floatUp {
-    0% {
-      transform: translateY(0) rotate(0deg);
-      opacity: 0;
-    }
-    10% {
-      opacity: 1;
-    }
-    90% {
-      opacity: 1;
-    }
-    100% {
-      transform: translateY(-100vh) rotate(360deg);
-      opacity: 0;
-    }
-  }
-`;
-document.head.appendChild(styleSheet);
 
 export default Register;

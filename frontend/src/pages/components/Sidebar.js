@@ -11,8 +11,7 @@ import {
   Menu,
   Settings as SettingsIcon,
   Trophy,
-  Shield,
-  LayoutDashboard
+  Shield
 } from "lucide-react";
 import { isAdmin, getUserRole } from "../../utils/roleAuth";
 
@@ -31,8 +30,8 @@ function Sidebar({ sidebarOpen, setSidebarOpen, customMenuItems }) {
     { path: "/dashboard", icon: <Activity size={18} />, label: "Dashboard" },
     { path: "/journal", icon: <BookOpen size={18} />, label: "Journal" },
     { path: "/mental-health", icon: <Heart size={18} />, label: "Wellness Library" },
-    { path: "/peer-support", icon: <Users size={18} />, label: "Community Connect" },
-    { path: "/student-support", icon: <TrendingUp size={18} />, label: "University Resources" },
+    { path: "/peer-support", icon: <Users size={18} />, label: "Community" },
+    { path: "/student-support", icon: <TrendingUp size={18} />, label: "Support" },
     { path: "/profile", icon: <User size={18} />, label: "Profile" },
     { path: "/achievements", icon: <Trophy size={18} />, label: "Achievements" },
     { path: "/settings", icon: <SettingsIcon size={18} />, label: "Settings" },
@@ -68,6 +67,7 @@ function Sidebar({ sidebarOpen, setSidebarOpen, customMenuItems }) {
               <span>{item.label}</span>
             </button>
           ))}
+          {/* ✅ Updated logout button – now uses CSS class */}
           <button className="sidebar-item-logout" onClick={logout}>
             <LogOut size={18} />
             <span>Logout</span>
