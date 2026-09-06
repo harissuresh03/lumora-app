@@ -5,13 +5,10 @@ import { motion } from "framer-motion";
 import {
   LineChart,
   Line,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   ReferenceLine
 } from 'recharts';
@@ -22,16 +19,13 @@ import {
   LayoutDashboard, 
   Settings, 
   User, 
-  Eye, 
   Smile, 
   Moon, 
   Activity,
   Calendar,
-  FileText,
   Download,
   TrendingUp,
-  Award,
-  BookOpen
+  Award
 } from "lucide-react";
 
 function ParentDashboard() {
@@ -44,12 +38,49 @@ function ParentDashboard() {
   const [downloading, setDownloading] = useState(false);
   const parentId = localStorage.getItem("user_id");
 
-  // Parent menu items
   const parentMenuItems = [
     { path: "/parent/dashboard", icon: <LayoutDashboard size={18} />, label: "Dashboard" },
     { path: "/parent/settings", icon: <Settings size={18} />, label: "Settings" },
   ];
 
+  // ---------- Helper: robust stress score extraction ----------
+  const getStressScore = (stressData) => {
+    if (!stressData) return null;
+    // If it's already an object with current_score
+    if (typeof stressData === 'object' && stressData.current_score !== undefined) {
+      const score = parseFloat(stressData.current_score);
+      return isNaN(score) ? null : score;
+    }
+    // If it's a number
+    if (typeof stressData === 'number') {
+      return stressData;
+    }
+    // If it's a string that looks like a number
+    if (typeof stressData === 'string') {
+      const parsed = parseFloat(stressData);
+      return isNaN(parsed) ? null : parsed;
+    }
+    // If it's a stringified JSON (e.g., '{"current_score":35}')
+    if (typeof stressData === 'string' && stressData.startsWith('{')) {
+      try {
+        const obj = JSON.parse(stressData);
+        return getStressScore(obj);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  const getStressRisk = (stressData) => {
+    if (!stressData) return null;
+    if (typeof stressData === 'object' && stressData.risk_level) {
+      return stressData.risk_level;
+    }
+    return null;
+  };
+
+  // ---------- API calls ----------
   const fetchParentProfile = useCallback(async () => {
     try {
       const res = await api.get(`/profile/${parentId}`);
@@ -65,6 +96,7 @@ function ParentDashboard() {
     try {
       const res = await api.get("/parent/students");
       const studentsData = res.data || [];
+      console.log("Students API response:", studentsData); // debug
       setStudents(studentsData);
       if (studentsData.length > 0 && !selectedStudentId) {
         setSelectedStudentId(studentsData[0].id);
@@ -83,7 +115,24 @@ function ParentDashboard() {
     setStudentData(null);
     try {
       const res = await api.get(`/parent/student/${studentId}/summary`);
+      console.log("Summary API response:", res.data); // debug
       setStudentData(res.data);
+
+      // ✅ Update the selected student's current_stress with the summary data
+      if (res.data.current_stress) {
+        setStudents(prev => prev.map(s => {
+          if (s.id === studentId) {
+            return {
+              ...s,
+              current_stress: {
+                current_score: res.data.current_stress.current_score,
+                risk_level: res.data.current_stress.risk_level
+              }
+            };
+          }
+          return s;
+        }));
+      }
     } catch (err) {
       console.error("Fetch student summary error:", err);
       showErrorToast(err.response?.data?.msg || "Failed to fetch student data");
@@ -141,17 +190,10 @@ function ParentDashboard() {
   };
 
   const getStressColor = (score) => {
-    if (!score) return "#9ca3af";
+    if (score === null || score === undefined) return "#9ca3af";
     if (score >= 60) return "#ef4444";
     if (score >= 30) return "#f59e0b";
     return "#22c55e";
-  };
-
-  const getStressLabel = (score) => {
-    if (!score) return "No Data";
-    if (score >= 60) return "High";
-    if (score >= 30) return "Moderate";
-    return "Low";
   };
 
   const formatDate = (dateStr) => {
@@ -192,6 +234,8 @@ function ParentDashboard() {
   }
 
   const selectedStudent = students.find(s => s.id === selectedStudentId);
+  const stressScore = selectedStudent ? getStressScore(selectedStudent.current_stress) : null;
+  const stressRisk = selectedStudent ? getStressRisk(selectedStudent.current_stress) : null;
 
   return (
     <Layout customMenuItems={parentMenuItems}>
@@ -255,11 +299,13 @@ function ParentDashboard() {
               <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Average Sleep Quality (7 days)</div>
             </div>
             <div style={{ background: 'var(--card-bg-glass)', borderRadius: '16px', padding: '16px', textAlign: 'center', border: '1px solid var(--border-glass)' }}>
-              <Activity size={24} style={{ marginBottom: '8px', color: getStressColor(selectedStudent.current_stress?.current_score) }} />
-              <div style={{ fontSize: '28px', fontWeight: 700, color: getStressColor(selectedStudent.current_stress?.current_score) }}>
-                {selectedStudent.current_stress?.current_score || 'N/A'}
+              <Activity size={24} style={{ marginBottom: '8px', color: getStressColor(stressScore) }} />
+              <div style={{ fontSize: '28px', fontWeight: 700, color: getStressColor(stressScore) }}>
+                {stressScore !== null ? stressScore : 'N/A'}
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Current Stress</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Current Stress {stressRisk ? `(${stressRisk})` : ''}
+              </div>
             </div>
           </div>
         )}

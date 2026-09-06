@@ -313,8 +313,8 @@ function CounsellorStudents() {
             <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
               <th style={{ padding: '16px', textAlign: 'left' }}>Student</th>
               <th style={{ padding: '16px', textAlign: 'left' }}>Status</th>
-              <th style={{ padding: '16px', textAlign: 'center' }}>Avg Mood</th>
-              <th style={{ padding: '16px', textAlign: 'center' }}>Avg Sleep</th>
+              <th style={{ padding: '16px', textAlign: 'center' }}>Avg Weekly Mood</th>
+              <th style={{ padding: '16px', textAlign: 'center' }}>Avg Weekly Sleep</th>
               <th style={{ padding: '16px', textAlign: 'center' }}>Stress</th>
               <th style={{ padding: '16px', textAlign: 'center' }}>Consent</th>
               <th style={{ padding: '16px', textAlign: 'center' }}>Alerts</th>

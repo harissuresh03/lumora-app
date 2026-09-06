@@ -279,7 +279,7 @@ router.put("/settings", verifyToken, async (req, res) => {
 });
 
 // ============================================
-// PARENT: Get Linked Students
+// PARENT: Get Linked Students (FIXED)
 // ============================================
 
 router.get("/students", verifyToken, async (req, res) => {
@@ -296,12 +296,18 @@ router.get("/students", verifyToken, async (req, res) => {
         ps.consent_granted,
         (SELECT AVG(mood) FROM moods WHERE user_id = u.id AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as avg_mood,
         (SELECT AVG(quality) FROM sleep WHERE user_id = u.id AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as avg_sleep,
-        (SELECT 
-           JSON_EXTRACT(forecast_data, '$[0].score') 
-         FROM stress_forecast 
-         WHERE user_id = u.id 
-         ORDER BY created_at DESC 
-         LIMIT 1) as current_stress
+        COALESCE(
+          (SELECT 
+             JSON_OBJECT(
+               'current_score', JSON_EXTRACT(forecast_data, '$[0].score'),
+               'risk_level', JSON_EXTRACT(forecast_data, '$[0].risk_level')
+             )
+           FROM stress_forecast 
+           WHERE user_id = u.id 
+           ORDER BY created_at DESC 
+           LIMIT 1),
+          NULL
+        ) as current_stress
        FROM parent_student_links ps
        JOIN users u ON ps.student_id = u.id
        WHERE ps.parent_id = ? AND ps.consent_granted = 1`,
