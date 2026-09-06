@@ -21,7 +21,6 @@ function StressForecast({ userId }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showDeadlineModal, setShowDeadlineModal] = useState(false);
-  const [moodUsed, setMoodUsed] = useState(3);
 
   const fetchForecast = useCallback(async () => {
     setLoading(true);

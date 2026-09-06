@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../utils/api";
 import Layout from "./components/Layout";
-import { showSuccessToast } from "./components/ToastNotification";
 import { formatArticleContent } from "../utils/articleFormatter";
 import { 
   BookOpen, 
@@ -26,7 +25,6 @@ function MentalHealthArticle() {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [showArticleModal, setShowArticleModal] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [userNickname, setUserNickname] = useState("");
 
   useEffect(() => {
     const fetchUserProfile = async () => {

@@ -13,7 +13,7 @@ import {
   Trophy,
   Shield
 } from "lucide-react";
-import { isAdmin, getUserRole } from "../../utils/roleAuth";
+import { isAdmin} from "../../utils/roleAuth";
 
 function Sidebar({ sidebarOpen, setSidebarOpen, customMenuItems }) {
   const navigate = useNavigate();

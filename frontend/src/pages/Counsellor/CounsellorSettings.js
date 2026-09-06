@@ -27,8 +27,6 @@ function CounsellorSettings() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [userNickname, setUserNickname] = useState("");
-  const [isDeleting, setIsDeleting] = useState(false);
   
   // Theme
   const { theme, fontSize, setTheme, setFontSize, getFontSizeInPx } = useTheme();

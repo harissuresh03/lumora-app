@@ -149,12 +149,6 @@ function GamificationDisplay({ userId }) {
     return labels[type] || type;
   };
 
-  const getStreakIcon = (type) => {
-    const icons = { mood: Smile, sleep: Moon, journal: BookOpen, chat: MessageCircle };
-    const Icon = icons[type] || Star;
-    return <Icon size={14} />;
-  };
-
   if (loading) {
     return (
       <div style={{ padding: '40px', textAlign: 'center' }}>
@@ -171,7 +165,6 @@ function GamificationDisplay({ userId }) {
   const nextLevelPoints = level * 250;
   const progressToNextLevel = Math.min((points / nextLevelPoints) * 100, 100);
   const streakData = stats.streaks || {};
-  const earnedBadges = badges.filter(b => b.is_earned);
   const lockedBadges = badges.filter(b => !b.is_earned);
   const LevelIcon = getLevelIcon(level);
 

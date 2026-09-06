@@ -28,7 +28,6 @@ function Settings() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
-  const [userNickname, setUserNickname] = useState("");
   
   // Report Issue State
   const [showReportModal, setShowReportModal] = useState(false);

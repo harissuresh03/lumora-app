@@ -9,7 +9,7 @@ import Layout from "./components/Layout";
 import AssessmentModal from "./components/AssessmentModal";
 import Recommendations from "./components/Recommendations";
 import GamificationMini from "./components/GamificationMini";
-import { showSuccessToast, showErrorToast, showInfoToast } from "./components/ToastNotification";
+import { showSuccessToast, showErrorToast } from "./components/ToastNotification";
 import AnimatedCard, { AnimatedButton, PageTransition } from "./components/AnimatedWrapper";
 import ExportButton from "./components/ExportButton";
 import { 
@@ -61,7 +61,6 @@ function Dashboard() {
   const [selectedDateJournals, setSelectedDateJournals] = useState([]);
   const [showDateModal, setShowDateModal] = useState(false);
   const [chartView, setChartView] = useState("mood");
-  const [refreshing, setRefreshing] = useState(false);
 
   // ✅ PSS Reminder State
   const [pssReminder, setPssReminder] = useState(null);

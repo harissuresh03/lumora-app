@@ -28,7 +28,6 @@ function StudentSupport() {
   const user_id = localStorage.getItem("user_id");
   const [supportData, setSupportData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [userNickname, setUserNickname] = useState("");
   
   // Appointment state
   const [appointments, setAppointments] = useState([]);

@@ -20,13 +20,6 @@ function AssessmentHistoryGraph({ userId }) {
   const [data, setData] = useState({ phq9: [], gad7: [], pss: [] });
   const [loading, setLoading] = useState(true);
   const [selectedType, setSelectedType] = useState('phq9');
-  const [error, setError] = useState(null);
-
- useEffect(() => {
-  if (userId) {
-    fetchAssessmentHistory();
-  }
-}, [userId, fetchAssessmentHistory]);
 
   const fetchAssessmentHistory = useCallback(async () => {
     try {
@@ -48,6 +41,12 @@ function AssessmentHistoryGraph({ userId }) {
       setLoading(false);
     }
   }, [userId]);
+
+useEffect(() => {
+  if (userId) {
+    fetchAssessmentHistory();
+  }
+}, [userId, fetchAssessmentHistory]);
 
   const getSeverityColor = (score, type) => {
     if (type === 'phq9') {

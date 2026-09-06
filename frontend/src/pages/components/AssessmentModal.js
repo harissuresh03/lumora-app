@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast, showWarningToast } from "./ToastNotification";
 import ExportButton from "./ExportButton";
-import { Heart, Brain, AlertTriangle, ChevronRight, ChevronLeft, FileText, Activity } from "lucide-react";
+import { AlertTriangle, ChevronRight, ChevronLeft, FileText } from "lucide-react";
 
 function AssessmentModal({ type, onClose, onComplete }) {
   const [questions, setQuestions] = useState([]);

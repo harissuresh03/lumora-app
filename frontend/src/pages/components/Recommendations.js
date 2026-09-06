@@ -21,7 +21,6 @@ import AssessmentHistoryGraph from "./AssessmentHistoryGraph";
 
 function Recommendations({ userId }) {
   const [recommendations, setRecommendations] = useState([]);
-  const [assessmentRec, setAssessmentRec] = useState(null);
   const [crisis, setCrisis] = useState(null);
   const [loading, setLoading] = useState(true);
   const [hasEnoughData, setHasEnoughData] = useState(true);
