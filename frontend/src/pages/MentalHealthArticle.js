@@ -19,7 +19,7 @@ import {
 function MentalHealthArticle() {
   const navigate = useNavigate();
   const user_id = localStorage.getItem("user_id");
-  const [userNickname, setUserNickname] = useState("");
+  const [setUserNickname] = useState("");
   const [articles, setArticles] = useState([]);
   const [onlineResources, setOnlineResources] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -39,7 +39,7 @@ function MentalHealthArticle() {
     fetchUserProfile();
     fetchArticles();
     fetchOnlineResources();
-  }, [user_id]);
+  }, [user_id, setUserNickname]);
 
   const fetchArticles = async () => {
     try {

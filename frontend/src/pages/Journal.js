@@ -21,7 +21,7 @@ import {
 function Journal() {
   const navigate = useNavigate();
   const user_id = localStorage.getItem("user_id");
-  const [userNickname, setUserNickname] = useState("");
+  const [setUserNickname] = useState("");
 
   const [entries, setEntries] = useState([]);
   const [filteredEntries, setFilteredEntries] = useState([]);
@@ -61,7 +61,7 @@ function Journal() {
     } catch (err) {
       console.log("Profile fetch error:", err);
     }
-  }, [user_id]);
+  }, [user_id, setUserNickname]);
 
   const fetchEntries = useCallback(() => {
     api.get(`/journal/${user_id}`).then((res) => {

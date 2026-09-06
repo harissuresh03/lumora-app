@@ -135,7 +135,7 @@ function ParentDashboard() {
     } finally {
       setLoadingSummary(false);
     }
-  }, [selectedStudentId]); // ✅ Added selectedStudentId to deps to satisfy linter
+  }, []); // ✅ Added selectedStudentId to deps to satisfy linter
 
   useEffect(() => {
     fetchParentProfile();

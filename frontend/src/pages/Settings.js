@@ -28,7 +28,7 @@ function Settings() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
-  const [userNickname, setUserNickname] = useState("");
+  const [setUserNickname] = useState("");
   
   // Report Issue State
   const [showReportModal, setShowReportModal] = useState(false);
@@ -72,7 +72,7 @@ function Settings() {
       }
     };
     fetchUserProfile();
-  }, [user_id]);
+  }, [user_id, setUserNickname]);
 
   const handleProfileUpdate = async (e) => {
     e.preventDefault();

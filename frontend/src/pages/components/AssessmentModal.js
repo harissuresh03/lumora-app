@@ -6,6 +6,20 @@ import { showSuccessToast, showErrorToast, showWarningToast } from "./ToastNotif
 import ExportButton from "./ExportButton";
 import { AlertTriangle, ChevronRight, ChevronLeft, FileText } from "lucide-react";
 
+// Local PSS questions - static, defined outside component
+const PSS_QUESTIONS = [
+  { id: 1, text: "In the last month, how often have you been upset because of something that happened unexpectedly?", scores: [0, 1, 2, 3, 4] },
+  { id: 2, text: "In the last month, how often have you felt that you were unable to control the important things in your life?", scores: [0, 1, 2, 3, 4] },
+  { id: 3, text: "In the last month, how often have you felt nervous and 'stressed'?", scores: [0, 1, 2, 3, 4] },
+  { id: 4, text: "In the last month, how often have you felt confident about your ability to handle your personal problems?", scores: [0, 1, 2, 3, 4] },
+  { id: 5, text: "In the last month, how often have you felt that things were going your way?", scores: [0, 1, 2, 3, 4] },
+  { id: 6, text: "In the last month, how often have you found that you could not cope with all the things that you had to do?", scores: [0, 1, 2, 3, 4] },
+  { id: 7, text: "In the last month, how often have you been able to control irritations in your life?", scores: [0, 1, 2, 3, 4] },
+  { id: 8, text: "In the last month, how often have you felt that you were on top of things?", scores: [0, 1, 2, 3, 4] },
+  { id: 9, text: "In the last month, how often have you been angered because of things that happened that were outside of your control?", scores: [0, 1, 2, 3, 4] },
+  { id: 10, text: "In the last month, how often have you felt difficulties were piling up so high that you could not overcome them?", scores: [0, 1, 2, 3, 4] }
+];
+
 function AssessmentModal({ type, onClose, onComplete }) {
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
@@ -14,20 +28,6 @@ function AssessmentModal({ type, onClose, onComplete }) {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const [assessmentId, setAssessmentId] = useState(null);
-
-  // Local PSS questions (used as fallback or directly)
-  const PSS_QUESTIONS = [
-    { id: 1, text: "In the last month, how often have you been upset because of something that happened unexpectedly?", scores: [0, 1, 2, 3, 4] },
-    { id: 2, text: "In the last month, how often have you felt that you were unable to control the important things in your life?", scores: [0, 1, 2, 3, 4] },
-    { id: 3, text: "In the last month, how often have you felt nervous and 'stressed'?", scores: [0, 1, 2, 3, 4] },
-    { id: 4, text: "In the last month, how often have you felt confident about your ability to handle your personal problems?", scores: [0, 1, 2, 3, 4] },
-    { id: 5, text: "In the last month, how often have you felt that things were going your way?", scores: [0, 1, 2, 3, 4] },
-    { id: 6, text: "In the last month, how often have you found that you could not cope with all the things that you had to do?", scores: [0, 1, 2, 3, 4] },
-    { id: 7, text: "In the last month, how often have you been able to control irritations in your life?", scores: [0, 1, 2, 3, 4] },
-    { id: 8, text: "In the last month, how often have you felt that you were on top of things?", scores: [0, 1, 2, 3, 4] },
-    { id: 9, text: "In the last month, how often have you been angered because of things that happened that were outside of your control?", scores: [0, 1, 2, 3, 4] },
-    { id: 10, text: "In the last month, how often have you felt difficulties were piling up so high that you could not overcome them?", scores: [0, 1, 2, 3, 4] }
-  ];
 
   const fetchQuestions = useCallback(async () => {
     try {
@@ -51,11 +51,11 @@ function AssessmentModal({ type, onClose, onComplete }) {
       showErrorToast("Failed to load assessment");
       onClose();
     }
-  }, [type]);
+  }, [type, onClose]); // PSS_QUESTIONS is now stable
 
   useEffect(() => {
-  fetchQuestions();
-}, [fetchQuestions]);
+    fetchQuestions();
+  }, [fetchQuestions]);
 
   const handleAnswer = (score) => {
     setAnswers({ ...answers, [currentQuestion]: score });

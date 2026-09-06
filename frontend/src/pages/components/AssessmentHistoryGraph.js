@@ -20,7 +20,6 @@ function AssessmentHistoryGraph({ userId }) {
   const [data, setData] = useState({ phq9: [], gad7: [], pss: [] });
   const [loading, setLoading] = useState(true);
   const [selectedType, setSelectedType] = useState('phq9');
-  const [error, setError] = useState(null);
 
   const fetchAssessmentHistory = useCallback(async () => {
     try {
@@ -32,10 +31,8 @@ function AssessmentHistoryGraph({ userId }) {
         gad7: Array.isArray(res.data.gad7) ? res.data.gad7 : [],
         pss: Array.isArray(res.data.pss) ? res.data.pss : []
       });
-      setError(null);
     } catch (err) {
       console.error("Fetch assessment history error:", err);
-      setError("Failed to load assessment history");
       // ✅ Set empty arrays on error so component doesn't crash
       setData({ phq9: [], gad7: [], pss: [] });
     } finally {
@@ -119,9 +116,7 @@ useEffect(() => {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const dataPoint = payload[0].payload;
-      const typeLabels = { phq9: 'PHQ-9', gad7: 'GAD-7', pss: 'PSS-10' };
       const maxScores = { phq9: 27, gad7: 21, pss: 40 };
-      const typeLabel = typeLabels[selectedType] || 'PHQ-9';
       const maxScore = maxScores[selectedType] || 27;
       
       return (
@@ -166,8 +161,6 @@ useEffect(() => {
   const maxScore = maxScores[selectedType] || 27;
   const typeLabels = { phq9: 'PHQ-9', gad7: 'GAD-7', pss: 'PSS-10' };
   const typeLabel = typeLabels[selectedType] || 'PHQ-9';
-  const typeIcons = { phq9: '📋', gad7: '😰', pss: '📊' };
-  const typeIcon = typeIcons[selectedType] || '📋';
 
   // Severity threshold lines
   const getThresholds = () => {

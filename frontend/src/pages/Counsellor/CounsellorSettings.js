@@ -27,8 +27,7 @@ function CounsellorSettings() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [userNickname, setUserNickname] = useState("");
-const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleting] = useState(false);
   
   // Theme
   const { theme, fontSize, setTheme, setFontSize, getFontSizeInPx } = useTheme();
@@ -62,8 +61,6 @@ const [isDeleting, setIsDeleting] = useState(false);
         newPassword: "",
         confirmPassword: ""
       });
-      if (res.data.nickname) setUserNickname(res.data.nickname);
-      else setUserNickname(res.data.name.split(" ")[0]);
     } catch (err) {
       console.log("Profile fetch error:", err);
     }

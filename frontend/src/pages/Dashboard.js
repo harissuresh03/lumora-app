@@ -61,7 +61,7 @@ function Dashboard() {
   const [selectedDateJournals, setSelectedDateJournals] = useState([]);
   const [showDateModal, setShowDateModal] = useState(false);
   const [chartView, setChartView] = useState("mood");
-  const [refreshing, setRefreshing] = useState(false);
+  const [setRefreshing] = useState(false);
 
   // ✅ PSS Reminder State
   const [pssReminder, setPssReminder] = useState(null);
@@ -124,7 +124,7 @@ function Dashboard() {
     }
   }, [user_id]);
 
-  const fetchJournals = async () => {
+  const fetchJournals = useCallback(async () => {
     try {
       const res = await api.get(`/journal/${user_id}`);
       setJournalTotal(res.data.length);
@@ -132,7 +132,7 @@ function Dashboard() {
     } catch (err) {
       console.log("Fetch journals error:", err);
     }
-  };
+  }, [user_id]);
 
   const fetchJournalsByDate = async (date) => {
     try {
@@ -157,7 +157,7 @@ function Dashboard() {
     }
   };
 
-  const fetchTodayEntries = async () => {
+  const fetchTodayEntries = useCallback(async () => {
     try {
       const [moodRes, sleepRes] = await Promise.all([
         api.get(`/mood/today/${user_id}`),
@@ -187,7 +187,7 @@ function Dashboard() {
     } catch (err) {
       console.log("Fetch today's entries error:", err);
     }
-  };
+  }, [user_id]);
 
   // ✅ Check PSS status (monthly reminder)
   const checkPSSStatus = useCallback(async () => {
@@ -218,7 +218,7 @@ function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [user_id]);
+  }, [user_id, fetchTodayEntries, fetchJournals]);
 
   const refreshData = async () => {
     setRefreshing(true);

@@ -22,24 +22,7 @@ function StressForecast({ userId }) {
   const [refreshing, setRefreshing] = useState(false);
   const [showDeadlineModal, setShowDeadlineModal] = useState(false);
 
-  const fetchForecast = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await api.get(`/stress-forecast/latest/${userId}`);
-      if (res.data.hasData) {
-        setForecast(res.data);
-      } else {
-        setForecast(null);
-      }
-    } catch (err) {
-      console.error("Fetch forecast error:", err);
-      await generateForecast();
-    } finally {
-      setLoading(false);
-    }
-  }, [userId]);
-
-  const generateForecast = async () => {
+  const generateForecast = useCallback(async () => {
     setRefreshing(true);
     try {
       const res = await api.post(`/stress-forecast/generate/${userId}`);
@@ -63,7 +46,24 @@ function StressForecast({ userId }) {
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [userId]);
+
+  const fetchForecast = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get(`/stress-forecast/latest/${userId}`);
+      if (res.data.hasData) {
+        setForecast(res.data);
+      } else {
+        setForecast(null);
+      }
+    } catch (err) {
+      console.error("Fetch forecast error:", err);
+      await generateForecast();
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, generateForecast]);
 
 useEffect(() => {
   fetchForecast();

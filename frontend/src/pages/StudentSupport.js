@@ -42,7 +42,7 @@ function StudentSupport() {
   });
   const [counsellors, setCounsellors] = useState([]);
   const [activeTab, setActiveTab] = useState("resources");
-  const [userNickname, setUserNickname] = useState("");
+  const [setUserNickname] = useState("");
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -92,7 +92,7 @@ function StudentSupport() {
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [user_id]);
+  }, [user_id, setUserNickname]);
 
   const openExternalLink = (url) => { 
     if (url) window.open(url, "_blank", "noopener noreferrer"); 
