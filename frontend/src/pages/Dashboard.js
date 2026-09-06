@@ -1,5 +1,5 @@
 // pages/Dashboard.js
-import { useEffect, useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../utils/api";
@@ -55,13 +55,13 @@ function Dashboard() {
   const [journals, setJournals] = useState([]);
   const [journalTotal, setJournalTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedDateJournals, setSelectedDateJournals] = useState([]);
   const [showDateModal, setShowDateModal] = useState(false);
   const [chartView, setChartView] = useState("mood");
+  const [refreshing, setRefreshing] = useState(false);
 
   // ✅ PSS Reminder State
   const [pssReminder, setPssReminder] = useState(null);
@@ -109,7 +109,7 @@ function Dashboard() {
     { value: 5, label: "Great", emoji: "😄", color: "#16a34a" },
   ];
 
-  const fetchUserProfile = async () => {
+  const fetchUserProfile = useCallback(async () => {
     try {
       const res = await api.get(`/profile/${user_id}`);
       if (res.data.nickname) {
@@ -122,7 +122,7 @@ function Dashboard() {
     } catch (err) {
       console.log("Profile fetch error:", err);
     }
-  };
+  }, [user_id]);
 
   const fetchJournals = async () => {
     try {
@@ -190,7 +190,7 @@ function Dashboard() {
   };
 
   // ✅ Check PSS status (monthly reminder)
-  const checkPSSStatus = async () => {
+  const checkPSSStatus = useCallback(async () => {
     try {
       const res = await api.get(`/assessments/pss/should-retake/${user_id}`);
       setPssReminder(res.data);
@@ -198,9 +198,9 @@ function Dashboard() {
     } catch (err) {
       console.error("Check PSS status error:", err);
     }
-  };
+  }, [user_id]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [moodRes, sleepRes] = await Promise.all([
@@ -218,7 +218,7 @@ function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user_id]);
 
   const refreshData = async () => {
     setRefreshing(true);
@@ -228,11 +228,11 @@ function Dashboard() {
     showSuccessToast("Dashboard refreshed!");
   };
 
-  useEffect(() => {
-    fetchUserProfile();
-    fetchData();
-    checkPSSStatus();
-  }, []);
+useEffect(() => {
+  fetchUserProfile();
+  fetchData();
+  checkPSSStatus();
+}, [fetchUserProfile, fetchData, checkPSSStatus]);
 
   const updateMoodManually = async (moodValue) => {
     setIsUpdatingMood(true);
@@ -446,12 +446,6 @@ function Dashboard() {
 
   const formatMonthYear = () => {
     return currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  };
-
-  const logout = () => {
-    localStorage.clear();
-    navigate("/");
-    showInfoToast("You've been logged out. Take care! 💙");
   };
 
   const getGreeting = () => {

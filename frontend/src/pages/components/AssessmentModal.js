@@ -1,5 +1,5 @@
 // frontend/src/pages/components/AssessmentModal.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast, showWarningToast } from "./ToastNotification";
@@ -29,11 +29,7 @@ function AssessmentModal({ type, onClose, onComplete }) {
     { id: 10, text: "In the last month, how often have you felt difficulties were piling up so high that you could not overcome them?", scores: [0, 1, 2, 3, 4] }
   ];
 
-  useEffect(() => {
-    fetchQuestions();
-  }, [type]);
-
-  const fetchQuestions = async () => {
+  const fetchQuestions = useCallback(async () => {
     try {
       let endpoint;
       if (type === 'phq9') {
@@ -55,7 +51,11 @@ function AssessmentModal({ type, onClose, onComplete }) {
       showErrorToast("Failed to load assessment");
       onClose();
     }
-  };
+  }, [type]);
+
+  useEffect(() => {
+  fetchQuestions();
+}, [fetchQuestions]);
 
   const handleAnswer = (score) => {
     setAnswers({ ...answers, [currentQuestion]: score });
@@ -166,7 +166,6 @@ function AssessmentModal({ type, onClose, onComplete }) {
   if (result) {
     const severityColor = getSeverityColor(result.severity);
     const maxScore = result.maxScore || (type === 'phq9' ? 27 : type === 'gad7' ? 21 : 40);
-    const typeIcon = type === 'phq9' ? <Brain size={24} /> : type === 'gad7' ? <Heart size={24} /> : <Activity size={24} />;
 
     return (
       <div className="modal-overlay" onClick={resetAndClose}>

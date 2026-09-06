@@ -1,5 +1,5 @@
 // frontend/src/pages/components/CounsellorStressForecast.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import api from "../../utils/api";
 import { showErrorToast } from "./ToastNotification";
 import {
@@ -21,7 +21,7 @@ function CounsellorStressForecast({ studentId, counsellorId }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchForecast = async () => {
+  const fetchForecast = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get(`/counsellor/stress-forecast/${studentId}/${counsellorId}`);
@@ -39,13 +39,13 @@ function CounsellorStressForecast({ studentId, counsellorId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [studentId, counsellorId]);
 
   useEffect(() => {
     if (studentId) {
       fetchForecast();
     }
-  }, [studentId]);
+  }, [studentId, fetchForecast]);
 
   const getRiskColor = (score) => {
     if (score < 30) return "#22c55e";

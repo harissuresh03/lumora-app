@@ -25,10 +25,10 @@ import { motion, AnimatePresence } from "framer-motion";
 function Settings() {
   const navigate = useNavigate();
   const user_id = localStorage.getItem("user_id");
-  const [userNickname, setUserNickname] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [userNickname, setUserNickname] = useState("");
   
   // Report Issue State
   const [showReportModal, setShowReportModal] = useState(false);

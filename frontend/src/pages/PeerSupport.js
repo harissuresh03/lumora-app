@@ -123,13 +123,11 @@ function PeerSupport() {
   const [showComments, setShowComments] = useState({});
   const [commentText, setCommentText] = useState({});
   const [openDropdown, setOpenDropdown] = useState(null);
-  const [activeTab, setActiveTab] = useState("feed");
 
   // Moderation State
   const [moderationStatus, setModerationStatus] = useState(null);
   const [moderationScore, setModerationScore] = useState(0);
   const [moderationReason, setModerationReason] = useState("");
-  const [isModerating, setIsModerating] = useState(false);
   const [commentModeration, setCommentModeration] = useState({});
   const [commentModerationStatus, setCommentModerationStatus] = useState({});
   const [commentModerationReason, setCommentModerationReason] = useState({});
@@ -282,7 +280,6 @@ function PeerSupport() {
   const handleAddPost = async () => {
     if (!newPost.trim() || sending || isBlocked) return;
     
-    setIsModerating(true);
     setModerationStatus('checking');
     setModerationReason('Analyzing your post content...');
     setSending(true);
@@ -294,7 +291,6 @@ function PeerSupport() {
         showErrorToast(moderationResult.reason || 'Moderation service unavailable. Please try again.');
         setModerationStatus(null);
         setSending(false);
-        setIsModerating(false);
         return;
       }
       
@@ -309,14 +305,12 @@ function PeerSupport() {
         if (res.data.isBlocked) {
           setIsBlocked(true);
           setSending(false);
-          setIsModerating(false);
           showErrorToast('Your account has been blocked for multiple violations.');
           return;
         }
         
         showErrorToast(`Your post was not approved: ${moderationResult.reason}. Warning ${res.data.count}/3.`);
         setSending(false);
-        setIsModerating(false);
         
         setTimeout(() => {
           setModerationStatus(null);
@@ -330,7 +324,6 @@ function PeerSupport() {
         setShowCrisisAlert(true);
         showWarningToast('We noticed you might be going through a difficult time. Support is available.');
         setSending(false);
-        setIsModerating(false);
         
         setTimeout(() => {
           setModerationStatus(null);
@@ -374,7 +367,6 @@ function PeerSupport() {
       setModerationStatus(null);
     } finally {
       setSending(false);
-      setIsModerating(false);
     }
   };
 
@@ -969,7 +961,7 @@ function PeerSupport() {
       {/* Mobile Bottom Nav */}
       <div className="mobile-bottom-nav">
         <button className="mobile-nav-item" onClick={() => navigate("/dashboard")}><Home size={22} /></button>
-        <button className="mobile-nav-item active" onClick={() => setActiveTab("feed")}><MessageCircle size={22} /></button>
+        <button className="mobile-nav-item active" onClick={() => {}}><MessageCircle size={22} /></button>
         <button className="mobile-nav-item" onClick={() => navigate("/profile")}><User size={22} /></button>
       </div>
 

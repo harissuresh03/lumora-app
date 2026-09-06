@@ -1,5 +1,5 @@
 // frontend/src/pages/components/Recommendations.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   BookOpen, 
@@ -16,7 +16,7 @@ import {
   BarChart3
 } from "lucide-react";
 import api from "../../utils/api";
-import { showErrorToast, showSuccessToast } from "./ToastNotification";
+import { showErrorToast } from "./ToastNotification";
 import AssessmentHistoryGraph from "./AssessmentHistoryGraph";
 
 function Recommendations({ userId }) {
@@ -39,15 +39,8 @@ function Recommendations({ userId }) {
   // ✅ Single graph visibility
   const [showGraph, setShowGraph] = useState(false);
 
-  useEffect(() => {
-    if (userId) {
-      fetchRecommendations();
-      fetchAssessmentHistory();
-    }
-  }, [userId]);
-
   // Fetch assessment history
-  const fetchAssessmentHistory = async () => {
+  const fetchAssessmentHistory = useCallback(async () => {
     try {
       const res = await api.get(`/assessments/history/graph/${userId}`);
       
@@ -65,10 +58,10 @@ function Recommendations({ userId }) {
     } catch (err) {
       console.error("Fetch assessment history error:", err);
     }
-  };
+  }, [userId]);
 
   // Fetch recommendations
-  const fetchRecommendations = async () => {
+  const fetchRecommendations = useCallback(async () => {
     try {
       const res = await api.get(`/recommendations/${userId}`);
       
@@ -88,7 +81,14 @@ function Recommendations({ userId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+  if (userId) {
+    fetchRecommendations();
+    fetchAssessmentHistory();
+  }
+}, [userId, fetchRecommendations, fetchAssessmentHistory]);
 
   const handleOpenTip = (tip) => {
     setSelectedTip(tip);

@@ -1,5 +1,5 @@
 // frontend/src/pages/components/DeadlineModal.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast } from "./ToastNotification";
@@ -18,11 +18,7 @@ function DeadlineModal({ userId, onClose, onUpdate }) {
     difficulty: "medium"
   });
 
-  useEffect(() => {
-    fetchDeadlines();
-  }, []);
-
-  const fetchDeadlines = async () => {
+  const fetchDeadlines = useCallback(async () => {
     try {
       const res = await api.get(`/deadlines/${userId}`);
       setDeadlines(res.data);
@@ -32,7 +28,11 @@ function DeadlineModal({ userId, onClose, onUpdate }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+  fetchDeadlines();
+}, [fetchDeadlines]);
 
   const handleAddDeadline = async (e) => {
     e.preventDefault();

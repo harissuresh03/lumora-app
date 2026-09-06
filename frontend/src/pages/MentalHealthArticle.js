@@ -20,13 +20,13 @@ import {
 function MentalHealthArticle() {
   const navigate = useNavigate();
   const user_id = localStorage.getItem("user_id");
-  const [userNickname, setUserNickname] = useState("");
   const [articles, setArticles] = useState([]);
   const [onlineResources, setOnlineResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [showArticleModal, setShowArticleModal] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [userNickname, setUserNickname] = useState("");
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -77,12 +77,6 @@ function MentalHealthArticle() {
     setOnlineResources([]);
   }
 };
-
-  const logout = () => {
-    localStorage.clear();
-    navigate("/");
-    showSuccessToast("Logged out successfully. Take care! 💙");
-  };
 
   const openArticle = (article) => {
     setSelectedArticle(article);

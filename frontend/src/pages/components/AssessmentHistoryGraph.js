@@ -1,5 +1,5 @@
 // frontend/src/pages/components/AssessmentHistoryGraph.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Line,
@@ -22,13 +22,13 @@ function AssessmentHistoryGraph({ userId }) {
   const [selectedType, setSelectedType] = useState('phq9');
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (userId) {
-      fetchAssessmentHistory();
-    }
-  }, [userId]);
+ useEffect(() => {
+  if (userId) {
+    fetchAssessmentHistory();
+  }
+}, [userId, fetchAssessmentHistory]);
 
-  const fetchAssessmentHistory = async () => {
+  const fetchAssessmentHistory = useCallback(async () => {
     try {
       const res = await api.get(`/assessments/history/graph/${userId}`);
       
@@ -47,7 +47,7 @@ function AssessmentHistoryGraph({ userId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
   const getSeverityColor = (score, type) => {
     if (type === 'phq9') {

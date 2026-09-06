@@ -1,5 +1,5 @@
 // frontend/src/pages/Journal.js
-import { useEffect, useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../utils/api";
@@ -49,31 +49,21 @@ function Journal() {
     averageLength: 0
   });
 
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        const res = await api.get(`/profile/${user_id}`);
-        if (res.data.nickname) {
-          setUserNickname(res.data.nickname);
-        } else {
-          setUserNickname(res.data.name.split(" ")[0]);
-        }
-      } catch (err) {
-        console.log("Profile fetch error:", err);
+  // ---------- Callbacks ----------
+  const fetchUserProfile = useCallback(async () => {
+    try {
+      const res = await api.get(`/profile/${user_id}`);
+      if (res.data.nickname) {
+        setUserNickname(res.data.nickname);
+      } else {
+        setUserNickname(res.data.name.split(" ")[0]);
       }
-    };
-    fetchUserProfile();
-    fetchEntries();
-    fetchWeeklyPrompt();
-    fetchJournalStats();
-  }, []);
+    } catch (err) {
+      console.log("Profile fetch error:", err);
+    }
+  }, [user_id]);
 
-  // Filter entries when month/year changes or entries update
-  useEffect(() => {
-    filterEntries();
-  }, [entries, filterMonth, filterYear]);
-
-  const fetchEntries = () => {
+  const fetchEntries = useCallback(() => {
     api.get(`/journal/${user_id}`).then((res) => {
       setEntries(res.data);
       calculateStats(res.data);
@@ -85,10 +75,9 @@ function Journal() {
         setFilterYear(years[0]);
       }
     }).catch((err) => console.log(err));
-  };
+  }, [user_id, filterYear]);
 
-  // Filter entries by month and year
-  const filterEntries = () => {
+  const filterEntries = useCallback(() => {
     if (!entries.length) {
       setFilteredEntries([]);
       return;
@@ -102,9 +91,32 @@ function Journal() {
     });
     
     setFilteredEntries(filtered);
-  };
+  }, [entries, filterMonth, filterYear]);
 
-  // Get month name
+  const fetchJournalStats = useCallback(async () => {
+    try {
+      const res = await api.get(`/journal/stats/${user_id}`);
+      if (res.data) {
+        setStats(res.data);
+      }
+    } catch (err) {
+      console.log("Fetch stats error:", err);
+    }
+  }, [user_id]);
+
+  // ---------- Effects ----------
+  useEffect(() => {
+    fetchUserProfile();
+    fetchEntries();
+    fetchWeeklyPrompt();
+    fetchJournalStats();
+  }, [fetchUserProfile, fetchEntries, fetchJournalStats]); // fetchWeeklyPrompt is stable
+
+  useEffect(() => {
+    filterEntries();
+  }, [filterEntries]);
+
+  // ---------- Helper functions ----------
   const getMonthName = (month) => {
     return new Date(2024, month - 1).toLocaleString('default', { month: 'long' });
   };
@@ -156,17 +168,6 @@ function Journal() {
     }
   };
 
-  const fetchJournalStats = async () => {
-    try {
-      const res = await api.get(`/journal/stats/${user_id}`);
-      if (res.data) {
-        setStats(res.data);
-      }
-    } catch (err) {
-      console.log("Fetch stats error:", err);
-    }
-  };
-
   const addEntry = async () => {
     if (!text.trim()) return;
     
@@ -181,7 +182,6 @@ function Journal() {
       fetchEntries();
       showSuccessToast("Journal entry saved! ✨");
       
-      // Show crisis message if detected
       if (response.data.crisisDetected) {
         showWarningToast("We're here for you. 💙 Support is available.");
       }
@@ -257,12 +257,6 @@ function Journal() {
     return labels[mood] || "Unknown";
   };
 
-  const logout = () => {
-    localStorage.clear();
-    navigate("/");
-    showSuccessToast("Logged out successfully. Take care! 💙");
-  };
-
   const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-US', { 
       month: 'short', 
@@ -271,6 +265,7 @@ function Journal() {
     });
   };
 
+  // ---------- JSX ----------
   return (
     <Layout>
 
@@ -334,7 +329,6 @@ function Journal() {
             </select>
           </div>
           
-          {/* ✅ Export PDF Button - Now matches "Export CSV" style (primary variant) */}
           <ExportButton 
             type="journal" 
             userId={parseInt(user_id)} 

@@ -1,6 +1,5 @@
 // frontend/src/pages/components/StressForecast.js
-import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect, useCallback } from "react";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast } from "./ToastNotification";
 import {
@@ -24,7 +23,7 @@ function StressForecast({ userId }) {
   const [showDeadlineModal, setShowDeadlineModal] = useState(false);
   const [moodUsed, setMoodUsed] = useState(3);
 
-  const fetchForecast = async () => {
+  const fetchForecast = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get(`/stress-forecast/latest/${userId}`);
@@ -40,7 +39,7 @@ function StressForecast({ userId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
   const generateForecast = async () => {
     setRefreshing(true);
@@ -69,9 +68,9 @@ function StressForecast({ userId }) {
     }
   };
 
-  useEffect(() => {
-    fetchForecast();
-  }, [userId]);
+useEffect(() => {
+  fetchForecast();
+}, [fetchForecast]);
 
   const getRiskColor = (score) => {
     if (score < 30) return "#22c55e";

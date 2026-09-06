@@ -18,7 +18,6 @@ import { isAdmin, getUserRole } from "../../utils/roleAuth";
 function Sidebar({ sidebarOpen, setSidebarOpen, customMenuItems }) {
   const navigate = useNavigate();
   const adminUser = isAdmin();
-  const userRole = getUserRole();
 
   const logout = () => {
     localStorage.clear();

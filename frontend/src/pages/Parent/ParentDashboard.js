@@ -46,21 +46,17 @@ function ParentDashboard() {
   // ---------- Helper: robust stress score extraction ----------
   const getStressScore = (stressData) => {
     if (!stressData) return null;
-    // If it's already an object with current_score
     if (typeof stressData === 'object' && stressData.current_score !== undefined) {
       const score = parseFloat(stressData.current_score);
       return isNaN(score) ? null : score;
     }
-    // If it's a number
     if (typeof stressData === 'number') {
       return stressData;
     }
-    // If it's a string that looks like a number
     if (typeof stressData === 'string') {
       const parsed = parseFloat(stressData);
       return isNaN(parsed) ? null : parsed;
     }
-    // If it's a stringified JSON (e.g., '{"current_score":35}')
     if (typeof stressData === 'string' && stressData.startsWith('{')) {
       try {
         const obj = JSON.parse(stressData);
@@ -96,7 +92,7 @@ function ParentDashboard() {
     try {
       const res = await api.get("/parent/students");
       const studentsData = res.data || [];
-      console.log("Students API response:", studentsData); // debug
+      console.log("Students API response:", studentsData);
       setStudents(studentsData);
       if (studentsData.length > 0 && !selectedStudentId) {
         setSelectedStudentId(studentsData[0].id);
@@ -107,7 +103,7 @@ function ParentDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedStudentId]);
 
   const fetchStudentSummary = useCallback(async (studentId) => {
     if (!studentId) return;
@@ -115,10 +111,10 @@ function ParentDashboard() {
     setStudentData(null);
     try {
       const res = await api.get(`/parent/student/${studentId}/summary`);
-      console.log("Summary API response:", res.data); // debug
+      console.log("Summary API response:", res.data);
       setStudentData(res.data);
 
-      // ✅ Update the selected student's current_stress with the summary data
+      // Update the selected student's current_stress with the summary data
       if (res.data.current_stress) {
         setStudents(prev => prev.map(s => {
           if (s.id === studentId) {
@@ -139,7 +135,7 @@ function ParentDashboard() {
     } finally {
       setLoadingSummary(false);
     }
-  }, []);
+  }, [selectedStudentId]); // ✅ Added selectedStudentId to deps to satisfy linter
 
   useEffect(() => {
     fetchParentProfile();

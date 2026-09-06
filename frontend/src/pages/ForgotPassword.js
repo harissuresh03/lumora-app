@@ -6,11 +6,11 @@ import { showSuccessToast, showErrorToast } from "./components/ToastNotification
 
 function ForgotPassword() {
   const navigate = useNavigate();
+  const [userId, setUserId] = useState(null);
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [userId, setUserId] = useState(null);
 
   const [emailFocused, setEmailFocused] = useState(false);
 

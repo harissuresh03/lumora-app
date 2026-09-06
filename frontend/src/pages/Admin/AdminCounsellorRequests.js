@@ -1,5 +1,5 @@
 // frontend/src/pages/Admin/AdminCounsellorRequests.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast } from "../components/ToastNotification";
@@ -15,11 +15,7 @@ function AdminCounsellorRequests() {
   const [showModal, setShowModal] = useState(false);
   const [adminNotes, setAdminNotes] = useState("");
 
-  useEffect(() => {
-    fetchRequests();
-  }, [page, statusFilter]);
-
-  const fetchRequests = async () => {
+  const fetchRequests = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get("/admin/counsellor-requests", {
@@ -33,7 +29,11 @@ function AdminCounsellorRequests() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, statusFilter]); 
+
+  useEffect(() => {
+  fetchRequests();
+}, [fetchRequests]);
 
   const handleApprove = async (id) => {
     if (window.confirm("Are you sure you want to approve this counsellor registration?")) {

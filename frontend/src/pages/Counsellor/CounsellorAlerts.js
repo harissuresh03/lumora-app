@@ -1,5 +1,5 @@
 // frontend/src/pages/Counsellor/CounsellorAlerts.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import api from "../../utils/api";
@@ -13,11 +13,7 @@ function CounsellorAlerts() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("active");
 
-  useEffect(() => {
-    fetchAlerts();
-  }, [filter]);
-
-  const fetchAlerts = async () => {
+  const fetchAlerts = useCallback(async () => {
     try {
       const res = await api.get(`/counsellor/alerts/${counsellorId}`, {
         params: { resolved: filter === 'resolved' ? 'true' : undefined }
@@ -29,7 +25,11 @@ function CounsellorAlerts() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [counsellorId, filter]);
+
+  useEffect(() => {
+  fetchAlerts();
+}, [fetchAlerts]);
 
   const handleResolve = async (id) => {
     try {

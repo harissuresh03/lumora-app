@@ -1,5 +1,5 @@
 // frontend/src/pages/components/NotificationBell.js
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Bell, CheckCircle, CheckCheck, X } from "lucide-react";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast } from "./ToastNotification";
@@ -22,7 +22,25 @@ function NotificationBell({ userId }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  useEffect(() => {
+  const fetchUnreadNotifications = useCallback(async () => {
+    try {
+      const res = await api.get(`/notifications/unread/${userId}`);
+      setNotifications(res.data || []);
+    } catch (err) {
+      console.error("Fetch unread notifications error:", err);
+    }
+  }, [userId]);
+
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const res = await api.get(`/notifications/count/${userId}`);
+      setUnreadCount(res.data.count || 0);
+    } catch (err) {
+      console.error("Fetch unread count error:", err);
+    }
+  }, [userId]);
+
+    useEffect(() => {
     if (userId) {
       fetchUnreadNotifications();
       fetchUnreadCount();
@@ -36,25 +54,7 @@ function NotificationBell({ userId }) {
     }, 30000);
     
     return () => clearInterval(interval);
-  }, [userId]);
-
-  const fetchUnreadNotifications = async () => {
-    try {
-      const res = await api.get(`/notifications/unread/${userId}`);
-      setNotifications(res.data || []);
-    } catch (err) {
-      console.error("Fetch unread notifications error:", err);
-    }
-  };
-
-  const fetchUnreadCount = async () => {
-    try {
-      const res = await api.get(`/notifications/count/${userId}`);
-      setUnreadCount(res.data.count || 0);
-    } catch (err) {
-      console.error("Fetch unread count error:", err);
-    }
-  };
+  }, [userId, fetchUnreadNotifications, fetchUnreadCount]);
 
   const markAsRead = async (id, e) => {
     e.stopPropagation();

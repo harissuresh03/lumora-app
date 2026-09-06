@@ -94,25 +94,6 @@ function AdminResources() {
     setShowModal(true);
   };
 
-  const resourceSections = [
-    { 
-      key: 'onlineResources', 
-      title: 'Online Resources', 
-      icon: <Globe size={20} />, 
-      color: '#3b82f6',
-      type: 'online_resource',
-      fields: ['name', 'url', 'description']
-    },
-    { 
-      key: 'crisisResources', 
-      title: 'Crisis Resources', 
-      icon: <Phone size={20} />, 
-      color: '#ef4444',
-      type: 'crisis_resource',
-      fields: ['name', 'number', 'description', 'hours']
-    }
-  ];
-
   if (loading) {
     return (
       <div className="loading-container">

@@ -26,9 +26,9 @@ import {
 function StudentSupport() {
   const navigate = useNavigate();
   const user_id = localStorage.getItem("user_id");
-  const [userNickname, setUserNickname] = useState("");
   const [supportData, setSupportData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [userNickname, setUserNickname] = useState("");
   
   // Appointment state
   const [appointments, setAppointments] = useState([]);

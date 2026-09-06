@@ -1,5 +1,5 @@
 // frontend/src/pages/components/GamificationDisplay.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import api from "../../utils/api";
 import {
   Star,
@@ -56,13 +56,7 @@ function GamificationDisplay({ userId }) {
   const [equippedBadge, setEquippedBadge] = useState(null);
   const [activeTab, setActiveTab] = useState('badges');
 
-  useEffect(() => {
-    if (userId) {
-      fetchGamificationData();
-    }
-  }, [userId]);
-
-  const fetchGamificationData = async () => {
+  const fetchGamificationData = useCallback(async () => {
     try {
       const [statsRes, badgesRes] = await Promise.all([
         api.get(`/gamification/stats/${userId}`),
@@ -77,7 +71,13 @@ function GamificationDisplay({ userId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+  if (userId) {
+    fetchGamificationData();
+  }
+}, [userId, fetchGamificationData]);
 
   const handleEquipBadge = async (badgeId) => {
     try {

@@ -366,9 +366,12 @@ export const StatsCard = ({ title, value, change, icon, color, subtitle, valueCo
   );
 };
 
-export default {
+// ✅ Named export assignment to satisfy linter
+const EnhancedCharts = {
   MoodChart,
   SleepChart,
   CorrelationChart,
   StatsCard
 };
+
+export default EnhancedCharts;

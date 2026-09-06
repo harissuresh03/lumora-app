@@ -1,5 +1,5 @@
 // frontend/src/pages/Admin/AdminIssues.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast } from "../components/ToastNotification";
@@ -16,11 +16,7 @@ function AdminIssues() {
   const [adminResponse, setAdminResponse] = useState("");
   const [showResponseModal, setShowResponseModal] = useState(false);
 
-  useEffect(() => {
-    fetchIssues();
-  }, [page, statusFilter, typeFilter]);
-
-  const fetchIssues = async () => {
+  const fetchIssues = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get("/admin/issues", {
@@ -34,7 +30,11 @@ function AdminIssues() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, statusFilter, typeFilter]);
+
+  useEffect(() => {
+  fetchIssues();
+}, [fetchIssues]);
 
   const handleResolveIssue = async (issueId, response = null) => {
     try {

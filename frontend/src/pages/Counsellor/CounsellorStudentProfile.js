@@ -1,5 +1,5 @@
 // frontend/src/pages/Counsellor/CounsellorStudentProfile.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import api from "../../utils/api";
@@ -29,13 +29,7 @@ function CounsellorStudentProfile() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
 
-  useEffect(() => {
-    if (id) {
-      fetchStudentProfile();
-    }
-  }, [id]);
-
-  const fetchStudentProfile = async () => {
+  const fetchStudentProfile = useCallback(async () => {
     try {
       const res = await api.get(`/counsellor/student/${id}/${counsellorId}`);
       setProfile(res.data);
@@ -51,7 +45,13 @@ function CounsellorStudentProfile() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, counsellorId, navigate]);
+
+  useEffect(() => {
+  if (id) {
+    fetchStudentProfile();
+  }
+}, [id, fetchStudentProfile]);
 
   const generateWellnessReport = async () => {
     setGenerating(true);

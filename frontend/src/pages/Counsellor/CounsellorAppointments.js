@@ -1,5 +1,5 @@
 // frontend/src/pages/Counsellor/CounsellorAppointments.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast } from "../components/ToastNotification";
@@ -23,16 +23,7 @@ function CounsellorAppointments() {
     notes: ""
   });
 
-  useEffect(() => {
-    fetchAppointments();
-    fetchStudents();
-  }, []);
-
-  useEffect(() => {
-    fetchAppointments();
-  }, [statusFilter]);
-
-  const fetchAppointments = async () => {
+  const fetchAppointments = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get(`/counsellor/appointments/${counsellorId}`, {
@@ -45,9 +36,9 @@ function CounsellorAppointments() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [counsellorId, statusFilter]);
 
-  const fetchStudents = async () => {
+  const fetchStudents = useCallback(async () => {
     try {
       const res = await api.get(`/counsellor/students/${counsellorId}`, {
         params: { limit: 100 }
@@ -56,7 +47,17 @@ function CounsellorAppointments() {
     } catch (err) {
       console.error("Fetch students error:", err);
     }
-  };
+  }, [counsellorId]);
+  
+      useEffect(() => {
+      fetchAppointments();
+      fetchStudents();
+    }, [fetchAppointments, fetchStudents]);
+
+    // Second useEffect
+    useEffect(() => {
+      fetchAppointments();
+    }, [fetchAppointments]);
 
   const handleCreateAppointment = async (e) => {
     e.preventDefault();

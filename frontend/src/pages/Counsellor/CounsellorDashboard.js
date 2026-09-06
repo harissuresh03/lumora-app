@@ -1,5 +1,5 @@
 // frontend/src/pages/Counsellor/CounsellorDashboard.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   BarChart,
@@ -35,7 +35,7 @@ function CounsellorDashboard() {
   const [error, setError] = useState(null);
   const counsellorId = localStorage.getItem("user_id");
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const res = await api.get(`/counsellor/stats/${counsellorId}`);
       console.log("Stats response:", res.data);
@@ -50,25 +50,25 @@ function CounsellorDashboard() {
       showErrorToast("Failed to load dashboard data");
       setError("Failed to load data");
     }
-  };
+  }, [counsellorId]);
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
       const res = await api.get(`/counsellor/analytics/${counsellorId}`);
       setAnalytics(res.data);
     } catch (err) {
       console.error("Fetch analytics error:", err);
     }
-  };
+  }, [counsellorId]);
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await Promise.all([fetchStats(), fetchAnalytics()]);
-      setLoading(false);
-    };
-    loadData();
-  }, []);
+ useEffect(() => {
+  const loadData = async () => {
+    setLoading(true);
+    await Promise.all([fetchStats(), fetchAnalytics()]);
+    setLoading(false);
+  };
+  loadData();
+}, [fetchStats, fetchAnalytics]);
 
   const moodLabels = ['Terrible', 'Sad', 'Okay', 'Good', 'Great'];
   const moodColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#16a34a'];

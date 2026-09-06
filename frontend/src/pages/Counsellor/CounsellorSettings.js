@@ -1,5 +1,5 @@
 // frontend/src/pages/Counsellor/CounsellorSettings.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import api from "../../utils/api";
@@ -23,12 +23,12 @@ import { AnimatePresence } from "framer-motion";
 function CounsellorSettings() {
   const navigate = useNavigate();
   const user_id = localStorage.getItem("user_id");
-  const [userNickname, setUserNickname] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
-  const [isDeleting, setIsDeleting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [userNickname, setUserNickname] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Theme
   const { theme, fontSize, setTheme, setFontSize, getFontSizeInPx } = useTheme();
@@ -49,12 +49,7 @@ function CounsellorSettings() {
   const [universities, setUniversities] = useState([]);
   const [loadingUniversities, setLoadingUniversities] = useState(true);
 
-  useEffect(() => {
-    fetchUserProfile();
-    fetchUniversities();
-  }, []);
-
-  const fetchUserProfile = async () => {
+  const fetchUserProfile = useCallback(async () => {
     try {
       const res = await api.get(`/profile/${user_id}`);
       setProfile({
@@ -72,7 +67,12 @@ function CounsellorSettings() {
     } catch (err) {
       console.log("Profile fetch error:", err);
     }
-  };
+  }, [user_id]);
+
+  useEffect(() => {
+  fetchUserProfile();
+  fetchUniversities();
+}, [fetchUserProfile]);
 
   const fetchUniversities = async () => {
     try {
@@ -141,12 +141,6 @@ function CounsellorSettings() {
     } catch (err) {
       showErrorToast("Failed to delete account");
     }
-  };
-
-  const logout = () => {
-    localStorage.clear();
-    navigate("/");
-    showSuccessToast("Logged out successfully. Take care! 💙");
   };
 
   return (

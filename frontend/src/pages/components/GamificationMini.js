@@ -1,5 +1,5 @@
 // frontend/src/pages/components/GamificationMini.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../utils/api";
 import {
@@ -23,13 +23,7 @@ function GamificationMini({ userId }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (userId) {
-      fetchGamificationData();
-    }
-  }, [userId]);
-
-  const fetchGamificationData = async () => {
+  const fetchGamificationData = useCallback(async () => {
     try {
       const res = await api.get(`/gamification/stats/${userId}`);
       setStats(res.data);
@@ -38,7 +32,13 @@ function GamificationMini({ userId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+  if (userId) {
+    fetchGamificationData();
+  }
+}, [userId, fetchGamificationData]);
 
   const getLevelTitle = (level) => {
     const titles = {

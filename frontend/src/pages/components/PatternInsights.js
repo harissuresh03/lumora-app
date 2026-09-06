@@ -1,5 +1,5 @@
 // frontend/src/pages/components/PatternInsights.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import api from "../../utils/api";
 import { Lightbulb, TrendingUp, TrendingDown, Moon, Calendar, Brain, Sparkles } from "lucide-react";
@@ -11,11 +11,7 @@ function PatternInsights() {
   const [loading, setLoading] = useState(true);
   const user_id = localStorage.getItem("user_id");
 
-  useEffect(() => {
-    fetchPatterns();
-  }, []);
-
-  const fetchPatterns = async () => {
+  const fetchPatterns = useCallback(async () => {
     try {
       const res = await api.get(`/analytics/patterns/${user_id}`);
       setInsights(res.data.insights);
@@ -26,7 +22,11 @@ function PatternInsights() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user_id]);
+
+  useEffect(() => {
+  fetchPatterns();
+}, [fetchPatterns]);
 
   const getInsightIcon = (type) => {
     switch(type) {
