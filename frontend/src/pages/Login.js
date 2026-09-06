@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
-import { showSuccessToast, showErrorToast, showInfoToast } from "./components/ToastNotification";
+import { showInfoToast } from "./components/ToastNotification";
 
 function Login() {
   const navigate = useNavigate();

@@ -5,14 +5,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import api from "../utils/api";
 import Layout from "./components/Layout";
 import ExportButton from "./components/ExportButton";
-import { showSuccessToast, showErrorToast, showInfoToast } from "./components/ToastNotification";
+import { showSuccessToast, showErrorToast } from "./components/ToastNotification";
 import { 
   Phone, 
   Mail, 
   Globe, 
   Heart, 
   ArrowLeft, 
-  User, 
   MessageCircle, 
   Shield, 
   Building, 
@@ -21,8 +20,7 @@ import {
   Calendar,
   BookOpen,
   Plus,
-  FileSpreadsheet,
-  AlertCircle
+  FileSpreadsheet
 } from "lucide-react";
 
 function StudentSupport() {

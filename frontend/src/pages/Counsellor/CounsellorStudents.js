@@ -7,15 +7,12 @@ import { showSuccessToast, showErrorToast } from "../components/ToastNotificatio
 import ExportButton from "../components/ExportButton";
 import { 
   Search, 
-  UserCheck, 
-  UserX, 
   AlertTriangle, 
   Mail, 
   RefreshCw,
   Users,
   Eye,
-  FileSpreadsheet,
-  Filter
+  FileSpreadsheet
 } from "lucide-react";
 
 function CounsellorStudents() {

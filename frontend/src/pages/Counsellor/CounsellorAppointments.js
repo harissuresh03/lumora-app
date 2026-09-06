@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast } from "../components/ToastNotification";
 import ExportButton from "../components/ExportButton";
-import { Calendar, Clock, User, CheckCircle, XCircle, Plus, FileSpreadsheet, Trash2 } from "lucide-react";
+import { Calendar, Clock, CheckCircle, XCircle, Plus, FileSpreadsheet, Trash2 } from "lucide-react";
 
 function CounsellorAppointments() {
   const counsellorId = localStorage.getItem("user_id");

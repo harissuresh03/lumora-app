@@ -1,6 +1,6 @@
 // frontend/src/pages/components/ToastNotification.js
 import { Toaster, toast } from 'react-hot-toast';
-import { CheckCircle, XCircle, Info, AlertTriangle, Heart } from 'lucide-react';
+import { AlertTriangle, Heart } from 'lucide-react';
 
 // Toast notification component wrapper
 export const ToastProvider = () => {

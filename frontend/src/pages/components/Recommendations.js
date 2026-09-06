@@ -6,18 +6,13 @@ import {
   Lightbulb, 
   Activity, 
   Sparkles, 
-  Clock, 
   ChevronRight,
-  AlertTriangle,
   Heart,
   Phone,
-  Calendar,
   Brain,
   TrendingUp,
   Award,
   RefreshCw,
-  CheckCircle,
-  AlertCircle,
   BarChart3
 } from "lucide-react";
 import api from "../../utils/api";

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast } from "./ToastNotification";
-import { X, Plus, Trash2, Edit, CheckCircle } from "lucide-react";
+import { Plus, Trash2, Edit } from "lucide-react";
 
 function DeadlineModal({ userId, onClose, onUpdate }) {
   const [deadlines, setDeadlines] = useState([]);

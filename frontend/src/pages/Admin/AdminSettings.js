@@ -17,8 +17,7 @@ import {
   Sun,
   Moon,
   Monitor,
-  Eye as EyeIcon,
-  Shield
+  Eye as EyeIcon
 } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 

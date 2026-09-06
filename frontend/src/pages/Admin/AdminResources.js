@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast } from "../components/ToastNotification";
-import { Plus, Edit, Trash2, Globe, Phone, Save, X } from "lucide-react";
+import { Plus, Edit, Trash2, Globe, Phone } from "lucide-react";
 
 function AdminResources() {
   const [resources, setResources] = useState({

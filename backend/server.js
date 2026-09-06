@@ -1,18 +1,55 @@
+
 // backend/server.js
-require('dotenv').config();
+
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 const checkMaintenance = require("./middleware/checkMaintenance");
 
 const app = express();
 
-app.use(cors());
+// ==========================================
+// CORS CONFIGURATION
+// ==========================================
+
+const allowedOrigins = [
+  "http://localhost:3000",
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (Postman, mobile apps, etc.)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true
+  })
+);
+
+// ==========================================
+// MIDDLEWARE
+// ==========================================
+
 app.use(express.json());
 
-// Apply maintenance check to all routes (except admin and login)
+// Apply maintenance check to all routes
+// (except routes handled by the middleware itself)
 app.use(checkMaintenance);
 
+// ==========================================
 // ROUTES
+// ==========================================
+
 const authRoutes = require("./routes/auth");
 const moodRoutes = require("./routes/mood");
 const journalRoutes = require("./routes/journal");
@@ -33,13 +70,17 @@ const adminNotificationRoutes = require("./routes/adminNotifications");
 const aiModerationRoutes = require("./routes/aiModeration");
 const studentExportRoutes = require("./routes/studentExport");
 const counsellorExportRoutes = require("./routes/counsellorExport");
-const publicResourcesRoutes = require("./routes/publicResources"); 
+const publicResourcesRoutes = require("./routes/publicResources");
 const deadlinesRoutes = require("./routes/deadlines");
 const stressForecastRoutes = require("./routes/stressForecast");
 const recommendationsRoutes = require("./routes/recommendations");
 const gamificationRoutes = require("./routes/gamification");
 const parentRoutes = require("./routes/parent");
 const verificationRoutes = require("./routes/verification");
+
+// ==========================================
+// API ROUTES
+// ==========================================
 
 app.use("/api/auth", authRoutes);
 app.use("/api/mood", moodRoutes);
@@ -62,17 +103,39 @@ app.use("/api/admin-notifications", adminNotificationRoutes);
 app.use("/api/ai", aiModerationRoutes);
 app.use("/api/student-export", studentExportRoutes);
 app.use("/api/counsellor-export", counsellorExportRoutes);
-app.use("/api/public", publicResourcesRoutes); 
+app.use("/api/public", publicResourcesRoutes);
 app.use("/api/deadlines", deadlinesRoutes);
 app.use("/api/stress-forecast", stressForecastRoutes);
 app.use("/api/recommendations", recommendationsRoutes);
 app.use("/api/gamification", gamificationRoutes);
 app.use("/api/parent", parentRoutes);
 
-app.get("/", (req, res) => {
-  res.send("API running 🌿");
+// ==========================================
+// HEALTH CHECK
+// ==========================================
+
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "OK",
+    message: "Lumora backend is running 🌿"
+  });
 });
 
-app.listen(5000, () => {
-  console.log("Server running on port 5000 🌿");
+// ==========================================
+// ROOT ROUTE
+// ==========================================
+
+app.get("/", (req, res) => {
+  res.send("Lumora API running 🌿");
 });
+
+// ==========================================
+// START SERVER
+// ==========================================
+
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => {
+  console.log(`Lumora server running on port ${PORT} 🌿`);
+});
+

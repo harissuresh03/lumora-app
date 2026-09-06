@@ -23,7 +23,6 @@ import {
   CheckCircle2,
   Check,
   X,
-  // New icons for badges (matching the SQL updates)
   Sun,
   Brain,
   Heart,

@@ -1,6 +1,6 @@
 // frontend/src/pages/components/ExportButton.js
 import React, { useState } from "react";
-import { Download, FileDown, FileText, Calendar, Moon, Activity, FileSpreadsheet } from "lucide-react";
+import { Download, FileText, Calendar, Moon, Activity, FileSpreadsheet } from "lucide-react";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast } from "./ToastNotification";
 

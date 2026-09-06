@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast } from "../components/ToastNotification";
-import { AlertTriangle, Eye, CheckCircle, Clock, User } from "lucide-react";
+import { Eye, CheckCircle, Clock, User } from "lucide-react";
 
 function CounsellorAlerts() {
   const navigate = useNavigate();

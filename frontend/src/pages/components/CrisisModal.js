@@ -1,7 +1,7 @@
 // frontend/src/pages/components/CrisisModal.js
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Phone, X, Shield, Clock, AlertTriangle, Heart } from "lucide-react";
+import { Phone, X, Shield, Clock, Heart } from "lucide-react";
 import api from "../../utils/api";
 import { showErrorToast } from "./ToastNotification";
 

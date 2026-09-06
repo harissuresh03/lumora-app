@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import api from "../../utils/api";
 import { showSuccessToast, showErrorToast } from "../components/ToastNotification";
-import { CheckCircle, Trash2, MessageSquare, RefreshCw, Eye } from "lucide-react";
+import { CheckCircle, Trash2, MessageSquare, RefreshCw } from "lucide-react";
 
 function AdminIssues() {
   const [issues, setIssues] = useState([]);

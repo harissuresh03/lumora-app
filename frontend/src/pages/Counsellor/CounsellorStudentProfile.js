@@ -7,10 +7,8 @@ import { showSuccessToast, showErrorToast } from "../components/ToastNotificatio
 import CounsellorStressForecast from "../components/CounsellorStressForecast";
 import {
   ArrowLeft,
-  User,
   Mail,
   Calendar,
-  Activity,
   Moon,
   Smile,
   BookOpen,

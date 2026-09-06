@@ -32,7 +32,6 @@ import {
   ThumbsUp,
   Trash2,
   Award,
-  // Badge icons (matching SQL update)
   Sun,
   Moon,
   BookOpen,
@@ -45,7 +44,6 @@ import {
   Trophy,
   Star,
   Smile,
-  // Level icons
   Flower2,
   TreePine,
   Rainbow,

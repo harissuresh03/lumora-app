@@ -4,24 +4,21 @@ import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import Layout from "./components/Layout";
 import { useTheme } from "./components/ThemeProvider";
-import { showSuccessToast, showErrorToast, showWarningToast } from "./components/ToastNotification";
+import { showSuccessToast, showErrorToast } from "./components/ToastNotification";
 import {
   User,
-  LogOut,
   ArrowLeft,
   Moon,
   Sun,
   Contrast,
   Eye,
-  Activity,
   Trash2,
   AlertTriangle,
   Mail,
   Shield,
   Save,
   EyeOff,
-  Lock,
-  Type
+  Lock
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
