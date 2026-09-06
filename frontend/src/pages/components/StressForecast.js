@@ -28,7 +28,6 @@ function StressForecast({ userId }) {
       const res = await api.get(`/stress-forecast/latest/${userId}`);
       if (res.data.hasData) {
         setForecast(res.data);
-        setMoodUsed(res.data.mood_used || 3);
       } else {
         setForecast(null);
       }
@@ -53,7 +52,6 @@ function StressForecast({ userId }) {
           tip: res.data.tip,
           summary_sentence: res.data.summary_sentence
         });
-        setMoodUsed(res.data.mood_used || 3);
         showSuccessToast("Academic Stress forecast updated!");
       } else {
         showSuccessToast(res.data.message || "Add some deadlines to get a forecast");

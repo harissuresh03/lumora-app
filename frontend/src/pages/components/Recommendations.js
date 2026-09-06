@@ -73,7 +73,7 @@ function Recommendations({ userId }) {
       setHasEnoughData(res.data.hasEnoughData);
       setMessage(res.data.message || "");
       setRecommendations(res.data.recommendations || []);
-      setAssessmentRec(res.data.assessmentRecommendation || null);
+      //setAssessmentRec(res.data.assessmentRecommendation || null);
     } catch (err) {
       console.error("Fetch recommendations error:", err);
       showErrorToast("Failed to load recommendations");

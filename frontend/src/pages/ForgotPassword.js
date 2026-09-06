@@ -31,7 +31,7 @@ function ForgotPassword() {
       showSuccessToast("Check your email for the reset code");
 
       if (res.data.userId) {
-        setUserId(res.data.userId);
+        //setUserId(res.data.userId);
         setTimeout(() => {
           navigate(`/verify-reset-code?email=${encodeURIComponent(email)}&userId=${res.data.userId}`);
         }, 2000);

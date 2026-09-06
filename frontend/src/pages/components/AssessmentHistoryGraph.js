@@ -20,6 +20,7 @@ function AssessmentHistoryGraph({ userId }) {
   const [data, setData] = useState({ phq9: [], gad7: [], pss: [] });
   const [loading, setLoading] = useState(true);
   const [selectedType, setSelectedType] = useState('phq9');
+  const [error, setError] = useState(null);
 
   const fetchAssessmentHistory = useCallback(async () => {
     try {

@@ -61,6 +61,7 @@ function Dashboard() {
   const [selectedDateJournals, setSelectedDateJournals] = useState([]);
   const [showDateModal, setShowDateModal] = useState(false);
   const [chartView, setChartView] = useState("mood");
+  const [refreshing, setRefreshing] = useState(false);
 
   // ✅ PSS Reminder State
   const [pssReminder, setPssReminder] = useState(null);

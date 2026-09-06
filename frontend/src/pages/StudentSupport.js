@@ -42,6 +42,7 @@ function StudentSupport() {
   });
   const [counsellors, setCounsellors] = useState([]);
   const [activeTab, setActiveTab] = useState("resources");
+  const [userNickname, setUserNickname] = useState("");
 
   useEffect(() => {
     const fetchUserProfile = async () => {
